@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>카드 결투</title>
+<style>
+:root{
+  --felt:#14121f; --felt2:#1c1930; --gold:#c9a227; --gold-d:#8a6f1c;
+  --parch:#ede3c8; --parch-d:#c9bd9c; --ink:#2a2417;
+  --ember:#b23a2e; --teal:#3d8c86; --teal-l:#6fc2ba;
+  --hp:#8a2e2e; --font-d:'Cormorant Garamond',Georgia,serif; --font-u:system-ui,sans-serif;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  box-sizing:border-box;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{
+  background:radial-gradient(ellipse at center, var(--felt2), var(--felt) 70%);
+  font-family:var(--font-u); color:var(--parch); overflow-x:hidden;
+  display:flex; flex-direction:row; min-height:100%;
+}
+.main{flex:1; display:flex; flex-direction:column; min-width:0;}
+h1{font-family:var(--font-d); font-weight:600; font-size:1.4rem; margin:.6rem 1rem; color:var(--gold); letter-spacing:.02em;}
+.board{flex:1; display:flex; flex-direction:column; justify-content:space-between; padding:.5rem 1rem; gap:.4rem;}
+.row{display:flex; align-items:center; gap:.6rem;}
+.hero{
+  display:flex; align-items:center; gap:.5rem; padding:.4rem .7rem;
+  background:linear-gradient(180deg,#241f38,#181428); border:1px solid var(--gold-d); border-radius:6px;
+  min-width:140px;
+}
+.hero .name{font-family:var(--font-d); font-size:1.05rem; color:var(--gold);}
+.hp{color:var(--hp); font-weight:700;}
+.mana{color:var(--teal-l); font-weight:700; font-size:.85rem;}
+.pile{font-size:.68rem; color:var(--parch-d);}
+.crystals{display:flex; gap:3px; flex-wrap:wrap; max-width:120px;}
+.crystal{width:10px; height:10px; background:var(--teal); border-radius:2px; box-shadow:0 0 3px var(--teal-l);}
+.crystal.empty{background:#2a2a3a;}
+.zone{
+  flex:1; min-height:110px; display:flex; gap:.5rem; align-items:center; justify-content:center;
+  border-top:1px solid rgba(201,162,39,.15); border-bottom:1px solid rgba(201,162,39,.15);
+  padding:.4rem; flex-wrap:wrap;
+}
+.card{
+  width:92px; height:128px; background:linear-gradient(160deg,var(--parch),var(--parch-d));
+  border:2px solid var(--ink); border-radius:8px; color:var(--ink); position:relative;
+  display:flex; flex-direction:column; justify-content:space-between; padding:.3rem;
+  cursor:pointer; transition:transform .12s ease, box-shadow .12s ease, opacity .3s ease; user-select:none; flex-shrink:0;
+}
+.card:hover{transform:translateY(-6px); box-shadow:0 6px 14px rgba(0,0,0,.5);}
+.card.selected{outline:3px solid var(--teal-l); transform:translateY(-8px);}
+.card.attackable{outline:2px dashed var(--ember);}
+.card.sick::after{content:"휴식"; position:absolute; bottom:24px; right:4px; font-size:.55rem; color:#7a6f4d; font-weight:700;}
+.card.dead{opacity:0; transform:scale(.3); pointer-events:none;}
+.card .cname{font-family:var(--font-d); font-weight:700; font-size:.76rem; line-height:1.05; text-align:center;}
+.card .effect{font-size:.55rem; line-height:1.1; text-align:center; color:#5a4f30; min-height:1.6em;}
+.cost{
+  position:absolute; top:-8px; left:-8px; width:22px; height:22px; border-radius:50%;
+  background:var(--teal); color:#fff; font-weight:700; font-size:.75rem;
+  display:flex; align-items:center; justify-content:center; border:2px solid var(--felt);
+}
+.stats{display:flex; justify-content:space-between; font-weight:700; font-size:.85rem;}
+.atk{color:#7a3a10;} .life{color:var(--hp);}
+.tag{display:inline-block; font-size:.5rem; font-weight:700; padding:0 3px; border-radius:3px; margin:0 1px;}
+.tag.taunt{background:#5a3d1a; color:#f0c869;}
+.tag.shield{background:#1a4a5a; color:#8fd8f0;}
+.tag.charge{background:#6a2a1a; color:#ffb899;}
+.tag.revive{background:#5a2a5a; color:#f0b8f0;}
+.card.taunt{border-color:var(--gold);}
+.card.spell{background:linear-gradient(160deg,#e9e0fa,#c6b4ea); border-color:#4a2d7a;}
+.card.spell .effect{color:#3d2a66;}
+.stats.spelltype{justify-content:center; font-size:.62rem; color:#4a2d7a; letter-spacing:.15em;}
+#spellCast{position:fixed; inset:0; z-index:70; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.1rem;
+  pointer-events:none; background:rgba(8,6,20,.55); animation:spellFade 2s ease both;}
+#spellCast .card{transform:scale(2.1); cursor:default; box-shadow:0 0 28px rgba(160,120,255,.75); animation:spellPop .35s ease-out both;}
+#spellCast .cap{margin-top:3.2rem; color:#efe6ff; font-family:var(--font-d); font-size:1.05rem; text-shadow:0 2px 8px #000; text-align:center;}
+@keyframes spellFade{0%{opacity:0} 10%{opacity:1} 85%{opacity:1} 100%{opacity:0}}
+@keyframes spellPop{0%{transform:scale(1.2); opacity:0} 100%{transform:scale(2.1); opacity:1}}
+.card.shielded{box-shadow:0 0 8px var(--teal-l);}
+.card.targetable{outline:2px dashed var(--gold); box-shadow:0 0 10px rgba(201,162,39,.6); cursor:pointer;}
+.hero.targetable{outline:2px dashed var(--gold); box-shadow:0 0 10px rgba(201,162,39,.6); cursor:pointer;}
+.hand{display:flex; gap:.5rem; justify-content:center; padding:.6rem 0 calc(.6rem + env(safe-area-inset-bottom,0px)); min-height:130px;}
+.hand .card.unaffordable{filter:grayscale(.7) brightness(.7); cursor:not-allowed;}
+.controls{display:flex; justify-content:center; gap:.6rem; padding:.4rem;}
+button.end-turn{
+  background:var(--gold); color:var(--ink); border:none; padding:.55rem 1.4rem; border-radius:5px;
+  font-weight:700; font-size:.95rem; cursor:pointer; font-family:var(--font-u);
+}
+button.end-turn:disabled{opacity:.4; cursor:not-allowed;}
+#logPanel{
+  width:190px; flex-shrink:0; background:rgba(0,0,0,.35); border-left:1px solid rgba(201,162,39,.25);
+  padding:.6rem .5rem calc(.6rem + env(safe-area-inset-bottom,0px));
+  padding-top:calc(.6rem + env(safe-area-inset-top,0px));
+  display:flex; flex-direction:column;
+}
+#logPanel h3{font-family:var(--font-d); font-size:.85rem; color:var(--gold); margin:0 0 .4rem .2rem; font-weight:600;}
+#logList{flex:1; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:.3rem;}
+#logList div{font-size:.72rem; line-height:1.3; color:var(--parch-d); border-bottom:1px solid rgba(255,255,255,.06); padding-bottom:.25rem;}
+#logList div:first-child{color:var(--parch);}
+@media (max-width:640px){
+  body{flex-direction:column;}
+  #logPanel{width:100%; height:90px; border-left:none; border-top:1px solid rgba(201,162,39,.25);}
+  #logList{flex-direction:column-reverse;}
+}
+#overlay{
+  position:fixed; inset:0; background:rgba(10,8,18,.9); display:none; align-items:center; justify-content:center;
+  flex-direction:column; gap:1rem; z-index:10;
+}
+#overlay.show{display:flex;}
+#overlay h2{font-family:var(--font-d); font-size:2.2rem; color:var(--gold);}
+.label{font-size:.7rem; color:var(--parch-d); text-align:center;}
+#arrowSvg{position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:15; display:none;}
+.card[data-attacking]{position:relative; z-index:20;}
+.float{position:fixed; z-index:50; font-weight:800; font-size:1.3rem; pointer-events:none; transform:translate(-50%,-50%);
+  text-shadow:0 1px 3px #000; animation:floatUp .9s ease-out forwards;}
+.float.dmg{color:#ff6b5b;} .float.heal{color:#7be07b;} .float.buff{color:#f0c869;} .float.shield{color:#8fd8f0;}
+@keyframes floatUp{from{opacity:1; margin-top:0;} to{opacity:0; margin-top:-46px;}}
+.badge{font-family:var(--font-u); font-size:.7rem; font-weight:600; color:var(--teal-l); border:1px solid var(--teal); border-radius:999px; padding:.1rem .55rem; margin-left:.5rem; vertical-align:middle;}
+/* ---- 시작 메뉴 ---- */
+#menu{position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at center, var(--felt2), var(--felt) 70%); padding:1rem;}
+#menu.hidden{display:none;}
+.screen{display:none; flex-direction:column; align-items:center; gap:.9rem; width:100%; max-width:360px; text-align:center;}
+.screen.show{display:flex;}
+.screen h2{font-family:var(--font-d); font-size:2.4rem; font-weight:600; color:var(--gold); margin:0 0 .4rem; letter-spacing:.02em;}
+.screen h3{font-family:var(--font-d); font-size:1.5rem; font-weight:600; color:var(--gold); margin:0 0 .4rem;}
+.screen p.sub{margin:0 0 .4rem; font-size:.8rem; color:var(--parch-d);}
+.menu-btn{width:100%; background:linear-gradient(180deg,#2a2444,#1c1830); color:var(--parch); border:1px solid var(--gold-d);
+  border-radius:8px; padding:.8rem 1rem; font-size:1rem; font-weight:700; font-family:var(--font-u); cursor:pointer; text-align:left;
+  transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;}
+.menu-btn:hover:not(:disabled){transform:translateY(-2px); border-color:var(--gold); box-shadow:0 4px 12px rgba(0,0,0,.45);}
+.menu-btn .desc{display:block; margin-top:.2rem; font-size:.74rem; font-weight:400; color:var(--parch-d);}
+.menu-btn.primary{background:var(--gold); color:var(--ink); text-align:center; font-size:1.1rem; border:none;}
+.menu-btn.primary:hover:not(:disabled){box-shadow:0 4px 14px rgba(201,162,39,.45);}
+.menu-btn.back{background:transparent; text-align:center; font-weight:600; font-size:.88rem; border-color:rgba(201,162,39,.35); color:var(--parch-d);}
+.menu-btn:disabled{opacity:.45; cursor:not-allowed;}
+.menu-btn .soon{float:right; font-size:.68rem; font-weight:600; color:var(--parch-d); border:1px solid var(--parch-d); border-radius:999px; padding:0 .45rem;}
+/* ---- 덱 보기 ---- */
+button.end-turn.sub{background:transparent; color:var(--gold); border:1px solid var(--gold-d);}
+button.end-turn.sub.armed{background:var(--ember); color:#fff; border-color:var(--ember);}
+#deckModal{position:fixed; inset:0; z-index:25; background:rgba(10,8,18,.88); display:none; align-items:center; justify-content:center; padding:1rem;}
+#deckModal.show{display:flex;}
+.deck-panel{background:linear-gradient(180deg,#241f38,#181428); border:1px solid var(--gold-d); border-radius:10px;
+  width:min(860px,100%); max-height:88vh; display:flex; flex-direction:column; padding:1rem;}
+.deck-head{display:flex; justify-content:space-between; align-items:center; gap:1rem;}
+.deck-head h3{font-family:var(--font-d); color:var(--gold); margin:0; font-size:1.3rem; font-weight:600;}
+.deck-panel p.note{margin:.3rem 0 .6rem; font-size:.74rem; color:var(--parch-d);}
+.deck-grid{display:flex; flex-wrap:wrap; gap:.9rem .7rem; justify-content:center; overflow-y:auto; padding:.7rem .4rem;}
+.deck-grid .card{cursor:default;}
+.deck-grid .card.drawn{filter:grayscale(.85) brightness(.55);}
+.copies{position:absolute; top:-8px; right:-8px; min-width:30px; height:22px; padding:0 5px; border-radius:11px; background:var(--gold); color:var(--ink);
+  font-weight:800; font-size:.72rem; display:flex; align-items:center; justify-content:center; border:2px solid var(--felt2);}
+.deck-grid .card.drawn .copies{background:#555; color:#ccc;}
+/* ---- 덱 편집 ---- */
+#deckEditor{position:fixed; inset:0; z-index:35; background:rgba(10,8,18,.95); display:none; align-items:center; justify-content:center; padding:1rem;}
+#deckEditor.show{display:flex;}
+.ed-btns{display:flex; gap:.4rem; flex-wrap:wrap; justify-content:flex-end;}
+.ed-btns button.end-turn{padding:.4rem .9rem; font-size:.85rem;}
+.ed-curve{font-size:.74rem; color:var(--parch-d); margin:0 0 .3rem;}
+.ed-item{display:flex; flex-direction:column; align-items:center; gap:.4rem;}
+.ed-item .card{cursor:pointer;}
+.ed-item.zero .card{filter:grayscale(.6) brightness(.65);}
+.ed-ctl{display:flex; align-items:center; gap:.45rem; font-weight:800; font-size:.85rem;}
+.ed-ctl b{min-width:1.4rem; text-align:center; color:var(--gold);}
+.ed-ctl button{width:28px; height:28px; border-radius:50%; border:1px solid var(--gold-d); background:transparent; color:var(--gold); font-weight:800; font-size:1rem; line-height:1; cursor:pointer;}
+.ed-ctl button:disabled{opacity:.3; cursor:not-allowed;}
+/* ---- 골드 / 보상 ---- */
+.wallet{display:inline-block; font-family:var(--font-u); font-size:.78rem; font-weight:700; color:var(--gold); border:1px solid var(--gold-d);
+  border-radius:999px; padding:.1rem .65rem; margin-left:.5rem; vertical-align:middle; background:rgba(0,0,0,.25);}
+#menuWallet{position:fixed; top:calc(.8rem + env(safe-area-inset-top,0px)); right:1rem; margin:0; font-size:.9rem;}
+.notice{font-size:.74rem; color:var(--parch-d); margin:0;}
+.notice.warn{color:#e08a7f;}
+.bet-box{width:100%; background:rgba(0,0,0,.28); border:1px solid var(--gold-d); border-radius:8px; padding:.8rem; display:flex; flex-direction:column; gap:.6rem; text-align:left;}
+.bet-box .row2{display:flex; justify-content:space-between; font-size:.82rem; color:var(--parch-d);}
+.bet-box .row2 b{color:var(--parch);}
+.bet-box input[type=number]{width:100%; background:#120f1e; color:var(--parch); border:1px solid var(--gold-d); border-radius:6px; padding:.5rem; font-size:1.05rem; font-weight:700; text-align:center;}
+.bet-box input[type=range]{width:100%; accent-color:var(--gold);}
+.bet-quick{display:flex; gap:.4rem;}
+.bet-quick button{flex:1; background:transparent; color:var(--gold); border:1px solid var(--gold-d); border-radius:5px; padding:.35rem 0; font-size:.78rem; font-weight:700; cursor:pointer;}
+.bet-result{font-size:.8rem; text-align:center; color:var(--parch-d);}
+.bet-result .win{color:var(--teal-l); font-weight:700;} .bet-result .lose{color:#e08a7f; font-weight:700;}
+/* ---- 상대 손패(뒷면만) ---- */
+.ai-hand{display:flex; justify-content:center; align-items:flex-start; height:46px; overflow:visible; padding:0 .5rem;}
+.card-back{width:34px; height:48px; flex:0 0 auto; margin-left:-12px; border-radius:5px; border:2px solid var(--gold-d);
+  background:radial-gradient(circle at 50% 50%, var(--gold-d) 0 5px, transparent 6px),
+             repeating-linear-gradient(45deg,#2a2444 0 5px,#1c1830 5px 10px);
+  box-shadow:0 2px 4px rgba(0,0,0,.5); transform:translateY(-6px);}
+.card-back:first-child{margin-left:0;}
+/* ---- 배당 / 치트 ---- */
+.tier-toggle{display:flex; gap:.35rem;}
+.tier-toggle button{flex:1; background:transparent; color:var(--parch-d); border:1px solid var(--gold-d); border-radius:5px; padding:.45rem 0; font-size:.82rem; font-weight:700; cursor:pointer;}
+.tier-toggle button.on{background:var(--gold); color:var(--ink); border-color:var(--gold);}
+.cheat-info{font-size:.74rem; color:var(--parch-d); line-height:1.45;}
+.cheat-info .chip, .cheats .chip{display:inline-block; font-size:.68rem; border:1px solid var(--ember); color:#e8a79e; border-radius:999px; padding:.05rem .5rem; margin:.15rem .15rem 0 0;}
+.cheats{min-width:140px; text-align:right; max-width:60%;}
+.cheats .chip{cursor:help;}
+.cheat-info .chip{cursor:help;}
+.cheat-info .chip:hover, .cheats .chip:hover, .cheat-info .chip:focus, .cheats .chip:focus{background:rgba(178,58,46,.18); outline:none;}
+#tip{position:fixed; z-index:60; display:none; max-width:220px; padding:.4rem .6rem; border-radius:6px; pointer-events:none;
+  background:#0d0b16; color:var(--parch); border:1px solid var(--gold-d); box-shadow:0 4px 14px rgba(0,0,0,.6);
+  font-size:.78rem; line-height:1.4; font-weight:500;}
+#overlayReward{font-size:1.05rem; font-weight:700; text-align:center; line-height:1.6; margin:0;}
+#overlayReward .sub2{display:block; font-size:.8rem; font-weight:400; color:var(--parch-d);}
+#overlayReward .plus{color:var(--teal-l);} #overlayReward .minus{color:#e08a7f;}
+</style>
+</head>
+<body>
+<svg id="arrowSvg"><defs><marker id="arrowhead" markerWidth="10" markerHeight="9" refX="7" refY="4.5" orient="auto"><polygon points="0 0,10 4.5,0 9" style="fill:var(--ember)"/></marker></defs>
+<line id="arrowLine" x1="0" y1="0" x2="0" y2="0" style="stroke:var(--ember); stroke-width:4; marker-end:url(#arrowhead);"/></svg>
+<div class="main">
+<h1>카드 결투<span class="badge" id="diffBadge"></span><span class="wallet walletView"></span></h1>
+<div class="board">
+  <div class="row" style="justify-content:space-between;">
+    <div class="hero" id="aiHero">
+      <div>
+        <div class="name">상대</div>
+        <div class="hp">체력 <span id="aiHp"></span></div>
+        <div class="mana"><span id="aiManaText"></span></div>
+        <div class="crystals" id="aiCrystals"></div>
+        <div class="pile">손패 <span id="aiHandCnt"></span> · 덱 <span id="aiDeckCnt"></span></div>
+      </div>
+    </div>
+    <div class="label">상대 필드</div>
+    <div class="cheats" id="aiCheats"></div>
+  </div>
+  <div class="ai-hand" id="aiHand" title="상대 손패"></div>
+  <div class="zone" id="aiZone"></div>
+  <div class="zone" id="playerZone"></div>
+  <div class="row" style="justify-content:space-between;">
+    <div class="hero" id="playerHero">
+      <div>
+        <div class="name">나</div>
+        <div class="hp">체력 <span id="playerHp"></span></div>
+        <div class="mana"><span id="manaText"></span></div>
+        <div class="crystals" id="crystals"></div>
+        <div class="pile">덱 <span id="myDeckCnt"></span></div>
+      </div>
+    </div>
+    <div class="label">내 필드</div>
+    <div style="min-width:140px;"></div>
+  </div>
+</div>
+<div class="controls"><button class="end-turn sub" id="deckBtn" onclick="openDeck()">덱 보기</button><button class="end-turn sub" id="surrenderBtn">항복</button><button class="end-turn" id="endTurnBtn">턴 종료</button></div>
+<div class="hand" id="hand"></div>
+</div>
+<aside id="logPanel"><h3>전투 기록</h3><div id="logList"></div></aside>
+<div id="overlay"><h2 id="overlayText"></h2><p id="overlayReward"></p><button class="end-turn" onclick="goToMenu()">처음 화면으로</button></div>
+
+<div id="deckModal" onclick="if(event.target===this) closeDeck()">
+  <div class="deck-panel">
+    <div class="deck-head"><h3 id="deckTitle"></h3><button class="end-turn sub" onclick="closeDeck()">닫기</button></div>
+    <p class="note">카드 위 숫자는 (덱에 남은 장수 / 내 덱에 넣은 장수)입니다. 덱에 넣지 않은 카드는 표시되지 않습니다. 모두 뽑은 카드는 어둡게 표시되고, 뽑는 순서는 알 수 없습니다.</p>
+    <div class="deck-grid" id="deckGrid"></div>
+  </div>
+</div>
+
+<div id="deckEditor">
+  <div class="deck-panel">
+    <div class="deck-head"><h3 id="edTitle"></h3>
+      <div class="ed-btns"><button class="end-turn sub" id="edReset">추천 덱</button><button class="end-turn" id="edSave">저장</button><button class="end-turn sub" id="edClose">닫기</button></div>
+    </div>
+    <p class="note" id="edNote"></p>
+    <p class="ed-curve" id="edCurve"></p>
+    <div class="deck-grid" id="edGrid"></div>
+  </div>
+</div>
+
+<div id="menu">
+  <span class="wallet walletView" id="menuWallet"></span>
+  <div class="screen show" id="screen-main">
+    <h2>카드 결투</h2>
+    <p class="sub">턴제 카드 대전</p>
+    <button class="menu-btn primary" onclick="showScreen('mode')">게임 시작</button>
+    <button class="menu-btn" onclick="openDeckEditor()">덱 편집<span class="desc" id="deckMenuDesc"></span></button>
+  </div>
+  <div class="screen" id="screen-mode">
+    <h3>모드 선택</h3>
+    <button class="menu-btn" onclick="showScreen('difficulty')">AI 대전<span class="desc">컴퓨터 상대와 1대1로 대전합니다.</span></button>
+    <button class="menu-btn back" onclick="showScreen('main')">뒤로</button>
+  </div>
+  <div class="screen" id="screen-difficulty">
+    <h3>난이도 선택</h3>
+    <div id="difficultyList" style="display:flex; flex-direction:column; gap:.9rem; width:100%;"></div>
+    <button class="menu-btn back" onclick="showScreen('mode')">뒤로</button>
+  </div>
+  <div class="screen" id="screen-playmode">
+    <h3 id="playmodeTitle">중급 AI — 방식 선택</h3>
+    <button class="menu-btn" id="btnNormalMode" onclick="startGame(curKey,{mode:'normal'})"></button>
+    <button class="menu-btn" id="btnBetMode" onclick="openBetScreen()"></button>
+    <button class="menu-btn back" onclick="showScreen('difficulty')">뒤로</button>
+  </div>
+  <div class="screen" id="screen-bet">
+    <h3>배팅 설정</h3>
+    <div class="bet-box">
+      <div class="row2"><span>보유 골드</span><b id="betGold"></b></div>
+      <div class="row2"><span>최대 배팅</span><b id="betMax"></b></div>
+      <div class="row2"><span>배당 선택</span><b id="betTierLabel"></b></div>
+      <div class="tier-toggle" id="tierToggle"></div>
+      <div class="cheat-info" id="cheatInfo"></div>
+      <input type="number" id="betInput" inputmode="numeric" step="1">
+      <input type="range" id="betRange" step="1">
+      <div class="bet-quick">
+        <button onclick="setBet('min')">최소</button><button onclick="setBet(0.25)">25%</button><button onclick="setBet(0.5)">50%</button><button onclick="setBet('max')">전액</button>
+      </div>
+      <div class="bet-result" id="betResult"></div>
+    </div>
+    <p class="notice warn">배팅 금액은 게임 시작 즉시 차감됩니다. 도중에 나가면 돌려받을 수 없습니다. 배당 200% 이상은 게임 시작 때 상대 AI에게 치트가 추첨됩니다.</p>
+    <button class="menu-btn primary" id="betGo" onclick="confirmBet()">배팅하고 시작</button>
+    <button class="menu-btn back" onclick="showScreen('playmode')">뒤로</button>
+  </div>
+</div>
+
+<!-- =====================================================================
+     [1] 룰 엔진 (DOM·전역 가변 상태 없음)
+     - 이 블록은 화면을 전혀 모른다. 서버(Java RuleEngine)로 포팅할 대상.
+     - 상태는 apply()가 복제본을 만들어 반환하고, 입력 상태는 절대 수정하지 않는다.
+     - 행동은 데이터: {type:'PLAY_CARD',cardId,target} / {type:'ATTACK',attackerId,target} / {type:'END_TURN'} / {type:'SURRENDER'}
+     - 대상(target): {kind:'hero',seat} | {kind:'minion',seat,id} | null
+     - 결과의 events 는 "무슨 일이 일어났는지" 기록이며, 연출/로그는 이것만 보고 재생한다.
+     ===================================================================== -->
+<script id="engine">
+const CONFIG = {HERO_HP:30, MAX_MANA:10, MAX_HAND:10, MAX_BOARD:7, START_HAND:3, START_HAND_MAX:7, COPIES:2, DECK_SIZE:30,
+  SECOND_HAND:1, COIN_MANA:2};
+// 후공 보정: 시작 손패 +SECOND_HAND장, 그리고 주문 카드 '동전'(이번 턴 마나 +COIN_MANA) 1장. 선·후공 승률은 selfPlay(N, bot, bot)의 firstWins 로 잰다.
+// 측정(같은 봇끼리, 선공 승률 / 초급·중급·중급2): 손패+1·동전+1 → 51 / 50 / 62%,  손패+1·동전+2 → 50 / 46 / 52% (채택),  손패+2·동전+1 → 44 / 40 / 50%
+
+const CARD_POOL = [
+  {type:'minion', name:"들쥐", cost:1, atk:1, hp:2},
+  {type:'minion', name:"책벌레", cost:1, atk:1, hp:1, effect:{type:'draw', value:1}},
+  {type:'minion', name:"은빛 신병", cost:1, atk:1, hp:1, shield:true},
+  {type:'minion', name:"돌담 견습병", cost:1, atk:1, hp:3, taunt:true},
+  {type:'minion', name:"견습 검사", cost:2, atk:2, hp:2},
+  {type:'minion', name:"방패병", cost:2, atk:1, hp:4},
+  {type:'minion', name:"약초꾼", cost:2, atk:1, hp:3, effect:{type:'heal', value:3}},
+  {type:'minion', name:"훈련 교관", cost:2, atk:2, hp:1, effect:{type:'buff', value:1}},
+  {type:'minion', name:"빛나는 파수병", cost:2, atk:1, hp:4, taunt:true},
+  {type:'minion', name:"매의 눈 궁수", cost:2, atk:2, hp:1, effect:{type:'damage', value:1}},
+  {type:'minion', name:"숲 늑대", cost:3, atk:3, hp:3},
+  {type:'minion', name:"화염 정령", cost:3, atk:4, hp:2, effect:{type:'damage', value:2}},
+  {type:'minion', name:"부족의 주술사", cost:3, atk:2, hp:3, effect:{type:'buff', value:1}},
+  {type:'minion', name:"수정 골렘", cost:3, atk:2, hp:4, shield:true},
+  {type:'minion', name:"강철 파수대장", cost:3, atk:2, hp:5, taunt:true},
+  {type:'minion', name:"떠돌이 치유사", cost:3, atk:2, hp:2, effect:{type:'heal', value:4}},
+  {type:'minion', name:"돌 골렘", cost:4, atk:3, hp:6},
+  {type:'minion', name:"용병대장", cost:4, atk:4, hp:4, effect:{type:'draw', value:1}},
+  {type:'minion', name:"대지 정령", cost:4, atk:4, hp:6, taunt:true},
+  {type:'minion', name:"빛의 수호자", cost:4, atk:3, hp:4, shield:true},
+  {type:'minion', name:"불사조", cost:4, atk:3, hp:3, charge:true, revive:true},
+  {type:'minion', name:"늙은 사자", cost:5, atk:5, hp:5},
+  {type:'minion', name:"벼락 마법사", cost:5, atk:4, hp:4, effect:{type:'damage', value:4}},
+  {type:'minion', name:"시간의 마법사", cost:5, atk:2, hp:3, effect:{type:'gainMana', value:3}},
+  {type:'minion', name:"서리 거인", cost:6, atk:6, hp:7},
+  {type:'minion', name:"폭풍 부르는 자", cost:6, atk:5, hp:5, effect:{type:'damage', value:5}},
+  {type:'minion', name:"심판관", cost:6, atk:4, hp:5, effect:{type:'sweep', value:3}},
+  {type:'minion', name:"고대 용", cost:7, atk:8, hp:8, effect:{type:'buff', value:2}},
+  {type:'minion', name:"고대의 수호룡", cost:7, atk:6, hp:9, taunt:true, shield:true},
+];
+const EFFECT_TEXT = {
+  mana: v=>`주문: 이번 턴 마나 ${v} 얻기`,
+  gainMana: v=>`전투의 함성: 이번 턴 마나 +${v}`,
+  sweep: v=>`전투의 함성: 적 하수인 전체에 ${v} 피해`,
+  draw: v=>`전투의 함성: 카드 ${v}장 뽑기`,
+  damage: v=>`전투의 함성: 대상에게 ${v} 피해`,
+  heal: v=>`전투의 함성: 대상 체력 ${v} 회복`,
+  buff: v=>`전투의 함성: 아군 하수인 +${v}/+${v}`,
+};
+// 주문 카드: 덱(CARD_POOL)에는 들어가지 않고, 후공이 시작할 때 손패로 받는다.
+function makeCoin(){ return {type:'spell', name:'동전', cost:0, effect:{type:'mana', value:CONFIG.COIN_MANA}}; }
+function effectText(c){ return c.effect ? EFFECT_TEXT[c.effect.type](c.effect.value) : ''; }
+const NO_TARGET_FX=['draw','sweep','gainMana'];   // 대상을 고르지 않는 전투의 함성
+
+// ---- 덱 목록: 카드 이름의 배열 (같은 카드는 이름이 여러 번 나온다). 서버에서도 같은 검증을 쓴다 ----
+function validateDeckList(names){
+  if(!Array.isArray(names)) return '덱 형식이 올바르지 않습니다.';
+  if(names.length!==CONFIG.DECK_SIZE) return `덱은 정확히 ${CONFIG.DECK_SIZE}장이어야 합니다.`;
+  const cnt={};
+  for(const n of names){
+    if(!CARD_POOL.some(c=>c.name===n)) return '존재하지 않는 카드가 있습니다.';
+    cnt[n]=(cnt[n]||0)+1;
+    if(cnt[n]>CONFIG.COPIES) return `같은 카드는 최대 ${CONFIG.COPIES}장까지 넣을 수 있습니다.`;
+  }
+  return null;
+}
+const DEFAULT_DECK_EXTRAS=["숲 늑대"];                 // 모든 카드 1장씩(29) + 이 1장 = 30장
+const defaultDeckList = () => [...CARD_POOL.map(c=>c.name), ...DEFAULT_DECK_EXTRAS];   // DECK_SIZE 를 바꾸면 같이 맞출 것
+
+const other = seat => 1 - seat;
+const tkey = t => t ? `${t.kind}:${t.seat}:${t.id ?? ''}` : 'none';
+const heroT = seat => ({kind:'hero', seat});
+const minionT = (seat, id) => ({kind:'minion', seat, id});
+const findMinion = (s, seat, id) => s.seats[seat].board.find(m=>m.id===id);
+
+function shuffle(a, rng){
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+// ---- 게임 생성 ----
+// opts.mods = [좌석0 치트, 좌석1 치트]. 치트는 좌석에 붙는 데이터일 뿐이고, 비어 있으면 기본 규칙과 완전히 같다.
+//   hp(영웅 체력+N) startMana(첫 턴 마나 N) startHand(시작 손패+N, 최대 START_HAND_MAX) startBoard(시작 하수인 N기)
+//   costDown(덱 하수인 비용-N) manaBonus(매 턴 추가 마나+N) buff(소환 시 체력 +N) armor(영웅 받는 피해-N)
+//   extraDraw(N: 이 좌석의 첫 N턴 동안 매 턴 2장 / true: 영구) doubleBattlecry(true: 전투의 함성 두 번)
+function newGame(rng=Math.random, opts={}){
+  // 선공: opts.first(0|1)로 지정하지 않으면 무작위. 후공 좌석은 보정(시작 손패 +, 동전)을 받는다.
+  const first = (opts.first===0 || opts.first===1) ? opts.first : (rng()<0.5 ? 0 : 1);
+  const s = {turn:first, first, turnNo:0, over:false, winner:null, nextId:1, seats:[]};
+  for(let seat=0; seat<2; seat++){
+    const mods={...((opts.mods && opts.mods[seat]) || {})};
+    const deck=[];
+    // opts.decks[seat] = 카드 이름 배열. 없거나 규칙에 어긋나면 기본 덱(모든 카드 COPIES장씩)을 쓴다.
+    const wanted=(opts.decks && opts.decks[seat]) || null;
+    const names=(wanted && !validateDeckList(wanted)) ? wanted : null;
+    const src=names ? names.map(n=>CARD_POOL.find(c=>c.name===n)) : CARD_POOL.flatMap(c=>Array(CONFIG.COPIES).fill(c));
+    src.forEach(c=>deck.push({...c, cost:Math.max(0, c.cost-(mods.costDown||0)), id:s.nextId++}));
+    shuffle(deck, rng);
+    const maxHp=CONFIG.HERO_HP+(mods.hp||0);
+    s.seats.push({hp:maxHp, maxHp, mana:0, maxMana:mods.startMana?Math.max(0, mods.startMana-1):0, deck, hand:[], board:[], mods});
+  }
+  for(let seat=0; seat<2; seat++){
+    const P=s.seats[seat];
+    drawCards(s, seat, Math.min(CONFIG.START_HAND_MAX, CONFIG.START_HAND+(seat===first ? 0 : CONFIG.SECOND_HAND)+(P.mods.startHand||0)), null);
+    if(seat!==first) P.hand.push({...makeCoin(), id:s.nextId++});      // 후공: 동전 1장
+    for(let k=0;k<(P.mods.startBoard||0) && P.board.length<CONFIG.MAX_BOARD;k++)
+      P.board.push({id:s.nextId++, name:'보초병', cost:1, atk:1, hp:2, maxHp:2, attacked:false, summoned:false});
+  }
+  startTurn(s, first, []);      // 선공도 정상적으로 턴 시작 처리(마나 1)
+  return s;
+}
+
+// ---- 내부 변경 함수 (복제본 s 에만 사용) ----
+function drawCards(s, seat, n, ev, src){
+  const P=s.seats[seat]; let drawn=0, burned=0;
+  for(let i=0;i<n && P.deck.length;i++){
+    const c=P.deck.pop();
+    if(P.hand.length<CONFIG.MAX_HAND){ P.hand.push(c); drawn++; } else burned++;
+  }
+  if(ev && (drawn||burned)) ev.push({type:'draw', seat, count:drawn, burned, src:src||null});
+}
+function startTurn(s, seat, ev){
+  const P=s.seats[seat];
+  s.turn=seat; s.turnNo++;
+  P.maxMana=Math.min(CONFIG.MAX_MANA, P.maxMana+1);   // 마나는 플레이어별로 따로 관리
+  const md=P.mods||{};
+  P.turns=(P.turns||0)+1;                              // 이 좌석이 진행한 턴 수
+  P.mana=P.maxMana+(md.manaBonus||0);                 // 추가 마나는 그 턴에만 (최대 마나는 늘리지 않음)
+  P.board.forEach(m=>{ m.attacked=false; m.summoned=false; });
+  ev.push({type:'turn_start', seat, turnNo:s.turnNo});
+  drawCards(s, seat, (md.extraDraw && (md.extraDraw===true || P.turns<=md.extraDraw)) ? 2 : 1, ev);
+}
+function hurtHero(s, seat, amount, ev, cause, src){
+  amount=Math.max(0, amount-((s.seats[seat].mods||{}).armor||0));
+  s.seats[seat].hp -= amount;
+  ev.push({type:'damage', target:heroT(seat), name:null, amount, absorbed:false, cause, src:src||null});
+}
+function hurtMinion(s, seat, m, amount, ev, cause, src){
+  const target=minionT(seat, m.id);
+  if(m.shield){
+    m.shield=false;
+    ev.push({type:'damage', target, name:m.name, amount:0, absorbed:true, cause, src:src||null});
+    return;
+  }
+  m.hp -= amount;
+  ev.push({type:'damage', target, name:m.name, amount, absorbed:false, cause, src:src||null});
+}
+function sweepDead(s, ev){
+  for(const seat of [0,1]){
+    const P=s.seats[seat];
+    P.board = P.board.filter(m=>{
+      if(m.hp>0) return true;
+      if(m.revive){ m.revive=false; m.hp=1; m.shield=false; ev.push({type:'revive', seat, id:m.id, name:m.name}); return true; }   // 부활: 1회, 체력 1로 (돌진은 유지)
+      ev.push({type:'death', seat, id:m.id, name:m.name});
+      return false;
+    });
+  }
+}
+function checkEnd(s, ev){
+  if(s.over) return;
+  const d0=s.seats[0].hp<=0, d1=s.seats[1].hp<=0;
+  if(d0||d1){
+    s.over=true;
+    s.winner = (d0&&d1) ? null : (d0 ? 1 : 0);
+    ev.push({type:'game_over', winner:s.winner});
+  }
+}
+
+// ---- 전투의 함성 ----
+// 카드를 낼 때 선택 가능한 대상(소환 전 상태 기준). 비어 있으면 대상 없음.
+function cardTargets(s, seat, card){
+  const e=card.effect; if(!e) return [];
+  const mins = sd => s.seats[sd].board.map(m=>minionT(sd, m.id));
+  if(e.type==='heal')   return [heroT(seat), ...mins(seat)];
+  if(e.type==='buff')   return mins(seat);
+  // 피해: 적·아군 모두 대상 가능 (소환 전 상태 기준이라 방금 낸 자기 자신은 대상이 아님)
+  if(e.type==='damage') return [heroT(other(seat)), ...mins(other(seat)), heroT(seat), ...mins(seat)];
+  return [];   // draw
+}
+function battlecry(s, seat, m, target, ev){
+  const e=m.effect; if(!e) return;
+  const src={seat, name:m.name};
+  if(e.type==='draw'){ drawCards(s, seat, e.value, ev, src); return; }
+  if(e.type==='sweep'){
+    const foes=[...s.seats[other(seat)].board];
+    if(!foes.length){ ev.push({type:'ignored', seat, src}); return; }
+    foes.forEach(t=>hurtMinion(s, other(seat), t, e.value, ev, 'battlecry', src));
+    return;
+  }
+  if(e.type==='gainMana'){ s.seats[seat].mana+=e.value; ev.push({type:'mana', seat, amount:e.value, src}); return; }
+  if(!target){ ev.push({type:'ignored', seat, src}); return; }
+  if(e.type==='damage'){
+    if(target.kind==='hero') hurtHero(s, target.seat, e.value, ev, 'battlecry', src);
+    else { const t=findMinion(s, target.seat, target.id); if(t) hurtMinion(s, target.seat, t, e.value, ev, 'battlecry', src); }
+  } else if(e.type==='heal'){
+    if(target.kind==='hero'){
+      const P=s.seats[target.seat]; const before=P.hp;
+      P.hp=Math.min(P.maxHp ?? CONFIG.HERO_HP, P.hp+e.value);
+      ev.push({type:'heal', target, name:null, amount:P.hp-before, src});
+    } else {
+      const t=findMinion(s, target.seat, target.id);
+      if(t){ const before=t.hp; t.hp=Math.min(t.maxHp, t.hp+e.value);
+        ev.push({type:'heal', target, name:t.name, amount:t.hp-before, src}); }
+    }
+  } else if(e.type==='buff'){
+    const t=findMinion(s, target.seat, target.id);
+    if(t){ t.atk+=e.value; t.hp+=e.value; t.maxHp+=e.value;
+      ev.push({type:'buff', target, name:t.name, value:e.value, src}); }
+  }
+}
+
+// ---- 검증: 오류 문자열 또는 null(합법) ----
+function validate(s, a, actor){
+  if(!a || typeof a!=='object') return '잘못된 행동입니다.';
+  if(s.over) return '게임이 끝났습니다.';
+  if(a.type==='SURRENDER') return null;          // 항복은 어느 시점이든 가능. legalActions 에는 넣지 않는다 (봇은 항복하지 않음)
+  if(actor!==s.turn) return '상대 턴입니다.';
+  const P=s.seats[actor], O=s.seats[other(actor)];
+  switch(a.type){
+    case 'END_TURN': return null;
+    case 'PLAY_CARD': {
+      const c=P.hand.find(x=>x.id===a.cardId);
+      if(!c) return '손패에 없는 카드입니다.';
+      if(c.cost>P.mana) return '마나가 부족합니다.';
+      if(c.type!=='spell' && P.board.length>=CONFIG.MAX_BOARD) return '전장이 가득 찼습니다.';   // 하수인만 전장 자리 필요
+      const ts=cardTargets(s, actor, c);
+      if(ts.length===0) return a.target ? '대상이 필요 없는 카드입니다.' : null;
+      if(!a.target || !ts.some(t=>tkey(t)===tkey(a.target))) return '올바른 대상을 선택해야 합니다.';
+      return null;
+    }
+    case 'ATTACK': {
+      const m=P.board.find(x=>x.id===a.attackerId);
+      if(!m) return '내 하수인이 아닙니다.';
+      if(m.summoned && !m.charge) return '소환 직후에는 공격할 수 없습니다.';
+      if(m.attacked) return '이미 공격했습니다.';
+      const t=a.target;
+      if(!t || t.seat!==other(actor)) return '공격 대상이 올바르지 않습니다.';
+      const taunts=O.board.filter(x=>x.taunt);
+      if(t.kind==='hero') return taunts.length ? '도발 하수인을 먼저 공격해야 합니다.' : null;
+      if(t.kind==='minion'){
+        const d=O.board.find(x=>x.id===t.id);
+        if(!d) return '존재하지 않는 대상입니다.';
+        if(taunts.length && !d.taunt) return '도발 하수인을 먼저 공격해야 합니다.';
+        return null;
+      }
+      return '공격 대상이 올바르지 않습니다.';
+    }
+    default: return '알 수 없는 행동입니다.';
+  }
+}
+
+// ---- 합법 행동 목록 (서버 검증·봇·클라이언트 하이라이트 공통 사용 / AI 학습의 action mask 원천) ----
+function legalActions(s, actor){
+  if(s.over || s.turn!==actor) return [];
+  const P=s.seats[actor], O=s.seats[other(actor)], out=[];
+  for(const c of P.hand){
+    const ts=cardTargets(s, actor, c);
+    for(const t of (ts.length ? ts : [null])){
+      const a={type:'PLAY_CARD', cardId:c.id, target:t};
+      if(!validate(s,a,actor)) out.push(a);
+    }
+  }
+  const targets=[heroT(other(actor)), ...O.board.map(m=>minionT(other(actor), m.id))];
+  for(const m of P.board) for(const t of targets){
+    const a={type:'ATTACK', attackerId:m.id, target:t};
+    if(!validate(s,a,actor)) out.push(a);
+  }
+  out.push({type:'END_TURN'});
+  return out;
+}
+
+// ---- 핵심: 행동 적용. 입력 state 는 수정하지 않고 새 state 를 반환 ----
+function apply(state, a, actor){
+  const err=validate(state, a, actor);
+  if(err) return {ok:false, error:err, state, events:[]};
+  const s=structuredClone(state), ev=[], P=s.seats[actor];
+  if(a.type==='PLAY_CARD'){
+    const c=P.hand.find(x=>x.id===a.cardId);
+    P.mana-=c.cost;
+    P.hand=P.hand.filter(x=>x.id!==c.id);
+    if(c.type==='spell'){
+      // 주문: 전장에 남지 않고 효과만 적용된 뒤 사라진다. card 는 화면에서 "무슨 주문을 썼는지" 보여주기 위한 사본.
+      if(c.effect.type==='mana') P.mana+=c.effect.value;
+      ev.push({type:'spell', seat:actor, name:c.name, gain:c.effect.value, card:{type:c.type, name:c.name, cost:c.cost, effect:c.effect}});
+    } else {
+    const m={...c, maxHp:c.hp, attacked:false, summoned:true};
+    const bf=(P.mods&&P.mods.buff)||0;
+    if(bf){ m.hp+=bf; m.maxHp+=bf; }
+    P.board.push(m);
+    ev.push({type:'summon', seat:actor, id:m.id, name:m.name});
+    battlecry(s, actor, m, a.target, ev);
+    if(P.mods && P.mods.doubleBattlecry && m.effect){
+      const t=a.target, alive = !t || t.kind==='hero' || (findMinion(s, t.seat, t.id)?.hp>0);
+      if(alive && (t || NO_TARGET_FX.includes(m.effect.type))){ ev.push({type:'echo', seat:actor, name:m.name}); battlecry(s, actor, m, t, ev); }
+    }
+    }   // end 하수인
+  } else if(a.type==='ATTACK'){
+    const m=P.board.find(x=>x.id===a.attackerId), t=a.target;
+    if(t.kind==='hero'){
+      ev.push({type:'attack', seat:actor, attackerId:m.id, name:m.name, target:t, targetName:null});
+      hurtHero(s, t.seat, m.atk, ev, 'combat');
+    } else {
+      const d=findMinion(s, t.seat, t.id);
+      ev.push({type:'attack', seat:actor, attackerId:m.id, name:m.name, target:t, targetName:d.name});
+      const dAtk=d.atk;
+      hurtMinion(s, t.seat, d, m.atk, ev, 'combat');
+      hurtMinion(s, actor, m, dAtk, ev, 'combat');
+    }
+    m.attacked=true;
+  } else if(a.type==='SURRENDER'){
+    s.over=true; s.winner=other(actor);              // 항복 = 즉시 패배 (체력은 건드리지 않음)
+    ev.push({type:'surrender', seat:actor});
+    ev.push({type:'game_over', winner:s.winner});
+  } else if(a.type==='END_TURN'){
+    ev.push({type:'turn_end', seat:actor});
+    startTurn(s, other(actor), ev);
+  }
+  sweepDead(s, ev);
+  checkEnd(s, ev);
+  return {ok:true, state:s, events:ev};
+}
+
+// ---- GameView: 특정 좌석에게 보내는 시점 정보 (상대 손패·덱 내용 제외) ----
+function viewFor(s, seat){
+  const me=s.seats[seat], op=s.seats[other(seat)];
+  return structuredClone({
+    seat, turn:s.turn, turnNo:s.turnNo, first:s.first, over:s.over, winner:s.winner,
+    // deckCards: 내 남은 덱 구성. 뽑는 순서가 드러나지 않도록 id 를 빼고 코스트·이름순으로 정렬해서 보낸다.
+    me:{hp:me.hp, maxHp:me.maxHp, mods:me.mods, mana:me.mana, maxMana:me.maxMana, hand:me.hand, board:me.board, deckCount:me.deck.length,
+        deckCards:me.deck.map(({id, ...rest})=>rest).sort((a,b)=>a.cost-b.cost || (a.name<b.name?-1:a.name>b.name?1:0))},
+    opp:{hp:op.hp, maxHp:op.maxHp, mods:op.mods, mana:op.mana, maxMana:op.maxMana, handCount:op.hand.length, board:op.board, deckCount:op.deck.length},
+    legal:legalActions(s, seat)
+  });
+}
+
+// ---- Player: decide(view) → action. 사람(소켓)·봇이 같은 인터페이스를 따른다 ----
+function hpOfTarget(view, t){
+  const list = t.seat===view.seat ? view.me.board : view.opp.board;
+  const m=list.find(x=>x.id===t.id); return m ? m.hp : Infinity;
+}
+function pickCardTarget(entries, view){
+  const card=view.me.hand.find(c=>c.id===entries[0].cardId), type=card.effect.type;
+  const minionOf=t=>(t.seat===view.seat?view.me.board:view.opp.board).find(m=>m.id===t.id);
+  let score;
+  if(type==='heal')        score=a=>a.target.kind==='hero' ? ((view.me.maxHp||CONFIG.HERO_HP)-view.me.hp) : (minionOf(a.target).maxHp-minionOf(a.target).hp);
+  else if(type==='buff')   score=a=>minionOf(a.target).atk;
+  else                     score=a=> a.target.seat===view.seat ? -1000                               // 피해: 아군은 피하고
+                                   : (a.target.kind==='minion' ? 100-minionOf(a.target).hp : 0);   // 적의 약한 하수인 우선
+  return entries.reduce((best,a)=>score(a)>score(best)?a:best);
+}
+// 주문(동전) 보조: 동전은 "지금 마나로는 못 내는 하수인을 낼 수 있게 될 때"만 쓴다 (그냥 쓰면 마나가 낭비된다)
+const isSpellCard = c => c.type==='spell';
+function coinUnlocks(view){
+  const me=view.me, coin=me.hand.find(isSpellCard);
+  if(!coin || me.board.length>=CONFIG.MAX_BOARD) return false;
+  return me.hand.some(c=>!isSpellCard(c) && c.cost>me.mana && c.cost<=me.mana+coin.effect.value);
+}
+const BotPlayers = {
+  // 규칙 기반: 가장 비싼 카드부터 내고, 약한 하수인을 우선 공격, 없으면 영웅 공격
+  rule:{ decide(view){
+    const L=view.legal;
+    const spellOf=a=>isSpellCard(view.me.hand.find(c=>c.id===a.cardId));
+    const coinAct=L.find(a=>a.type==='PLAY_CARD' && spellOf(a));
+    if(coinAct && coinUnlocks(view)) return coinAct;                      // 동전을 써야 더 낼 수 있을 때만
+    const plays=L.filter(a=>a.type==='PLAY_CARD' && !spellOf(a));        // 하수인만 (동전은 위에서 따로 판단)
+    if(plays.length){
+      const costOf=a=>view.me.hand.find(c=>c.id===a.cardId).cost;
+      const best=Math.max(...plays.map(costOf));
+      const cardId=plays.find(a=>costOf(a)===best).cardId;
+      const entries=plays.filter(a=>a.cardId===cardId);
+      return entries.length===1 ? entries[0] : pickCardTarget(entries, view);
+    }
+    const atks=L.filter(a=>a.type==='ATTACK');
+    if(atks.length){
+      const entries=atks.filter(a=>a.attackerId===atks[0].attackerId);
+      const mt=entries.filter(a=>a.target.kind==='minion');
+      if(mt.length) return mt.reduce((x,y)=>hpOfTarget(view,x.target)<=hpOfTarget(view,y.target)?x:y);
+      return entries[0];
+    }
+    return {type:'END_TURN'};
+  }},
+  // 무작위: 합법 행동 중 하나 (엔진 시험·부하용)
+  random:{ decide(view){ return view.legal[Math.floor(Math.random()*view.legal.length)]; } }
+};
+
+// ---- 규칙 봇 2 (중급2): 중급(rule)보다 한 수 앞을 보는 규칙 기반 봇 ----
+//  1) 마무리: 이번 턴에 상대 영웅을 쓰러뜨릴 수 있으면 곧바로 영웅을 공격한다.
+//  2) 카드: 마나를 가장 알차게 쓰는 조합을 고르고, 드로우 → 피해 → 하수인 → 회복 → 강화 순으로 낸다.
+//  3) 공격: 모든 (공격자, 대상) 조합을 점수로 비교한다. 이득 보는 교환 > 영웅 공격 > 손해 보는 교환(생략).
+//  4) 위기: 상대 필드의 공격력 합이 내 체력에 닿으면 영웅 공격을 줄이고 위협적인 하수인을 먼저 처리한다.
+// 점수 가중치는 아래 W 한 곳에 모아두었다. selfPlay 로 승률을 재 가며 이 표만 고치면 된다.
+const Rule2 = (()=>{
+  const W = {
+    atk:1.2, hp:0.8, taunt:1.5, shield:1.5,     // 하수인 가치 = 공격력·체력·도발·보호막
+    face:0.9, faceLow:1.4, faceCrit:2.0,        // 영웅 공격 1당 점수 (상대 체력이 낮을수록 커짐)
+    faceDanger:0.4,                             // 내가 위기일 때 영웅 공격 점수
+    tempo:1.0, killThreat:1.0,                  // 처치 보너스 / 위기 때 처치한 하수인 공격력 보너스
+  };
+  const val = m => m.atk*W.atk + m.hp*W.hp + (m.taunt?W.taunt:0) + (m.shield?W.shield:0) + (m.revive?1.5:0) + (m.charge?0.8:0);
+
+  function context(view){
+    const me=view.me, op=view.opp;
+    const threat=op.board.reduce((s,m)=>s+m.atk,0);
+    const danger = threat >= me.hp-2 && !me.board.some(m=>m.taunt);
+    const faceW = danger ? W.faceDanger : op.hp<=6 ? W.faceCrit : op.hp<=12 ? W.faceLow : W.face;
+    return {danger, faceW};
+  }
+
+  // 카드 한 장의 가치 (낼지 말지가 아니라 "어떤 조합이 더 좋은가"를 비교하는 용도)
+  function cardValue(c, view, ctx){
+    const me=view.me, e=c.effect;
+    let v=c.atk+c.hp+(c.shield?W.shield:0)+(c.taunt?(ctx.danger?3:1):0)+(c.revive?2:0)+(c.charge?1.5:0);
+    if(e){
+      if(e.type==='draw')   v+=2.5;
+      if(e.type==='damage') v+=e.value*1.2;
+      if(e.type==='heal')   v+=Math.min(e.value, (me.maxHp||30)-me.hp)*0.8;
+      if(e.type==='buff')   v+= me.board.length ? e.value*2 : 0;
+      if(e.type==='sweep')  v+= view.opp.board.reduce((s,m)=>s+(m.shield?1:(m.hp<=e.value ? m.atk+m.hp : e.value*0.5)),0);
+      if(e.type==='gainMana') v+= e.value;
+    }
+    return v;
+  }
+
+  // 마나 budget 안에서 낼 수 있는 하수인 조합 중 마나를 가장 많이 쓰고(1순위) 가치가 가장 큰(2순위) 것
+  // (budget 을 mana+동전으로 넣어 보면 "동전을 쓰면 얼마나 더 쓰는지" 비교할 수 있다)
+  const planCost = plan => plan.reduce((s,c)=>s+c.cost,0);
+  function bestPlan(view, ctx, budget){
+    const me=view.me;
+    // 적 필드가 비어 있으면 광역 피해 카드는 아껴 둔다
+    const cards=me.hand.filter(c=>!isSpellCard(c) && c.cost<=budget && !(c.effect&&c.effect.type==='sweep'&&view.opp.board.length===0));
+    const gain=c=>(c.effect&&c.effect.type==='gainMana')?c.effect.value:0;   // 마나를 돌려주는 카드는 실질 비용이 낮다
+    const slots=CONFIG.MAX_BOARD-me.board.length, n=cards.length;
+    const vals=cards.map(c=>cardValue(c, view, ctx));
+    let best=null, bc=-1, bv=-1;
+    for(let mask=1; mask<(1<<n); mask++){
+      let cost=0, net=0, cnt=0, v=0;
+      for(let i=0;i<n;i++) if(mask&(1<<i)){ cost+=cards[i].cost; net+=cards[i].cost-gain(cards[i]); cnt++; v+=vals[i]; }
+      if(net>budget || cnt>slots) continue;
+      if(cost>bc || (cost===bc && v>bv)){ bc=cost; bv=v; best=mask; }
+    }
+    if(best===null) return [];
+    return cards.filter((_,i)=>best&(1<<i));
+  }
+  // 낼 순서: 드로우(선택지 늘리기) → 피해(적 정리) → 하수인 → 회복 → 강화(마지막에 낸 아군에게도 쓸 수 있게)
+  const rankOf = c => { const t=c.effect&&c.effect.type; return t==='gainMana'?-1 : t==='draw'?0 : (t==='damage'||t==='sweep')?1 : t==='heal'?3 : t==='buff'?4 : 2; };
+
+  // 전투의 함성 대상 고르기
+  function targetScore(card, t, view, ctx){
+    const me=view.me, op=view.opp, e=card.effect, v=e.value;
+    const mineSide = t.seat===view.seat;
+    const list = mineSide ? me.board : op.board;
+    const m = t.kind==='minion' ? list.find(x=>x.id===t.id) : null;
+    if(e.type==='damage'){
+      if(mineSide) return -1000;                                   // 아군은 때리지 않는다
+      if(t.kind==='hero') return (v>=op.hp ? 1000 : v*ctx.faceW);  // 마무리가 되면 최우선
+      if(m.shield) return 1.0;                                     // 보호막만 깬다
+      if(m.hp<=v)  return val(m)+W.tempo+(ctx.danger?m.atk*W.killThreat:0);
+      return v*0.4+(m.taunt?1:0);                                  // 못 죽이면 약하게 만들어 두기
+    }
+    if(e.type==='heal'){
+      if(!mineSide) return -1000;
+      if(t.kind==='hero') return Math.min(v,(me.maxHp||30)-me.hp)*(ctx.danger?1.5:0.8);
+      return Math.min(v, m.maxHp-m.hp)*0.6;
+    }
+    if(e.type==='buff'){
+      if(!mineSide) return -1000;
+      const ready=!m.attacked&&(!m.summoned||m.charge);
+      return (ready?1.5:0)+(m.atk>=3?1:0)+m.atk*0.3+m.hp*0.2+(m.taunt?0.5:0);
+    }
+    return 0;
+  }
+
+  // 공격 한 건의 점수
+  function attackScore(a, view, ctx){
+    const me=view.me, op=view.opp;
+    const m=me.board.find(x=>x.id===a.attackerId);
+    if(a.target.kind==='hero') return m.atk>=op.hp ? 1000 : m.atk*ctx.faceW;
+    const d=op.board.find(x=>x.id===a.target.id);
+    const kill=!d.shield && !d.revive && m.atk>=d.hp;
+    const die =!m.shield && !m.revive && d.atk>=m.hp;
+    let s=0;
+    if(kill) s+=val(d)+W.tempo+(ctx.danger?d.atk*W.killThreat:0);
+    else     s+= d.shield ? 0.8 : m.atk*0.25;
+    if(die) s-=val(m);
+    else if(m.shield && d.atk>0) s-=0.8;
+    else s-=d.atk*0.3;
+    return s;
+  }
+
+  function decide(view){
+    const L=view.legal, me=view.me, op=view.opp;
+    const allPlays=L.filter(a=>a.type==='PLAY_CARD'), atks=L.filter(a=>a.type==='ATTACK');
+    const coinAct=allPlays.find(a=>isSpellCard(me.hand.find(c=>c.id===a.cardId)));
+    const plays=allPlays.filter(a=>a!==coinAct);                         // 하수인 카드만
+    const ctx=context(view);
+
+    // 1) 마무리 확인 (상대 도발이 없을 때만 영웅을 칠 수 있다)
+    const heroHits=atks.filter(a=>a.target.kind==='hero');
+    if(heroHits.length){
+      const ids=[...new Set(heroHits.map(a=>a.attackerId))];
+      const total=ids.reduce((s,id)=>s+me.board.find(m=>m.id===id).atk,0);
+      if(total>=op.hp) return heroHits[0];
+      const burn=plays.filter(a=>a.target && a.target.kind==='hero' && a.target.seat!==view.seat);
+      if(burn.length){
+        const dmg=a=>me.hand.find(c=>c.id===a.cardId).effect.value;
+        const b=burn.reduce((x,y)=>dmg(x)>=dmg(y)?x:y);
+        if(total+dmg(b)>=op.hp) return b;
+      }
+    }
+
+    // 2) 동전: 쓰면 마나를 더 많이 쓸 수 있을 때만 (낭비 방지). 쓰고 나면 다음 판단에서 그 마나로 카드를 낸다.
+    if(coinAct){
+      const coin=me.hand.find(isSpellCard);
+      if(planCost(bestPlan(view, ctx, me.mana+coin.effect.value)) > planCost(bestPlan(view, ctx, me.mana))) return coinAct;
+    }
+
+    // 3) 카드 내기
+    if(plays.length){
+      const plan=bestPlan(view, ctx, me.mana);
+      if(plan.length){
+        plan.sort((x,y)=>rankOf(x)-rankOf(y) || y.cost-x.cost);
+        const card=plan[0];
+        const entries=plays.filter(a=>a.cardId===card.id);
+        if(entries.length===1) return entries[0];
+        return entries.reduce((b,a)=>targetScore(card,a.target,view,ctx)>targetScore(card,b.target,view,ctx)?a:b);
+      }
+    }
+
+    // 4) 공격 (가장 점수 높은 한 건. 손해만 보는 공격은 하지 않는다)
+    if(atks.length){
+      let best=null, bs=-Infinity;
+      for(const a of atks){ const s=attackScore(a, view, ctx); if(s>bs){ bs=s; best=a; } }
+      if(best && bs>0) return best;
+    }
+    return {type:'END_TURN'};
+  }
+  return {decide, W};
+})();
+BotPlayers.rule2 = { decide: Rule2.decide };
+
+// ---- 헤드리스 자동 대전 (엔진 검증 / 전적 데이터 생성용). 콘솔: selfPlay(1000) ----
+function selfPlay(games=1000, botA=BotPlayers.rule, botB=BotPlayers.random, maxTurns=200, opts={}){
+  const st={games, wins:[0,0], firstWins:0, draws:0, stalled:0, errors:0, avgTurns:0}; let turns=0;   // firstWins: 선공이 이긴 판 수
+  for(let g=0; g<games; g++){
+    let s=newGame(Math.random, opts);
+    while(!s.over && s.turnNo<=maxTurns){
+      const bot = s.turn===0 ? botA : botB;
+      const r=apply(s, bot.decide(viewFor(s, s.turn)), s.turn);
+      if(!r.ok){ st.errors++; break; }
+      s=r.state;
+    }
+    turns+=s.turnNo;
+    if(s.over){ if(s.winner===null) st.draws++; else { st.wins[s.winner]++; if(s.winner===s.first) st.firstWins++; } } else if(st.errors===0 || s.turnNo>maxTurns) st.stalled++;
+  }
+  st.avgTurns=+(turns/games).toFixed(1);
+  return st;
+}
+</script>
+
+<!-- =====================================================================
+     [1.2] 치트 풀 — DOM 없음. 배당 단계에 따라 AI 좌석에 붙일 modifiers 를 추첨한다.
+     - 숫자는 전부 여기 한 곳(levels)에만 있다. selfPlay 로 측정해 가며 이 표만 고치면 된다.
+     - 같은 group 안에서는 하나만 뽑는다 (같은 자원 축 중첩 방지).
+     ===================================================================== -->
+<script id="cheats">
+const CHEAT_TIERS = {            // 배당% → 치트 개수 / 값 단계(levels 인덱스). 봇 대전 측정: AI 승률 36%(기본) → 47 → 56 → 72 → 86%
+  150:{count:0, level:-1},
+  200:{count:1, level:0},
+  300:{count:2, level:0},        // 먼저 개수를 늘리고
+  400:{count:2, level:1},        // 그다음 값을 키운다
+  500:{count:2, level:3},
+};
+const CHEATS = [   // 값은 봇 대전(measure)으로 잰 잠정치. 사람 승률은 따로 보정 필요.
+  {id:'hp',              name:'강인한 영웅',   minTier:200, levels:[20,30,45,60], desc:v=>`영웅 체력 +${v}`},
+  {id:'startMana',       name:'앞선 출발',     minTier:200, levels:[2,3,4,5],     desc:v=>`첫 턴부터 마나 ${v}`,          group:'economy'},
+  {id:'manaBonus',       name:'마력의 샘',     minTier:200, levels:[1,1,2,3],     desc:v=>`매 턴 마나 +${v}`,             group:'economy'},
+  {id:'costDown',        name:'값싼 병력',     minTier:200, levels:[1,1,2,2],     desc:v=>`덱의 하수인 비용 −${v}`,        group:'economy'},
+  {id:'startHand',       name:'풍부한 손패',   minTier:200, levels:[1,2,2,3],     desc:v=>`시작 손패 +${v}장 (최대 ${CONFIG.START_HAND_MAX}장)`, group:'draw'},
+  {id:'extraDraw',       name:'속독',          minTier:300, levels:[2],           desc:v=>`첫 ${v}턴 동안 매 턴 카드 2장 뽑기`, group:'draw'},   // 켜짐/꺼짐형. 값은 지속 턴 수
+  {id:'startBoard',      name:'선발대',        minTier:200, levels:[1,2,3,4],     desc:v=>`시작 필드에 보초병(1/2) ${v}기`},
+  {id:'buff',            name:'튼튼한 병력',   minTier:400, levels:[1],           desc:v=>`소환되는 하수인 체력 +${v}`},
+  {id:'armor',           name:'강철 피부',     minTier:200, levels:[1,2,3,4],     desc:v=>`영웅이 받는 피해 −${v}`},
+  {id:'doubleBattlecry', name:'메아리',        minTier:400, levels:[true],        desc:()=>'전투의 함성이 두 번 발동'},
+];
+const cheatValue = (c, level) => c.levels[Math.min(Math.max(level,0), c.levels.length-1)];
+function cheatCandidates(tier){
+  const t=CHEAT_TIERS[tier]; if(!t || t.count<=0) return [];
+  return CHEATS.filter(c=>c.minTier<=tier).map(c=>{ const v=cheatValue(c, t.level); return {id:c.id, name:c.name, value:v, desc:c.desc(v), group:c.group||null}; });
+}
+// → {mods:{...}, list:[{id,name,desc}]}
+function rollCheats(tier, rng=Math.random){
+  const t=CHEAT_TIERS[tier], out={mods:{}, list:[]};
+  if(!t || t.count<=0) return out;
+  const pool=cheatCandidates(tier);
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  const usedGroups=new Set();
+  for(const c of pool){
+    if(out.list.length>=t.count) break;
+    if(c.group && usedGroups.has(c.group)) continue;
+    if(c.group) usedGroups.add(c.group);
+    out.mods[c.id]=c.value; out.list.push({id:c.id, name:c.name, desc:c.desc});
+  }
+  return out;
+}
+</script>
+
+<!-- =====================================================================
+     [1.5] 경제(골드) — DOM 없음. 룰 엔진과 별개로 "게임이 끝난 뒤" 보상만 처리한다.
+     - 순수 함수: settle(save, ctx) → {save, summary}   (입력 save 는 수정하지 않음)
+     - 저장소: localStorage (막혀 있으면 메모리로 대체). 나중에 서버 API 로 교체할 때 Store 만 바꾼다.
+     ===================================================================== -->
+<script id="economy">
+const ECON = {
+  SAVE_KEY:'cardDuel.save', VERSION:1,
+  START_GOLD:100,
+  EASY_WIN:10,                       // 초급: 승리 시 고정 보상
+  POOL_START:100, POOL_MIN:20, POOL_MAX:300,
+  POOL_UP:1.05, POOL_DOWN:0.95,      // 중급 일반: 승리 ×1.05 / 패배 ×0.95
+  RESET_HOUR:5,                      // 새벽 5시 기준으로 하루가 바뀐다
+  BET_MAX_RATIO:1.0,                 // 배팅 최대 = 보유 골드의 100% (전액 배팅 가능). 한도를 다시 두려면 0.5 등으로
+  BET_TIERS:[150,200,300,400,500],   // 선택 가능한 배당(%): 승리 시 순이익 = 건 금액 × 배당%
+  BET_DEFAULT:150,
+};
+const Economy = (() => {
+  const pad = n => String(n).padStart(2,'0');
+  function dayKey(now=new Date()){
+    const d=new Date(now.getTime() - ECON.RESET_HOUR*3600*1000);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  const clampPool = x => Math.min(ECON.POOL_MAX, Math.max(ECON.POOL_MIN, x));
+  const fresh = (now) => ({v:ECON.VERSION, gold:ECON.START_GOLD, pool:ECON.POOL_START, poolDay:dayKey(now), bet:0});
+
+  // 날짜가 바뀌었으면 풀 초기화
+  function refresh(save, now=new Date()){
+    const k=dayKey(now);
+    return save.poolDay===k ? save : {...save, pool:ECON.POOL_START, poolDay:k};
+  }
+  function sanitize(raw, now){
+    const base=fresh(now);
+    if(!raw || typeof raw!=='object') return base;
+    const num=(x,d)=>Number.isFinite(x)?x:d;
+    return {v:ECON.VERSION,
+      gold:Math.max(0, Math.floor(num(raw.gold, base.gold))),
+      pool:clampPool(num(raw.pool, base.pool)),
+      poolDay:typeof raw.poolDay==='string'?raw.poolDay:base.poolDay,
+      bet:Math.max(0, Math.floor(num(raw.bet, 0)))};
+  }
+  const poolNow = save => Math.round(clampPool(save.pool));
+  function maxBet(save){
+    if(save.gold<1) return 0;
+    return Math.max(1, Math.floor(save.gold*ECON.BET_MAX_RATIO));
+  }
+  const betWinNet = (amount, pct=ECON.BET_DEFAULT) => Math.round(amount*pct/100);   // 승리 시 순이익
+
+  // 배팅 시작: 즉시 차감. 잘못된 금액이면 null.
+  function placeBet(save, amount){
+    if(!Number.isInteger(amount) || amount<1 || amount>maxBet(save)) return null;
+    return {...save, gold:save.gold-amount, bet:amount};
+  }
+  // ctx: {difficulty:'easy'|'normal', mode:'normal'|'bet', bet:number, payoutPct:number, pool:number, winner:0|1|null}  (winner 0 = 나)
+  function settle(save, ctx){
+    const win = ctx.winner===0, draw = ctx.winner===null;
+    let next={...save}, payout=0, net=0, poolFrom=Math.round(save.pool), poolTo=poolFrom, kind='none';
+    if(ctx.difficulty==='easy'){
+      kind='easy'; if(win){ payout=ECON.EASY_WIN; net=payout; }
+    } else if(ctx.mode==='bet'){
+      kind='bet'; const bet=ctx.bet||0;
+      if(win){ payout=bet+betWinNet(bet, ctx.payoutPct); net=payout-bet; }
+      else if(draw){ payout=bet; net=0; }            // 무승부는 환불
+      else { payout=0; net=-bet; }
+      next.bet=0;                                      // 풀은 건드리지 않는다
+    } else {
+      kind='normal';
+      if(win){ payout=Math.round(clampPool(ctx.pool)); net=payout; next.pool=clampPool(save.pool*ECON.POOL_UP); }
+      else if(!draw){ next.pool=clampPool(save.pool*ECON.POOL_DOWN); }
+      poolTo=Math.round(next.pool);
+    }
+    next.gold=save.gold+payout;
+    return {save:next, summary:{kind, win, draw, payout, net, poolFrom, poolTo, bet:ctx.bet||0, payoutPct:ctx.payoutPct||ECON.BET_DEFAULT}};
+  }
+
+  // ---- 저장소 ----
+  let memory=null;
+  const Store = {
+    read(){ try{ const t=localStorage.getItem(ECON.SAVE_KEY); return t?JSON.parse(t):memory; }catch(e){ return memory; } },
+    write(save){ memory=save; try{ localStorage.setItem(ECON.SAVE_KEY, JSON.stringify(save)); }catch(e){} },
+  };
+  let cur=null, forfeited=0;
+  function load(now=new Date()){
+    const raw=Store.read();
+    let sv=refresh(sanitize(raw, now), now);
+    if(sv.bet>0){ forfeited=sv.bet; sv={...sv, bet:0}; }   // 게임 도중 종료된 배팅은 잃은 것으로 처리
+    cur=sv; Store.write(cur); return cur;
+  }
+  const get = () => { cur=refresh(cur||load()); return cur; };
+  const set = sv => { cur=sv; Store.write(cur); return cur; };
+  const takeForfeited = () => { const f=forfeited; forfeited=0; return f; };
+  return {dayKey, refresh, sanitize, poolNow, maxBet, betWinNet, placeBet, settle, load, get, set, takeForfeited};
+})();
+</script>
+
+<!-- =====================================================================
+     [2] 로컬 호스트 + 화면
+     - Host 가 지금은 같은 브라우저 안의 "가짜 서버". 나중에 이 객체만 WebSocket 으로 교체:
+         submit(seat, action) → ws.send(행동 메시지) / 응답(STATE_SYNC: view + events) 수신
+     - 화면은 view 만 읽어 그리고, 클릭은 행동 객체로 바꿔 submit 한다. 룰 판정은 하지 않는다.
+     - 연출은 events 를 순서대로 재생한다 (판정은 이미 끝난 상태).
+     ===================================================================== -->
+<script id="ui">
+const MY=0, OPP=1;
+const Host = {
+  state:null,
+  start(mods, deck){ this.state=newGame(Math.random, {mods:[{}, mods||{}], decks:[deck||null, null]}); },   // AI(좌석 1)에게만 치트 적용 / 내 덱은 편집한 덱
+  view(seat){ return viewFor(this.state, seat); },
+  submit(seat, action){
+    const r=apply(this.state, action, seat);
+    if(r.ok) this.state=r.state;
+    return {ok:r.ok, error:r.error, events:r.events};
+  }
+};
+// 난이도 → 상대 Player. bot:null 이면 아직 구현 전이라 선택할 수 없다.
+const DIFFICULTY = {
+  easy:   {label:'초급', desc:'완전 무작위로 행동하는 AI',      bot:BotPlayers.random},
+  normal: {label:'중급', desc:'규칙 기반으로 행동하는 AI',      bot:BotPlayers.rule},
+  normal2:{label:'중급2', desc:'한 수 앞을 보고 교환·마무리를 계산하는 AI (중급보다 강함)', bot:BotPlayers.rule2},
+  hard:   {label:'상급', desc:'강화학습 기반 AI',               bot:null},   // TODO: 학습한 정책(BotPlayer)이 준비되면 연결
+};
+let Bot = null;                    // 상대 좌석을 움직이는 Player (나중에 원격 사람으로 교체)
+let game = null;                   // {key, mode, bet, tier, cheats, pool, settled, result} 현재 판의 보상 정보
+let curKey = 'normal';           // 일반/배팅 선택 화면에서 고른 중급 계열 난이도 (normal | normal2)
+let betTier = ECON.BET_DEFAULT;    // 배팅 화면에서 고른 배당(%)
+const fmt = n => Number(n).toLocaleString('ko-KR');
+
+let view=null;
+const ui={selected:null, pending:null, busy:false};
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+const $ = id => document.getElementById(id);
+
+// ---------- 툴팁: data-tip 속성이 있는 요소에 마우스를 올리거나(터치는 탭) 포커스하면 설명을 띄운다 ----------
+const tipEl=document.createElement('div'); tipEl.id='tip'; document.body.appendChild(tipEl);
+function showTip(el){
+  tipEl.textContent=el.dataset.tip; tipEl.style.display='block';
+  const r=el.getBoundingClientRect(), w=tipEl.offsetWidth, h=tipEl.offsetHeight;
+  const x=Math.max(6, Math.min(innerWidth-w-6, r.left+r.width/2-w/2));
+  let y=r.top-h-8; if(y<6) y=r.bottom+8;                 // 위에 자리가 없으면 아래로
+  tipEl.style.left=x+'px'; tipEl.style.top=y+'px';
+}
+function hideTip(){ tipEl.style.display='none'; }
+const tipOwner = e => (e.target.closest && e.target.closest('[data-tip]')) || null;
+document.addEventListener('mouseover', e=>{ const c=tipOwner(e); if(c) showTip(c); });
+document.addEventListener('mouseout',  e=>{ if(tipOwner(e)) hideTip(); });
+document.addEventListener('focusin',   e=>{ const c=tipOwner(e); if(c) showTip(c); });
+document.addEventListener('focusout',  e=>{ if(tipOwner(e)) hideTip(); });
+document.addEventListener('click',     e=>{ const c=tipOwner(e); if(c) showTip(c); else hideTip(); });   // 터치 기기용
+
+// ---------- 로그 / 이벤트 문장 ----------
+function logLine(msg){
+  const list=$('logList'), item=document.createElement('div');
+  item.textContent=msg; list.appendChild(item);
+  while(list.children.length>60) list.removeChild(list.firstChild);
+}
+const who = seat => seat===MY ? '내' : '상대';
+const heroLabel = seat => seat===MY ? '내 영웅' : '상대 영웅';
+const tLabel = (t,name) => t.kind==='hero' ? heroLabel(t.seat) : name;
+function eventText(ev){
+  switch(ev.type){
+    case 'turn_start': return ev.seat===MY ? '당신의 턴입니다.' : '상대의 턴입니다.';
+    case 'spell': return `${ev.seat===MY?'당신이':'상대가'} 주문 「${ev.name}」 사용: 이번 턴 마나 +${ev.gain}`;
+    case 'draw':
+      if(ev.src) return `${who(ev.src.seat)} ${ev.src.name}: 카드 ${ev.count+ev.burned}장 뽑기`;
+      return ev.burned ? `${who(ev.seat)} 손패가 가득 차 카드 ${ev.burned}장이 소멸했습니다.` : null;
+    case 'summon': return ev.seat===MY ? `${ev.name} 소환!` : `상대가 ${ev.name}을(를) 소환!`;
+    case 'attack': return `${who(ev.seat)} ${ev.name} → ${ev.targetName || heroLabel(ev.target.seat)} 공격!`;
+    case 'damage':
+      if(ev.absorbed) return `${ev.name}의 보호막이 파괴됐습니다!`;
+      if(ev.cause==='battlecry') return `${who(ev.src.seat)} ${ev.src.name}: ${tLabel(ev.target,ev.name)}에게 ${ev.amount} 피해`;
+      return ev.target.kind==='hero' ? `${heroLabel(ev.target.seat)}에게 ${ev.amount} 피해` : null;
+    case 'heal': return `${who(ev.src.seat)} ${ev.src.name}: ${tLabel(ev.target,ev.name)} 체력 ${ev.amount} 회복`;
+    case 'buff': return `${who(ev.src.seat)} ${ev.src.name}: ${ev.name} +${ev.value}/+${ev.value}`;
+    case 'ignored': return `${who(ev.seat)} ${ev.src.name}: 대상이 없어 효과 무시`;
+    case 'mana': return `${who(ev.src.seat)} ${ev.src.name}: 이번 턴 마나 +${ev.amount}`;
+    case 'revive': return `${who(ev.seat)} ${ev.name}: 부활! (체력 1)`;
+    case 'echo': return `${who(ev.seat)} ${ev.name}: 전투의 함성이 한 번 더 발동!`;
+    case 'surrender': return `${who(ev.seat)} 항복했습니다.`;
+    case 'death': return `${who(ev.seat)} ${ev.name} 파괴됨`;
+    case 'game_over': return ev.winner===null ? '무승부' : (ev.winner===MY ? '승리!' : '패배...');
+    default: return null;
+  }
+}
+
+// ---------- 연출 ----------
+const zoneEl = seat => $(seat===MY ? 'playerZone' : 'aiZone');
+const heroEl = seat => $(seat===MY ? 'playerHero' : 'aiHero');
+function elOf(t){
+  if(t.kind==='hero') return heroEl(t.seat);
+  return zoneEl(t.seat).querySelector(`.card[data-id="${t.id}"]`);
+}
+function floatOn(t, text, cls){
+  const el=elOf(t); if(!el) return;
+  const r=el.getBoundingClientRect(), f=document.createElement('div');
+  f.className='float '+cls; f.textContent=text;
+  f.style.left=(r.left+r.width/2)+'px'; f.style.top=(r.top+r.height/2)+'px';
+  document.body.appendChild(f); setTimeout(()=>f.remove(), 950);
+}
+function showEffect(ev){
+  if(ev.type==='damage'){
+    if(ev.absorbed) floatOn(ev.target,'🛡','shield'); else floatOn(ev.target,'-'+ev.amount,'dmg');
+  } else if(ev.type==='heal'){ floatOn(ev.target,'+'+ev.amount,'heal'); }
+  else if(ev.type==='buff'){ floatOn(ev.target,`+${ev.value}/+${ev.value}`,'buff'); }
+  else if(ev.type==='death'){ const el=elOf(minionT(ev.seat, ev.id)); if(el) el.classList.add('dead'); }
+  else if(ev.type==='revive'){ floatOn(minionT(ev.seat, ev.id),'부활!','heal'); }
+  else if(ev.type==='mana'){ floatOn(heroT(ev.seat),'마나 +'+ev.amount,'buff'); }
+}
+async function lungeApproach(ev){
+  const a=elOf(minionT(ev.seat, ev.attackerId)), t=elOf(ev.target);
+  if(!a||!t) return;
+  const r1=a.getBoundingClientRect(), r2=t.getBoundingClientRect();
+  const dx=(r2.left+r2.width/2)-(r1.left+r1.width/2), dy=(r2.top+r2.height/2)-(r1.top+r1.height/2);
+  a.setAttribute('data-attacking','1');
+  a.style.transition='transform .15s ease-in';
+  a.style.transform=`translate(${dx*0.7}px,${dy*0.7}px) scale(1.08)`;
+  await sleep(160);
+}
+async function lungeRetract(ev){
+  const a=elOf(minionT(ev.seat, ev.attackerId)); if(!a) return;
+  a.style.transition='transform .15s ease-out';
+  a.style.transform='translate(0,0) scale(1)';
+  await sleep(160);
+}
+// 현재 DOM 은 "행동 직전" 상태. 이벤트를 연출한 뒤 호출자가 최종 상태로 render 한다.
+// 주문을 쓰면 화면 가운데에 카드를 2초간 크게 보여준다 (상대가 쓴 것도 똑같이 보여줘서 무슨 주문인지 알 수 있게)
+async function showSpellCast(ev){
+  const ov=document.createElement('div'); ov.id='spellCast';
+  ov.appendChild(cardEl(ev.card));
+  const cap=document.createElement('div'); cap.className='cap';
+  cap.textContent=`${ev.seat===MY?'당신이':'상대가'} 주문을 사용했습니다`;
+  ov.appendChild(cap);
+  document.body.appendChild(ov);
+  await sleep(2000);
+  ov.remove();
+}
+async function playEvents(evs){
+  for(let i=0;i<evs.length;i++){
+    const ev=evs[i];
+    if(ev.type==='spell'){ logLine(eventText(ev)); await showSpellCast(ev); continue; }
+    if(ev.type==='attack'){
+      const group=[];
+      while(i+1<evs.length && (evs[i+1].type==='damage'||evs[i+1].type==='death'||evs[i+1].type==='revive')) group.push(evs[++i]);
+      logLine(eventText(ev));
+      await lungeApproach(ev);
+      for(const g of group){ const t=eventText(g); if(t) logLine(t); showEffect(g); }
+      await sleep(240);
+      await lungeRetract(ev);
+      continue;
+    }
+    const t=eventText(ev); if(t) logLine(t);
+    showEffect(ev);
+    await sleep(ev.type==='summon'?250 : (ev.type==='damage'||ev.type==='heal'||ev.type==='buff'||ev.type==='death')?320 : 80);
+  }
+}
+
+// ---------- 행동 실행 ----------
+async function perform(seat, action){
+  const r=Host.submit(seat, action);
+  if(!r.ok) return r;
+  await playEvents(r.events);
+  view=Host.view(MY);
+  render();
+  return r;
+}
+async function playerAction(action){
+  if(ui.busy) return;
+  ui.busy=true; ui.selected=null; ui.pending=null; stopArrow();
+  const r=await perform(MY, action);
+  if(!r.ok){ logLine('⚠ '+r.error); ui.busy=false; render(); return; }
+  if(!Host.state.over && Host.state.turn===OPP) await runOpponentTurn();
+  if(Host.state.over) finishGame();
+  ui.busy=false; render();
+}
+// 게임 종료 시 정확히 한 번만 정산
+function finishGame(){
+  if(!game || game.settled) return;
+  game.settled=true;
+  const winner=Host.state.winner;
+  const r=Economy.settle(Economy.get(), {difficulty:game.key, mode:game.mode, bet:game.bet, payoutPct:game.tier, pool:game.pool, winner});
+  Economy.set(r.save);
+  game.result=r.summary;
+  updateWallet();
+  const m=r.summary;
+  if(m.kind==='easy') logLine(m.win?`보상 +${m.payout}골드`:'보상 없음');
+  else if(m.kind==='bet') logLine(m.win?`배팅 성공! (${m.payoutPct}%) +${fmt(m.net)}골드`:m.draw?'무승부: 배팅 금액 환불':`배팅 실패... -${fmt(m.bet)}골드`);
+  else logLine(m.win?`보상 +${fmt(m.payout)}골드 (풀 ${m.poolFrom}→${m.poolTo})`:m.draw?'무승부: 변동 없음':`풀 ${m.poolFrom}→${m.poolTo}`);
+}
+function rewardHTML(){
+  const m=game && game.result; if(!m) return '';
+  const sign=n=>n>0?`<span class="plus">+${fmt(n)}골드</span>`:n<0?`<span class="minus">${fmt(n)}골드</span>`:'<span>±0골드</span>';
+  let top, sub='';
+  if(m.kind==='easy') top=m.win?sign(m.payout):'<span>획득 골드 없음</span>';
+  else if(m.kind==='bet'){ top=sign(m.net); sub=m.win?`배팅 ${fmt(m.bet)}골드 × 배당 ${m.payoutPct}% → ${fmt(m.payout)}골드 반환`:m.draw?'무승부로 배팅 금액이 환불되었습니다':`배팅 ${fmt(m.bet)}골드를 잃었습니다`; }
+  else { top=m.win?sign(m.payout):'<span>획득 골드 없음</span>'; sub=m.draw?'':`오늘의 보상 풀 ${m.poolFrom} → ${m.poolTo}`; }
+  return `${top}<span class="sub2">${sub}</span><span class="sub2">보유 골드 ${fmt(Economy.get().gold)}</span>`;
+}
+async function runOpponentTurn(){
+  while(!Host.state.over && Host.state.turn===OPP){
+    await sleep(450);
+    let act=Bot.decide(Host.view(OPP));
+    let r=await perform(OPP, act);
+    if(!r.ok){ console.error('봇이 불법 행동 시도:', act, r.error); act={type:'END_TURN'}; r=await perform(OPP, act); }
+    if(act.type==='END_TURN') break;
+  }
+}
+
+// ---------- 입력 → 행동 ----------
+function playCard(c){
+  if(ui.busy || view.turn!==MY || view.over) return;
+  const entries=view.legal.filter(a=>a.type==='PLAY_CARD' && a.cardId===c.id);
+  if(!entries.length){
+    logLine(c.cost>view.me.mana ? '마나가 부족합니다.' : view.me.board.length>=CONFIG.MAX_BOARD ? '전장이 가득 찼습니다.' : '지금은 낼 수 없는 카드입니다.');
+    return;
+  }
+  ui.selected=null; stopArrow();
+  if(entries.length===1){ playerAction(entries[0]); return; }
+  ui.pending={cardId:c.id, entries};
+  logLine('대상을 선택하세요.');
+  render();
+}
+function isPendingTarget(t){ return !!ui.pending && ui.pending.entries.some(a=>tkey(a.target)===tkey(t)); }
+function resolvePending(t){
+  if(!isPendingTarget(t)) return;
+  playerAction(ui.pending.entries.find(a=>tkey(a.target)===tkey(t)));
+}
+function cancelPending(){ ui.pending=null; render(); }
+document.addEventListener('click', e=>{
+  if(!ui.pending) return;
+  if(e.target.closest && (e.target.closest('.card')||e.target.closest('.hero'))) return;
+  ui.pending=null; render();
+}, true);
+
+function selectMinion(m, canAttack){
+  if(ui.busy || !canAttack) return;
+  if(ui.selected===m.id){ ui.selected=null; stopArrow(); render(); return; }
+  ui.selected=m.id; render();
+  const el=zoneEl(MY).querySelector(`.card[data-id="${m.id}"]`);
+  if(el) startArrow(el);
+}
+function attackTarget(t){
+  if(ui.busy || ui.selected===null) return;
+  const a=view.legal.find(x=>x.type==='ATTACK' && x.attackerId===ui.selected && tkey(x.target)===tkey(t));
+  if(!a){ logLine(view.opp.board.some(m=>m.taunt) ? '상대 도발 하수인을 먼저 공격해야 합니다.' : '공격할 수 없습니다.'); return; }
+  playerAction(a);
+}
+$('endTurnBtn').onclick=()=>{ if(!ui.busy && view.turn===MY && !view.over && !ui.pending) playerAction({type:'END_TURN'}); };
+
+// 항복: 실수 방지를 위해 두 번 눌러야 한다 (첫 클릭 → 3초간 "정말 항복?" → 한 번 더 누르면 항복)
+let surrenderTimer=null;
+function resetSurrenderBtn(){
+  clearTimeout(surrenderTimer); surrenderTimer=null;
+  const b=$('surrenderBtn'); b.textContent='항복'; b.classList.remove('armed');
+}
+$('surrenderBtn').onclick=()=>{
+  if(ui.busy || !view || view.over) return;
+  if(!surrenderTimer){
+    const b=$('surrenderBtn');
+    b.textContent = game && game.mode==='bet' ? `정말 항복? (−${fmt(game.bet)}G)` : '정말 항복?';
+    b.classList.add('armed');
+    surrenderTimer=setTimeout(resetSurrenderBtn, 3000);
+    return;
+  }
+  resetSurrenderBtn();
+  playerAction({type:'SURRENDER'});
+};
+
+// ---------- 조준 화살표 ----------
+function outsideCancel(e){
+  if(e.target.closest && (e.target.closest('.card')||e.target.closest('#aiHero'))) return;
+  ui.selected=null; stopArrow(); render();
+}
+function startArrow(attackerEl){
+  $('arrowSvg').style.display='block';
+  document.addEventListener('mousemove', onArrowMove);
+  document.addEventListener('touchmove', onArrowTouchMove, {passive:false});
+  document.addEventListener('click', outsideCancel, true);
+  const r=attackerEl.getBoundingClientRect();
+  drawArrow(r.left+r.width/2, r.top, r.left+r.width/2, r.top);
+}
+function stopArrow(){
+  $('arrowSvg').style.display='none';
+  document.removeEventListener('mousemove', onArrowMove);
+  document.removeEventListener('touchmove', onArrowTouchMove);
+  document.removeEventListener('click', outsideCancel, true);
+}
+function onArrowMove(e){ moveArrowTip(e.clientX, e.clientY); }
+function onArrowTouchMove(e){ if(e.touches[0]){ moveArrowTip(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }
+function moveArrowTip(x,y){
+  if(ui.selected===null) return;
+  const el=zoneEl(MY).querySelector(`.card[data-id="${ui.selected}"]`); if(!el) return;
+  const r=el.getBoundingClientRect();
+  drawArrow(r.left+r.width/2, r.top, x, y);
+}
+function drawArrow(x1,y1,x2,y2){
+  const line=$('arrowLine');
+  line.setAttribute('x1',x1); line.setAttribute('y1',y1); line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+}
+
+// ---------- 렌더 (view 만 읽는다) ----------
+function cardEl(c, opts={}){
+  const el=document.createElement('div');
+  el.className='card'+(opts.extra?(' '+opts.extra):'');
+  el.dataset.id=c.id;
+  let tags='';
+  if(c.taunt) tags+='<span class="tag taunt">도발</span>';
+  if(c.shield) tags+='<span class="tag shield">보호막</span>';
+  if(c.charge) tags+='<span class="tag charge">돌진</span>';
+  if(c.revive) tags+='<span class="tag revive">부활</span>';
+  const eff=effectText(c);
+  if(c.type==='spell'){
+    el.classList.add('spell');
+    el.innerHTML=`<div class="cost">${c.cost}</div><div class="cname">${c.name}</div><div class="effect">${eff}</div><div class="stats spelltype">✦ 주문 ✦</div>`;
+  } else {
+    el.innerHTML=`<div class="cost">${c.cost}</div><div class="cname">${c.name}</div><div class="effect">${tags}${tags&&eff?'<br>':''}${eff}</div><div class="stats"><span class="atk">${c.atk}</span><span class="life">${c.hp}</span></div>`;
+  }
+  if(opts.onClick) el.onclick=opts.onClick;
+  return el;
+}
+
+// 마나 표시 (내 쪽·상대 쪽 공통). '매 턴 마나 +N' 치트가 있으면 그 추가분까지 총량에 포함한다.
+function renderMana(textId, crystalsId, p){
+  const total=Math.max(1, p.maxMana+((p.mods&&p.mods.manaBonus)||0));
+  $(textId).textContent=`마나 ${p.mana} / ${total}`;
+  const cz=$(crystalsId); cz.innerHTML='';
+  for(let i=0;i<Math.max(total, p.mana);i++){     // 동전 등으로 최대치를 넘긴 마나도 수정으로 보여준다
+    const d=document.createElement('div'); d.className='crystal'+(i<p.mana?'':' empty'); cz.appendChild(d);
+  }
+}
+function renderOppHand(n){
+  const box=$('aiHand'); box.innerHTML='';
+  for(let i=0;i<n;i++){ const b=document.createElement('div'); b.className='card-back'; box.appendChild(b); }   // 내용은 알 수 없으므로 뒷면만
+}
+function renderCheats(){
+  const box=$('aiCheats'); box.innerHTML='';
+  hideTip();   // 칩을 다시 만들면 마우스 아웃 이벤트가 안 오므로 남아 있는 툴팁을 치운다
+  ((game&&game.cheats)||[]).forEach(c=>{ const el=document.createElement('span'); el.className='chip'; el.textContent=c.name; el.dataset.tip=c.desc; el.tabIndex=0; box.appendChild(el); });
+}
+function render(){
+  const v=view, me=v.me, op=v.opp;
+  renderCheats();
+  renderOppHand(op.handCount);
+  $('playerHp').textContent=Math.max(0, me.hp);
+  $('aiHp').textContent=Math.max(0, op.hp);
+  renderMana('manaText','crystals',me);
+  renderMana('aiManaText','aiCrystals',op);
+  $('aiHandCnt').textContent=op.handCount; $('aiDeckCnt').textContent=op.deckCount; $('myDeckCnt').textContent=me.deckCount;
+
+  const active = v.turn===MY && !v.over && !ui.busy;
+  const legal = active ? v.legal : [];
+  const pending = ui.pending;
+
+  const hand=$('hand'); hand.innerHTML='';
+  me.hand.forEach(c=>{
+    const isPending = !!pending && pending.cardId===c.id;
+    const playable = legal.some(a=>a.type==='PLAY_CARD' && a.cardId===c.id) && (!pending || isPending);
+    const extra=(playable?'':'unaffordable')+(isPending?' selected':'');
+    hand.appendChild(cardEl(c, {extra, onClick:()=> isPending ? cancelPending() : playCard(c)}));
+  });
+
+  const pz=zoneEl(MY); pz.innerHTML='';
+  me.board.forEach(m=>{
+    const canAttack = !pending && legal.some(a=>a.type==='ATTACK' && a.attackerId===m.id);
+    const t=minionT(MY, m.id), isTarget=isPendingTarget(t);
+    const extra=(ui.selected===m.id?'selected':'')+(canAttack?' attackable':'')+(m.summoned&&!m.charge?' sick':'')+(isTarget?' targetable':'')+(m.taunt?' taunt':'')+(m.shield?' shielded':'');
+    pz.appendChild(cardEl(m, {extra, onClick: pending ? ()=>resolvePending(t) : ()=>selectMinion(m, canAttack)}));
+  });
+
+  const az=zoneEl(OPP); az.innerHTML='';
+  op.board.forEach(m=>{
+    const t=minionT(OPP, m.id);
+    const isTarget=isPendingTarget(t) || (ui.selected!==null && legal.some(a=>a.type==='ATTACK' && a.attackerId===ui.selected && tkey(a.target)===tkey(t)));
+    const extra=(m.summoned&&!m.charge?'sick':'')+(isTarget?' targetable':'')+(m.taunt?' taunt':'')+(m.shield?' shielded':'');
+    az.appendChild(cardEl(m, {extra, onClick: pending ? ()=>resolvePending(t) : ()=>attackTarget(t)}));
+  });
+
+  $('endTurnBtn').disabled = !active || !!pending;
+  $('surrenderBtn').disabled = v.over || ui.busy;
+  if(v.over || ui.busy) resetSurrenderBtn();
+
+  const myHeroT=heroT(MY), opHeroT=heroT(OPP);
+  const myHeroTarget=isPendingTarget(myHeroT);
+  const opHeroTarget=isPendingTarget(opHeroT) || (ui.selected!==null && legal.some(a=>a.type==='ATTACK' && a.attackerId===ui.selected && tkey(a.target)===tkey(opHeroT)));
+  $('playerHero').classList.toggle('targetable', myHeroTarget);
+  $('aiHero').classList.toggle('targetable', opHeroTarget);
+  $('playerHero').onclick = myHeroTarget ? ()=>resolvePending(myHeroT) : null;
+  $('aiHero').onclick = pending ? (opHeroTarget ? ()=>resolvePending(opHeroT) : null) : ()=>attackTarget(opHeroT);
+
+  if(v.over){
+    $('overlay').classList.add('show');
+    $('overlayText').textContent = v.winner===null ? '무승부' : (v.winner===MY ? '승리했습니다!' : '패배했습니다...');
+    $('overlayReward').innerHTML = rewardHTML();
+  }
+  if($('deckModal').classList.contains('show')) renderDeckModal();
+}
+
+// ---------- 내 덱 보기 ----------
+function renderDeckModal(){
+  if(!view) return;
+  const rem={};
+  for(const c of view.me.deckCards) rem[c.name]=(rem[c.name]||0)+1;
+  const mine=countsOf((game&&game.deckNames)||defaultDeckList());      // 이번 판에 넣은 내 덱 구성
+  const total=Object.values(mine).reduce((a,b)=>a+b,0);
+  $('deckTitle').textContent=`내 덱 — 남은 카드 ${view.me.deckCount}장 / 전체 ${total}장`;
+  const grid=$('deckGrid'); grid.innerHTML='';
+  CARD_POOL.forEach(c=>{
+    const k=mine[c.name]||0; if(!k) return;                             // 덱에 넣지 않은 카드는 보여주지 않는다
+    const n=rem[c.name]||0;
+    const el=cardEl(c, {extra:n?'':'drawn'});
+    const badge=document.createElement('div');
+    badge.className='copies'; badge.textContent=`${n}/${k}`;
+    el.appendChild(badge);
+    grid.appendChild(el);
+  });
+}
+function openDeck(){ if(!view) return; renderDeckModal(); $('deckModal').classList.add('show'); }
+function closeDeck(){ $('deckModal').classList.remove('show'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDeck(); closeDeckEditor(); } });
+
+// ---------- 내 덱 저장소 (localStorage, 막혀 있으면 메모리) ----------
+const DeckBook = (() => {
+  const KEY='cardDuel.deck'; let memory=null;
+  const read=()=>{ try{ const t=localStorage.getItem(KEY); return t?JSON.parse(t):memory; }catch(e){ return memory; } };
+  const write=list=>{ memory=list; try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} };
+  return {
+    get(){ const raw=read(); return (raw && !validateDeckList(raw)) ? raw.slice() : defaultDeckList(); },   // 없거나 규칙에 안 맞으면 추천 덱
+    set(list){ if(validateDeckList(list)) return false; write(list.slice()); return true; },
+  };
+})();
+
+// ---------- 덱 편집 ----------
+const ed={counts:{}};
+function countsOf(list){ const c={}; list.forEach(n=>c[n]=(c[n]||0)+1); return c; }
+function listOf(counts){ const out=[]; CARD_POOL.forEach(c=>{ for(let k=0;k<(counts[c.name]||0);k++) out.push(c.name); }); return out; }
+const edTotal = () => Object.values(ed.counts).reduce((a,b)=>a+b,0);
+function edAdjust(name, d){
+  const n=(ed.counts[name]||0)+d;
+  if(n<0 || n>CONFIG.COPIES) return;
+  if(d>0 && edTotal()>=CONFIG.DECK_SIZE) return;
+  ed.counts[name]=n; renderDeckEditor();
+}
+function renderDeckEditor(){
+  const total=edTotal(), size=CONFIG.DECK_SIZE, full=total===size;
+  $('edTitle').textContent=`덱 편집 — ${total} / ${size}장`;
+  $('edNote').textContent = full
+    ? '저장할 수 있습니다. 카드를 누르면 1장 추가되고, +/− 버튼으로 조절할 수 있습니다.'
+    : `정확히 ${size}장을 채워야 저장할 수 있습니다 (같은 카드는 최대 ${CONFIG.COPIES}장).`;
+  const byCost={}; CARD_POOL.forEach(c=>{ byCost[c.cost]=(byCost[c.cost]||0)+(ed.counts[c.name]||0); });
+  $('edCurve').textContent='마나 곡선  '+Object.keys(byCost).sort((a,b)=>a-b).map(k=>`${k}코 ${byCost[k]}장`).join(' · ');
+  $('edSave').disabled=!full;
+  const grid=$('edGrid'), st=grid.scrollTop; grid.innerHTML='';
+  CARD_POOL.forEach(c=>{
+    const n=ed.counts[c.name]||0;
+    const item=document.createElement('div'); item.className='ed-item'+(n?'':' zero');
+    item.appendChild(cardEl(c, {onClick:()=>edAdjust(c.name, +1)}));
+    const ctl=document.createElement('div'); ctl.className='ed-ctl';
+    const minus=document.createElement('button'); minus.textContent='−'; minus.disabled=n<=0; minus.onclick=()=>edAdjust(c.name, -1);
+    const plus=document.createElement('button');  plus.textContent='+';  plus.disabled=n>=CONFIG.COPIES || full; plus.onclick=()=>edAdjust(c.name, +1);
+    const num=document.createElement('b'); num.textContent=n;
+    ctl.append(minus, num, plus); item.appendChild(ctl);
+    grid.appendChild(item);
+  });
+  grid.scrollTop=st;      // 다시 그려도 스크롤 위치 유지
+}
+function updateDeckMenuDesc(){ $('deckMenuDesc').textContent=`내 덱을 직접 구성합니다 (${CONFIG.DECK_SIZE}장, 같은 카드 최대 ${CONFIG.COPIES}장)`; }
+function openDeckEditor(){ ed.counts=countsOf(DeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }
+function closeDeckEditor(){ $('deckEditor').classList.remove('show'); }
+$('edSave').onclick=()=>{ if(edTotal()!==CONFIG.DECK_SIZE) return; DeckBook.set(listOf(ed.counts)); closeDeckEditor(); };
+$('edReset').onclick=()=>{ ed.counts=countsOf(defaultDeckList()); renderDeckEditor(); };
+$('edClose').onclick=closeDeckEditor;
+
+// ---------- 메뉴 / 게임 시작·종료 ----------
+function showScreen(name){
+  document.querySelectorAll('#menu .screen').forEach(el=>el.classList.toggle('show', el.id==='screen-'+name));
+}
+function updateWallet(){
+  const g=fmt(Economy.get().gold);
+  document.querySelectorAll('.walletView').forEach(el=>el.textContent=`💰 ${g}`);
+}
+function rewardDesc(key){
+  if(key==='easy') return `승리 시 ${ECON.EASY_WIN}골드 · 패배 시 0골드`;
+  if(key==='normal' || key==='normal2') return '일반 / 배팅 모드 선택 가능';
+  return '';
+}
+function buildDifficultyButtons(){
+  const box=$('difficultyList'); box.innerHTML='';
+  for(const [key,d] of Object.entries(DIFFICULTY)){
+    const b=document.createElement('button');
+    b.className='menu-btn';
+    const rd=d.bot?rewardDesc(key):'';
+    b.innerHTML=`${d.label}${d.bot?'':'<span class="soon">준비 중</span>'}<span class="desc">${d.desc}</span>${rd?`<span class="desc">💰 ${rd}</span>`:''}`;
+    b.disabled=!d.bot;
+    b.onclick=()=> (key==='normal' || key==='normal2') ? openPlayMode(key) : startGame(key,{mode:'normal'});
+    box.appendChild(b);
+  }
+}
+// ---- 중급: 일반 / 배팅 선택 ----
+function openPlayMode(key='normal'){
+  curKey=key;
+  $('playmodeTitle').textContent=`${DIFFICULTY[key].label} AI — 방식 선택`;
+  const sv=Economy.get(), pool=Economy.poolNow(sv);
+  $('btnNormalMode').innerHTML=`일반 모드<span class="desc">참가비 없음 · 승리 시 오늘의 보상 <b>${pool}골드</b></span><span class="desc">승리하면 보상 +5%, 패배하면 −5% (매일 새벽 ${ECON.RESET_HOUR}시 ${ECON.POOL_START}골드로 초기화)</span>`;
+  const mb=Economy.maxBet(sv);
+  $('btnBetMode').disabled = mb<1;
+  $('btnBetMode').innerHTML=`배팅 모드${mb<1?'<span class="soon">골드 부족</span>':''}<span class="desc">골드를 걸고 대전 · 배당 ${ECON.BET_TIERS[0]}~${ECON.BET_TIERS[ECON.BET_TIERS.length-1]}% 선택, 패배 시 건 골드를 모두 잃음</span><span class="desc">배당 200% 이상은 상대 AI가 치트를 받습니다 · 보상 풀과는 별개 (최대 ${fmt(mb)}골드)</span>`;
+  showScreen('playmode');
+}
+// ---- 배팅 화면 ----
+function betBounds(){ const sv=Economy.get(); return {gold:sv.gold, min:1, max:Economy.maxBet(sv)}; }
+function readBet(){
+  const {min,max}=betBounds();
+  let v=Math.floor(Number($('betInput').value));
+  if(!Number.isFinite(v)) v=min;
+  return Math.min(max, Math.max(min, v));
+}
+function refreshBetUI(){
+  const {gold,min,max}=betBounds(), v=readBet();
+  $('betGold').textContent=fmt(gold)+'골드';
+  $('betMax').textContent=fmt(max)+'골드';
+  $('betRange').min=min; $('betRange').max=max; $('betRange').value=v;
+  $('betInput').min=min; $('betInput').max=max;
+  const net=Economy.betWinNet(v, betTier);
+  $('betResult').innerHTML=`승리 시 <span class="win">+${fmt(net)}</span> (총 ${fmt(v+net)}골드 반환) · 패배 시 <span class="lose">−${fmt(v)}</span>`;
+  buildTierToggle(); renderCheatInfo();
+  $('betGo').disabled = max<1;
+}
+function buildTierToggle(){
+  const box=$('tierToggle'); box.innerHTML='';
+  ECON.BET_TIERS.forEach(t=>{
+    const b=document.createElement('button'); b.textContent=t+'%'; b.className=t===betTier?'on':'';
+    b.onclick=()=>{ betTier=t; refreshBetUI(); };
+    box.appendChild(b);
+  });
+  $('betTierLabel').textContent=`${betTier}%`;
+}
+function renderCheatInfo(){
+  const box=$('cheatInfo'), t=CHEAT_TIERS[betTier], cands=cheatCandidates(betTier);
+  if(!t || t.count<=0){ box.textContent='치트 없음 — 기본 AI와 대전합니다.'; return; }
+  box.innerHTML=`상대 AI가 치트 <b>${t.count}개</b>를 받습니다 (게임 시작 때 아래 후보에서 무작위 추첨)<br>`+cands.map(c=>`<span class="chip" tabindex="0" data-tip="${c.desc}">${c.name}</span>`).join('')+'<br><span style="font-size:.68rem;">이름에 마우스를 올리면(터치는 탭) 자세한 효과가 보입니다.</span>';
+}
+function setBet(x){
+  const {min,max}=betBounds();
+  $('betInput').value = x==='min'?min : x==='max'?max : Math.max(min, Math.min(max, Math.floor(max*x)));
+  refreshBetUI();
+}
+function openBetScreen(){
+  betTier=ECON.BET_DEFAULT;
+  const {min,max}=betBounds();
+  $('betInput').value=Math.min(max, Math.max(min, Math.floor(max/2)||min));
+  refreshBetUI(); showScreen('bet');
+}
+$('betInput').addEventListener('input', refreshBetUI);
+$('betInput').addEventListener('change', ()=>{ $('betInput').value=readBet(); refreshBetUI(); });
+$('betRange').addEventListener('input', ()=>{ $('betInput').value=$('betRange').value; refreshBetUI(); });
+function confirmBet(){
+  const amount=readBet();
+  const placed=Economy.placeBet(Economy.get(), amount);
+  if(!placed){ refreshBetUI(); return; }
+  Economy.set(placed);                         // 시작 시점에 차감하고 즉시 저장
+  startGame(curKey, {mode:'bet', bet:amount, tier:betTier});
+}
+
+function startGame(key, opts={}){
+  const d=DIFFICULTY[key];
+  if(!d || !d.bot) return;
+  const mode=opts.mode||'normal', sv=Economy.get();
+  const tier = mode==='bet' ? (opts.tier||ECON.BET_DEFAULT) : 0;
+  const roll = mode==='bet' ? rollCheats(tier) : {mods:{}, list:[]};
+  game={key, mode, bet:mode==='bet'?(opts.bet||0):0, tier, cheats:roll.list, pool:Economy.poolNow(sv), settled:false, result:null};
+  Bot=d.bot;
+  game.deckNames=DeckBook.get();                 // 이번 판에 쓰는 내 덱(편집한 덱)
+  Host.start(roll.mods, game.deckNames);
+  view=Host.view(MY);
+  ui.selected=null; ui.pending=null; ui.busy=false; stopArrow(); closeDeck(); resetSurrenderBtn();
+  $('logList').innerHTML='';
+  $('overlay').classList.remove('show');
+  $('overlayReward').innerHTML='';
+  const tag = key==='easy' ? `승리 +${ECON.EASY_WIN}G` : mode==='bet' ? `배팅 ${fmt(game.bet)}G · ${tier}%` : `보상 ${game.pool}G`;
+  $('diffBadge').textContent=`${d.label} · ${tag}`;
+  $('menu').classList.add('hidden');
+  updateWallet();
+  const iFirst = Host.state.first===MY;
+  const bonusTxt = `시작 손패 +${CONFIG.SECOND_HAND}장 · 동전 1장`;
+  logLine(`게임 시작! (${d.label} 상대${mode==='bet'?` · 배팅 ${fmt(game.bet)}골드`:''}) ` + (iFirst ? `당신이 선공입니다. 후공(상대) 보너스: ${bonusTxt}. 당신의 턴입니다.` : `상대가 선공입니다. 후공(당신) 보너스: ${bonusTxt}.`));
+  $('diffBadge').textContent += iFirst ? ' · 선공' : ' · 후공';
+  if(game.cheats.length) logLine('⚠ 상대 치트: '+game.cheats.map(c=>c.desc).join(' / '));
+  render();
+  if(Host.state.turn===OPP){          // 상대가 선공이면 상대 턴부터 진행
+    ui.busy=true; render();
+    runOpponentTurn().then(()=>{ if(Host.state.over) finishGame(); ui.busy=false; render(); });
+  }
+}
+function goToMenu(){
+  $('overlay').classList.remove('show');
+  ui.selected=null; ui.pending=null; ui.busy=false; stopArrow(); closeDeck();
+  buildDifficultyButtons(); updateWallet();
+  showScreen('main');
+  $('menu').classList.remove('hidden');
+}
+
+// ---------- 시작: 메뉴 화면부터 ----------
+Economy.load();
+buildDifficultyButtons();
+updateWallet();
+updateDeckMenuDesc();
+{ const f=Economy.takeForfeited();
+  if(f>0){ const p=document.createElement('p'); p.className='notice warn'; p.textContent=`이전 판이 끝나기 전에 종료되어 배팅 ${fmt(f)}골드를 잃었습니다.`; $('screen-main').appendChild(p); } }
+showScreen('main');
+</script>
+</body>
+</html>
