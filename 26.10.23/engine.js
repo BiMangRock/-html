@@ -1,7 +1,7 @@
 // engine.js — 규칙·카드·봇 (화면 없음, 브라우저/Node 공용). 작업용 최신 엔진이며 analyze.js 가 이 파일을 쓴다.
 // 새 버전을 낼 때 이 내용 전체를 vNN.html 의 <script id="engine"> 안에 그대로 복사해 넣는다 (그래서 각 html 은 단독으로 열리고 그 버전의 규칙이 보존된다).
 // 규칙·카드를 고칠 때는 이 파일에서 고친 뒤, 새 버전 html 에 통째로 복사해 넣는다.
-const VERSION = 'v27';   // ★ 버전을 올릴 때는 여기 한 줄만 고친다 (분석 결과·화면 배지에 자동 반영)
+const VERSION = 'v28';   // ★ 버전을 올릴 때는 여기 한 줄만 고친다 (분석 결과·화면 배지에 자동 반영)
 const CONFIG = {HERO_HP:30, MAX_MANA:10, MAX_HAND:10, MAX_BOARD:7, START_HAND:3, START_HAND_MAX:7, COPIES:2, DECK_SIZE:30,
   SECOND_HAND:1, COIN_MANA:2};
 // 후공 보정: 시작 손패 +SECOND_HAND장, 그리고 주문 카드 '동전'(이번 턴 마나 +COIN_MANA) 1장. 선·후공 승률은 selfPlay(N, bot, bot)의 firstWins 로 잰다.
@@ -61,6 +61,9 @@ const CARD_POOL = [
   {type:'spell', name:"사냥개 떼",  cost:4, school:['자연'], effect:{type:'summon', count:3, atk:3, hp:1, token:'질주 사냥개'}},   // 속공 3/1 세 마리 소환 (이름은 임의로 정함)
   {type:'spell', name:"철벽 소집", cost:6, school:['신성'], effect:{type:'muster', total:6}},                                      // v26: 비용 합 6이 되도록 하수인 무작위 소환 + 도발 (이름은 임의로 정함)
   {type:'spell', name:"혼돈의 주문서", cost:10, school:['지옥'], effect:{type:'chaos', value:10}},                                  // v26: 무작위 주문 10회 사용 (이름은 임의로 정함)
+  {type:'spell', name:"고대의 축복", cost:3, school:['자연'], twin:true, effect:{type:'enhance', value:1}},                         // v28: 이중 주문 — 아군 하수인 +1/+1
+  {type:'spell', name:"숲의 지원군", cost:8, school:['자연'], twin:true, effect:{type:'summon', count:5, atk:2, hp:2, token:'나무정령', rush:false}},   // v28: 이중 주문 — 2/2 나무정령 5기 소환 (속공 아님)
+  {type:'spell', name:"일식",       cost:2, school:['자연'], effect:{type:'eclipse'}},                                                         // v28: 이번 턴에 시전하는 다음 주문을 2번 시전
   {type:'spell', name:"공중활강",   cost:7, school:['자연'], effect:{type:'glide', atk:1, hp:1, token:'활강병'}},                    // 속공 1/1 로 전장을 가득 채움. 이번 턴에 모두 죽으면 같은 수만큼 다시 소환
 ];
 const EFFECT_TEXT = {
@@ -110,7 +113,7 @@ function startDiscover(s, seat, e, ev, src, auto){             // e: {kind, min,
     ev.push({type:'discoverPick', seat, name:card.name, cost:card.cost, burned, auto:true});
     return;
   }
-  s.pending={seat, discount:e.value||0, options:opts};
+  s.pending={kind:'discover', seat, discount:e.value||0, options:opts};
   ev.push({type:'discover', seat, src});
 }
 const boltTargets = board => [...board].sort((a,b)=>b.atk-a.atk).slice(0,2);   // 번개: 공격력이 높은 둘 (동률이면 먼저 낸 하수인)
@@ -127,7 +130,8 @@ const freeSlots = (s, seat) => CONFIG.MAX_BOARD - s.seats[seat].board.length;
 function summonTokens(s, seat, n, tok, ev){                    // tok: {name, atk, hp}. 빈 자리만큼만 소환한다 (속공)
   const P=s.seats[seat], ids=[], bf=(P.mods&&P.mods.buff)||0;
   for(let i=0; i<n && P.board.length<CONFIG.MAX_BOARD; i++){
-    const m={type:'minion', name:tok.name, cost:1, atk:tok.atk, hp:tok.hp+bf, maxHp:tok.hp+bf, rush:true, id:s.nextId++, attacked:false, summoned:true};
+    const m={type:'minion', name:tok.name, cost:1, atk:tok.atk, hp:tok.hp+bf, maxHp:tok.hp+bf, id:s.nextId++, attacked:false, summoned:true};
+    if(tok.rush!==false) m.rush=true;                          // tok.rush===false 면 속공 없는 토큰 (숲의 지원군)
     P.board.push(m); ids.push(m.id);
     ev.push({type:'summon', seat, id:m.id, name:m.name});
   }
@@ -178,13 +182,21 @@ function castChaos(s, seat, c, ev){
     sweepDead(s, ev); checkGlide(s, ev);                        // 앞 주문으로 죽은 하수인을 치우고, 그 다음 주문을 고른다
     if(s.seats[0].hp<=0 || s.seats[1].hp<=0) break;             // 영웅이 쓰러지면 중단
     const sp=pool[Math.floor(nextRand(s)*pool.length)], fx=SPELL_FX[sp.effect.type], ts=cardTargets(s, seat, sp);
-    ev.push({type:'spell', seat, name:sp.name, gain:0, chaos:true, card:{type:'spell', name:sp.name, cost:sp.cost, effect:sp.effect}});
+    ev.push({type:'spell', seat, name:sp.name, gain:0, chaos:true, card:{type:'spell', name:sp.name, cost:sp.cost, effect:sp.effect, twin:sp.twin}});
     const fizzle = (fx.needsTarget && ts.length===0) || (fx.blocked && fx.blocked(s, seat))
                 || (sp.effect.type==='recall' && s.seats[seat].hand.length>=CONFIG.MAX_HAND);   // 대상 없음 · 전장이 가득/비어 있음 · 손패가 가득 찬 회수
     if(fizzle){ ev.push({type:'ignored', seat, fizzle:true, src:{seat, name:sp.name}}); continue; }
     const target=ts.length ? ts[Math.floor(nextRand(s)*ts.length)] : null;   // 대상도 무작위 (아군도 맞을 수 있다)
     castSpell(s, seat, {...sp, auto:true}, target, ev);         // auto: 발견 계열이 선택 창 대신 무작위로 고르게 한다
   }
+}
+// ---- v28 일식 도우미: 일식을 낸 뒤 2번 시전할 만한 주문이 손패에 있고 마나가 남는가 (봇 판단용) ----
+const ECLIPSE_BAD = ['mana','eclipse','glide','haste'];       // 2번 시전해도 이득이 없는 주문
+function eclipseHasPartner(view, c){
+  if(view.me.eclipse) return false;                           // 이미 걸려 있으면 또 쓰지 않는다
+  const left=view.me.mana-c.cost;
+  return view.me.hand.some(x=>x.id!==c.id && x.type==='spell' && !x.lifeCost && x.effect && x.cost<=left && !ECLIPSE_BAD.includes(x.effect.type)
+    && (!needsTarget(x) || view.legal.some(a=>a.type==='PLAY_CARD' && a.cardId===x.id)));
 }
 const SPELL_FX = {
   mana:   { text:v=>`주문: 이번 턴 마나 ${v} 얻기`, cast:(s,seat,c)=>{ s.seats[seat].mana+=c.effect.value; } },
@@ -302,10 +314,15 @@ const SPELL_FX = {
             cast:(s,seat,c,target,ev,src)=>{ castChaos(s, seat, c, ev); },
             spellWorth:()=>4,
             ruleUse:(view,acts)=> acts[0] || null },
+  // ---- v28 일식: 이번 턴에 손에서 내는 다음 주문을 2번 시전 (apply 의 PLAY_CARD 가 플래그를 소모하고 state.recast 를 만든다) ----
+  eclipse:{ text:()=>`이번 턴에 시전하는 다음 주문을 2번 시전한다 (대상은 다시 고르고, 발견은 한 번 더 한다)`, rank:-0.5,
+            cast:(s,seat,c,target,ev,src)=>{ s.seats[seat].eclipse=true; ev.push({type:'eclipse', seat, src}); },
+            spellWorth:(c,view)=> eclipseHasPartner(view, c) ? 4 : 0,
+            ruleUse:(view,acts)=>{ const c=acts.length && view.me.hand.find(x=>x.id===acts[0].cardId); return c && eclipseHasPartner(view, c) ? acts[0] : null; } },
   // ---- v24 소환 주문 (속공 하수인) ----
-  summon: { text:(v,e)=>`속공 ${e.atk}/${e.hp} 「${e.token}」 ${e.count}마리를 소환한다 (빈 자리만큼만)`, rank:2.5, summons:true,
+  summon: { text:(v,e)=>`${e.rush===false?'':'속공 '}${e.atk}/${e.hp} 「${e.token}」 ${e.count}마리를 소환한다 (빈 자리만큼만)`, rank:2.5, summons:true,
             blocked:(s,seat)=> freeSlots(s,seat)<=0 ? '전장이 가득 찼습니다.' : null,
-            cast:(s,seat,c,target,ev,src)=>{ summonTokens(s, seat, c.effect.count, {name:c.effect.token, atk:c.effect.atk, hp:c.effect.hp}, ev); },
+            cast:(s,seat,c,target,ev,src)=>{ summonTokens(s, seat, c.effect.count, {name:c.effect.token, atk:c.effect.atk, hp:c.effect.hp, rush:c.effect.rush}, ev); },
             spellWorth:(c,view,ctx,h)=>{ const e=c.effect, n=Math.min(e.count, CONFIG.MAX_BOARD-view.me.board.length);
               return n>=2 ? Math.min(20, n*h.val({atk:e.atk, hp:e.hp})) : 0; },
             ruleUse:(view,acts)=> acts.length && CONFIG.MAX_BOARD-view.me.board.length>=2 ? acts[0] : null },
@@ -320,7 +337,7 @@ const SPELL_FX = {
 };
 // 동전: 덱(CARD_POOL)에는 들어가지 않고, 후공이 시작할 때 손패로 받는다. (그 밖의 주문은 CARD_POOL 에 있어 덱에 넣을 수 있다)
 function makeCoin(){ return {type:'spell', name:'동전', cost:0, effect:{type:'mana', value:CONFIG.COIN_MANA}}; }
-function effectText(c){ return c.effect ? (c.lifeCost ? `마나 대신 생명력 ${c.cost} 지불. ` : '') + (c.type==='spell' ? SPELL_FX[c.effect.type].text : EFFECT_TEXT[c.effect.type])(c.effect.value, c.effect) : ''; }
+function effectText(c){ return c.effect ? (c.twin ? '이중 주문. ' : '') + (c.lifeCost ? `마나 대신 생명력 ${c.cost} 지불. ` : '') + (c.type==='spell' ? SPELL_FX[c.effect.type].text : EFFECT_TEXT[c.effect.type])(c.effect.value, c.effect) : ''; }
 const needsTarget = c => c.type==='spell' && !!(SPELL_FX[c.effect.type] && SPELL_FX[c.effect.type].needsTarget);   // 대상이 하나도 없으면 낼 수 없는 주문
 const NO_TARGET_FX=['draw','sweep','gainMana'];   // 대상을 고르지 않는 전투의 함성
 
@@ -399,7 +416,7 @@ function shuffle(a, rng){
 function newGame(rng=Math.random, opts={}){
   // 선공: opts.first(0|1)로 지정하지 않으면 무작위. 후공 좌석은 보정(시작 손패 +, 동전)을 받는다.
   const first = (opts.first===0 || opts.first===1) ? opts.first : (rng()<0.5 ? 0 : 1);
-  const s = {turn:first, first, turnNo:0, over:false, winner:null, nextId:1, seats:[], seed:Math.floor(rng()*2147483646)+1, pending:null};   // pending: 발견 선택 대기 {seat, discount, options}
+  const s = {turn:first, first, turnNo:0, over:false, winner:null, nextId:1, seats:[], seed:Math.floor(rng()*2147483646)+1, pending:null, recast:null};   // pending: 선택 대기 — 발견 {kind:'discover', seat, discount, options} / v28 대상 {kind:'target', seat, card, targets}. recast: 일식의 두 번째 시전 예약 {seat, card}
   for(let seat=0; seat<2; seat++){
     const mods={...((opts.mods && opts.mods[seat]) || {})};
     const deck=[];
@@ -535,6 +552,26 @@ function battlecry(s, seat, m, target, ev){
 function castSpell(s, seat, c, target, ev){
   const fx=SPELL_FX[c.effect.type];
   if(fx && fx.cast) fx.cast(s, seat, c, target, ev, {seat, name:c.name});
+  if(c.twin) twinCopy(s, seat, c, ev);          // v28 이중 주문: 시전될 때마다(손에서 낸 것·혼돈·일식의 두 번째 시전 모두) 이중 주문이 없는 사본이 손패에 들어온다. 손패가 가득이면 소각
+}
+function twinCopy(s, seat, c, ev){
+  const base=CARD_POOL.find(x=>x.name===c.name) || c, P=s.seats[seat];
+  const copy={...base, cost:c.cost, id:s.nextId++}; delete copy.twin; delete copy.auto;
+  const burned=P.hand.length>=CONFIG.MAX_HAND; if(!burned) P.hand.push(copy);
+  ev.push({type:'twin', seat, name:c.name, burned});
+}
+// v28 일식의 두 번째 시전: 첫 시전(과 그 발견)이 끝나면 호출된다. 대상이 필요하면 선택 대기(kind:'target')를 만들고 플레이어가 TARGET 으로 고른다
+function resolveRecast(s, ev){
+  const rc=s.recast; if(!rc || s.pending) return;
+  s.recast=null;
+  const {seat, card}=rc, P=s.seats[seat];
+  if(s.seats[0].hp<=0 || s.seats[1].hp<=0) return;
+  const fx=SPELL_FX[card.effect.type], ts=cardTargets(s, seat, card);
+  ev.push({type:'recast', seat, name:card.name});
+  const fizzle=(fx.needsTarget && ts.length===0) || (fx.blocked && fx.blocked(s, seat)) || (card.effect.type==='recall' && P.hand.length>=CONFIG.MAX_HAND);
+  if(fizzle){ ev.push({type:'ignored', seat, fizzle:true, src:{seat, name:card.name}}); return; }
+  if(ts.length){ s.pending={kind:'target', seat, card, targets:ts}; ev.push({type:'targetWait', seat, name:card.name}); return; }
+  castSpell(s, seat, card, null, ev);
 }
 
 // ---- 검증: 오류 문자열 또는 null(합법) ----
@@ -543,12 +580,17 @@ function validate(s, a, actor){
   if(s.over) return '게임이 끝났습니다.';
   if(a.type==='SURRENDER') return null;          // 항복은 어느 시점이든 가능. legalActions 에는 넣지 않는다 (봇은 항복하지 않음)
   if(actor!==s.turn) return '상대 턴입니다.';
+  if(s.pending && s.pending.kind==='target'){      // v28 일식의 두 번째 대상 선택 중에는 TARGET 만 가능
+    if(a.type!=='TARGET') return '먼저 두 번째 시전의 대상을 선택해야 합니다.';
+    if(s.pending.seat!==actor || !a.target || !s.pending.targets.some(t=>tkey(t)===tkey(a.target))) return '올바른 대상을 선택해야 합니다.';
+    return null;
+  }
   if(s.pending){                                  // 발견 선택 중에는 CHOOSE 만 가능
     if(a.type!=='CHOOSE') return '먼저 발견할 카드를 선택해야 합니다.';
     if(s.pending.seat!==actor || !Number.isInteger(a.index) || !s.pending.options[a.index]) return '잘못된 선택입니다.';
     return null;
   }
-  if(a.type==='CHOOSE') return '선택할 것이 없습니다.';
+  if(a.type==='CHOOSE' || a.type==='TARGET') return '선택할 것이 없습니다.';
   const P=s.seats[actor], O=s.seats[other(actor)];
   switch(a.type){
     case 'END_TURN': return null;
@@ -594,7 +636,7 @@ function validate(s, a, actor){
 // ---- 합법 행동 목록 (서버 검증·봇·클라이언트 하이라이트 공통 사용 / AI 학습의 action mask 원천) ----
 function legalActions(s, actor){
   if(s.over || s.turn!==actor) return [];
-  if(s.pending) return s.pending.options.map((_,i)=>({type:'CHOOSE', index:i}));
+  if(s.pending) return s.pending.kind==='target' ? s.pending.targets.map(t=>({type:'TARGET', target:t})) : s.pending.options.map((_,i)=>({type:'CHOOSE', index:i}));
   const P=s.seats[actor], O=s.seats[other(actor)], out=[];
   for(const c of P.hand){
     const ts=cardTargets(s, actor, c);
@@ -624,7 +666,11 @@ function apply(state, a, actor){
     P.hand=P.hand.filter(x=>x.id!==c.id);
     if(c.type==='spell'){
       // 주문: 전장에 남지 않고 효과만 적용된 뒤 사라진다. card 는 화면에서 "무슨 주문을 썼는지" 보여주기 위한 사본.
-      ev.push({type:'spell', seat:actor, name:c.name, gain:c.effect.type==='mana'?c.effect.value:0, card:{type:c.type, name:c.name, cost:c.cost, lifeCost:c.lifeCost, effect:c.effect}});
+      ev.push({type:'spell', seat:actor, name:c.name, gain:c.effect.type==='mana'?c.effect.value:0, card:{type:c.type, name:c.name, cost:c.cost, lifeCost:c.lifeCost, effect:c.effect, twin:c.twin}});
+      if(P.eclipse && c.effect.type!=='mana'){        // v28 일식: 손에서 낸 다음 주문(동전 제외)을 2번 시전 — 두 번째는 첫 시전이 끝난 뒤 resolveRecast 가 처리
+        P.eclipse=false; s.recast={seat:actor, card:{...c}};
+        ev.push({type:'eclipseUse', seat:actor, name:c.name});
+      }
       castSpell(s, actor, c, a.target, ev);
     } else {
     const m={...c, maxHp:c.hp, attacked:false, summoned:true};
@@ -656,15 +702,23 @@ function apply(state, a, actor){
     s.pending=null;
     const burned=P.hand.length>=CONFIG.MAX_HAND; if(!burned) P.hand.push(card);
     ev.push({type:'discoverPick', seat:actor, name:card.name, cost:card.cost, burned});   // name: 상대에게는 화면에서 숨긴다 (서버로 옮길 때는 name 을 빼고 보낼 것)
+  } else if(a.type==='TARGET'){                     // v28 일식의 두 번째 시전 대상 선택
+    const pd=s.pending; s.pending=null;
+    ev.push({type:'targetPick', seat:actor, name:pd.card.name});
+    castSpell(s, actor, pd.card, a.target, ev);
   } else if(a.type==='SURRENDER'){
     s.over=true; s.winner=other(actor);              // 항복 = 즉시 패배 (체력은 건드리지 않음)
     ev.push({type:'surrender', seat:actor});
     ev.push({type:'game_over', winner:s.winner});
   } else if(a.type==='END_TURN'){
     ev.push({type:'turn_end', seat:actor});
+    P.eclipse=false;                              // v28 일식은 그 턴이 끝나면 사라진다
     P.board.forEach(m=>{ m.frozen=false; });      // 얼음은 그 하수인 주인의 한 턴이 끝나면 풀린다
     startTurn(s, other(actor), ev);
   }
+  sweepDead(s, ev);
+  checkGlide(s, ev);
+  resolveRecast(s, ev);                           // v28 일식: 첫 시전이 끝났으면 두 번째 시전 (대상 선택 대기가 생길 수 있다)
   sweepDead(s, ev);
   checkGlide(s, ev);
   checkEnd(s, ev);
@@ -677,12 +731,14 @@ function viewFor(s, seat){
   return structuredClone({
     seat, turn:s.turn, turnNo:s.turnNo, first:s.first, over:s.over, winner:s.winner,
     // deckCards: 내 남은 덱 구성. 뽑는 순서가 드러나지 않도록 id 를 빼고 코스트·이름순으로 정렬해서 보낸다.
-    me:{hp:me.hp, maxHp:me.maxHp, mods:me.mods, fatigue:me.fatigue||0, mana:me.mana, maxMana:me.maxMana, hand:me.hand, board:me.board, deckCount:me.deck.length,
+    me:{hp:me.hp, maxHp:me.maxHp, mods:me.mods, eclipse:!!me.eclipse, fatigue:me.fatigue||0, mana:me.mana, maxMana:me.maxMana, hand:me.hand, board:me.board, deckCount:me.deck.length,
         deckCards:me.deck.map(({id, ...rest})=>rest).sort((a,b)=>a.cost-b.cost || (a.name<b.name?-1:a.name>b.name?1:0))},
-    opp:{hp:op.hp, maxHp:op.maxHp, mods:op.mods, fatigue:op.fatigue||0, mana:op.mana, maxMana:op.maxMana, handCount:op.hand.length, board:op.board, deckCount:op.deck.length},
+    opp:{hp:op.hp, maxHp:op.maxHp, mods:op.mods, eclipse:!!op.eclipse, fatigue:op.fatigue||0, mana:op.mana, maxMana:op.maxMana, handCount:op.hand.length, board:op.board, deckCount:op.deck.length},
     pending: s.pending ? (s.pending.seat===seat
-      ? {seat, options:s.pending.options.map(o=>({...o, cost:Math.max(0, o.cost-s.pending.discount), id:-1}))}   // 고르는 본인에게만 선택지를 보여 준다
-      : {seat:s.pending.seat}) : null,
+      ? (s.pending.kind==='target'
+          ? {kind:'target', seat, card:{name:s.pending.card.name, cost:s.pending.card.cost, effect:s.pending.card.effect, school:s.pending.card.school, twin:s.pending.card.twin}, targets:s.pending.targets}
+          : {kind:'discover', seat, options:s.pending.options.map(o=>({...o, cost:Math.max(0, o.cost-s.pending.discount), id:-1}))})   // 고르는 본인에게만 선택지를 보여 준다
+      : {kind:s.pending.kind||'discover', seat:s.pending.seat}) : null,
     legal:legalActions(s, seat)
   });
 }
@@ -717,8 +773,29 @@ function discoverScore(c, view){
   if(t==='glide') return mine<=3 ? 4.5 : 1;
   if(t==='muster') return mine<=5 ? 4 : 1;
   if(t==='chaos') return 3;
+  if(t==='eclipse') return 2;
   return 1;
 }
+function chooseTarget(view){                                    // v28 일식의 두 번째 시전 대상 (두 봇 공통). 후보 중 가장 점수 높은 것
+  const pd=view.pending, e=pd.card.effect, ts=pd.targets, me=view.me, op=view.opp, ty=e.type;
+  const mine=t=>t.seat===view.seat;
+  const minion=t=>t.kind==='minion' ? (mine(t)?me.board:op.board).find(m=>m.id===t.id) : null;
+  const sc=t=>{
+    const m=minion(t);
+    if(ty==='heal') return !mine(t) ? -1000 : t.kind==='hero' ? (me.maxHp||CONFIG.HERO_HP)-me.hp : m.maxHp-m.hp;
+    if(['enhance','giveShield','haste'].includes(ty)) return mine(t)&&m ? m.atk*2+m.hp : -1000;
+    if(ty==='recall') return mine(t)&&m ? (m.hp*2<=m.maxHp?5:0)-m.atk : -1000;
+    if(ty==='copy'){ const c=me.hand.find(x=>x.id===t.id); return c ? c.cost : -1000; }
+    if(['transform','freeze','silence','execute'].includes(ty)) return !mine(t)&&m ? m.atk+m.hp : -1000;
+    if(mine(t)) return -1000;                                     // 피해 계열: 아군은 피하고
+    if(t.kind==='hero') return (e.value>=op.hp) ? 1000 : 0;
+    return m.shield ? 1 : (m.hp<=e.value ? 50+m.atk+m.hp : 20-m.hp);
+  };
+  let best=ts[0], bs=-Infinity;
+  for(const t of ts){ const x=sc(t); if(x>bs){ bs=x; best=t; } }
+  return {type:'TARGET', target:best};
+}
+function choosePending(view){ return view.pending.kind==='target' ? chooseTarget(view) : chooseDiscover(view); }
 function chooseDiscover(view){
   const opts=view.pending.options; let bi=0, bs=-Infinity;
   opts.forEach((c,i)=>{ const sc=discoverScore(c, view); if(sc>bs){ bs=sc; bi=i; } });
@@ -787,7 +864,7 @@ function ruleSpell(view){
 const BotPlayers = {
   // 규칙 기반: 가장 비싼 카드부터 내고, 약한 하수인을 우선 공격, 없으면 영웅 공격
   rule:{ decide(view){
-    if(view.pending && view.pending.seat===view.seat) return chooseDiscover(view);
+    if(view.pending && view.pending.seat===view.seat) return choosePending(view);
     const L=view.legal;
     const cardOf=a=>view.me.hand.find(c=>c.id===a.cardId);
     const spellOf=a=>isSpellCard(cardOf(a));
@@ -967,7 +1044,7 @@ const Rule2 = (()=>{
   }
 
   function decide(view){
-    if(view.pending && view.pending.seat===view.seat) return chooseDiscover(view);
+    if(view.pending && view.pending.seat===view.seat) return choosePending(view);
     const L=view.legal, me=view.me, op=view.opp;
     const allPlays=L.filter(a=>a.type==='PLAY_CARD'), atks=L.filter(a=>a.type==='ATTACK');
     const coinAct=allPlays.find(a=>isCoin(me.hand.find(c=>c.id===a.cardId)));
