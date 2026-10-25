@@ -58,18 +58,63 @@ async function createDbTables(conn) {
       REFERENCES game_players(game_id, seat) ON DELETE CASCADE,
     CONSTRAINT fk_gc_card FOREIGN KEY (card_id) REFERENCES cards(card_id)
   ) ENGINE=InnoDB`);
+  await conn.query(`CREATE TABLE IF NOT EXISTS game_actions (
+    game_id BIGINT UNSIGNED NOT NULL,
+    seq INT NOT NULL,
+    seat SMALLINT NOT NULL,
+    action_type VARCHAR(32) NOT NULL,
+    card_name VARCHAR(191) NULL,
+    PRIMARY KEY (game_id, seq),
+    CONSTRAINT fk_ga_game FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+  // 기존 테이블에 새 컬럼 추가 (이미 있으면 건너뜀). 기존 행은 NULL = '기록 안 됨'.
+  await ensureColumn(conn, 'games', 'first_seat', 'SMALLINT NULL');
+  await ensureColumn(conn, 'game_players', 'final_hp', 'INT NULL');
+  await ensureColumn(conn, 'game_players', 'final_hand', 'INT NULL');
+  await ensureColumn(conn, 'game_players', 'final_board', 'INT NULL');
+  await ensureColumn(conn, 'game_cards', 'was_seen', 'TINYINT NULL');
 }
 
+async function ensureColumn(conn, table, column, definition) {
+  const [rows] = await conn.execute(
+    'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+    [table, column]
+  );
+  if (!rows.length) await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+}
+
+// 한 판 저장을 하나의 트랜잭션으로 묶는다: 전부 성공하면 commit, 하나라도 실패하면 rollback.
 async function saveCompletedGame(conn, runId, game) {
+  await conn.beginTransaction();
+  try {
+    await saveCompletedGameRows(conn, runId, game);
+    await conn.commit();
+  } catch (err) {
+    try { await conn.rollback(); } catch (_) {}
+    throw err;
+  }
+}
+
+const cardIdCache = new Map();
+async function getCardId(conn, name) {
+  if (cardIdCache.has(name)) return cardIdCache.get(name);
+  const [rows] = await conn.execute('SELECT card_id FROM cards WHERE card_key = ?', [name]);
+  const id = rows.length ? rows[0].card_id : null;
+  cardIdCache.set(name, id);
+  return id;
+}
+
+async function saveCompletedGameRows(conn, runId, game) {
   const [res] = await conn.execute(
-    'INSERT INTO games (run_id, game_number, engine_version, winner_seat, turns) VALUES (?, ?, ?, ?, ?)',
-    [runId, game.gameNumber, game.engineVersion, game.winner, game.turns]
+    'INSERT INTO games (run_id, game_number, engine_version, winner_seat, turns, first_seat) VALUES (?, ?, ?, ?, ?, ?)',
+    [runId, game.gameNumber, game.engineVersion, game.winner, game.turns, game.first ?? null]
   );
   const gameId = res.insertId;
   for (let seat = 0; seat < 2; seat++) {
+    const f = (game.final && game.final[seat]) || {};
     await conn.execute(
-      'INSERT INTO game_players (game_id, seat, player_type, bot_type, is_winner) VALUES (?, ?, ?, ?, ?)',
-      [gameId, seat, 'bot', game.botType, seat === game.winner]
+      'INSERT INTO game_players (game_id, seat, player_type, bot_type, is_winner, final_hp, final_hand, final_board) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [gameId, seat, 'bot', game.botType, seat === game.winner, f.hp ?? null, f.hand ?? null, f.board ?? null]
     );
   }
   const deckCounts = [new Map(), new Map()];
@@ -83,14 +128,21 @@ async function saveCompletedGame(conn, runId, game) {
         playedCounts[seat].set(action.card, (playedCounts[seat].get(action.card) || 0) + 1);
       }
     }
-    for (const [name, count] of deckCounts[seat]) {
-      const [rows] = await conn.execute('SELECT card_id FROM cards WHERE card_key = ?', [name]);
-      if (!rows.length) continue;
+    // 덱에 없던 카드(생성 카드 등)도 관측/사용됐다면 기록하도록 합집합으로 순회
+    const seenSet = (game.seen && game.seen[seat]) || new Set();
+    const names = new Set([...deckCounts[seat].keys(), ...openingCounts[seat].keys(), ...playedCounts[seat].keys(), ...seenSet]);
+    for (const name of names) {
+      const cardId = await getCardId(conn, name);
+      if (cardId === null) continue;
       await conn.execute(
-        'INSERT INTO game_cards (game_id, seat, card_id, deck_count, opening_count, played_count) VALUES (?, ?, ?, ?, ?, ?)',
-        [gameId, seat, rows[0].card_id, count, openingCounts[seat].get(name) || 0, playedCounts[seat].get(name) || 0]
+        'INSERT INTO game_cards (game_id, seat, card_id, deck_count, opening_count, played_count, was_seen) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [gameId, seat, cardId, deckCounts[seat].get(name) || 0, openingCounts[seat].get(name) || 0, playedCounts[seat].get(name) || 0, seenSet.has(name) ? 1 : 0]
       );
     }
+  }
+  if (game.actions.length) {
+    const rows = game.actions.map((a, i) => [gameId, i + 1, a.seat, a.type, a.card || null]);
+    await conn.query('INSERT INTO game_actions (game_id, seq, seat, action_type, card_name) VALUES ?', [rows]);
   }
 }
 
@@ -243,7 +295,7 @@ for (let g=0; g<GAMES; g++) {
   }
   const gameRecord = {game:g+1, winner, first:s.first, turns:s.turnNo, opening, decks:initialDecks, actions, final:s.seats.map(p=>({hp:p.hp, hand:p.hand.length, board:p.board.length}))};
   try {
-    await saveCompletedGame(db, runId, {gameNumber:g+1, engineVersion:String(E.VERSION), winner, turns:s.turnNo, decks:initialDecks, opening, actions, botType:BOT_NAME});
+    await saveCompletedGame(db, runId, {gameNumber:g+1, engineVersion:String(E.VERSION), winner, turns:s.turnNo, first:s.first, decks:initialDecks, opening, seen, actions, final:gameRecord.final, botType:BOT_NAME});
   } catch (err) {
     console.error(`MySQL 경기 ${g+1} 저장 실패:`, err.message);
     throw err;
