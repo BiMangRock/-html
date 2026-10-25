@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" role="img" aria-label="수호의 장벽">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#24586a"/><stop offset="1" stop-color="#171629"/></linearGradient><radialGradient id="glow"><stop stop-color="#9fe9f2" stop-opacity=".75"/><stop offset="1" stop-color="#9fe9f2" stop-opacity="0"/></radialGradient></defs>
+<rect width="240" height="120" fill="url(#bg)"/><ellipse cx="120" cy="58" rx="85" ry="65" fill="url(#glow)"/>
+<path d="M0 98 Q38 78 68 99 T132 96 T190 92 T240 97 V120 H0Z" fill="#0b0c17" opacity=".72"/>
+<g fill="none" stroke="#9fe9f2" stroke-opacity=".58"><circle cx="120" cy="58" r="42" stroke-width="2"/><circle cx="120" cy="58" r="51" stroke-dasharray="3 7"/><path d="M120 4V18 M120 98V116 M48 58H64 M176 58H192" stroke-width="2"/></g>
+<g fill="#9fe9f2" opacity=".8"><path d="M25 20l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/><path d="M204 23l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><circle cx="42" cy="77" r="2"/><circle cx="198" cy="82" r="2"/></g>
+<text x="120" y="77" font-size="61" text-anchor="middle" font-family="'Apple Color Emoji','Segoe UI Emoji',sans-serif" style="filter:drop-shadow(0 3px 2px #000)">🔰</text>
+<rect x="1.5" y="1.5" width="237" height="117" rx="7" fill="none" stroke="#9fe9f2" stroke-opacity=".6" stroke-width="3"/>
+</svg>
