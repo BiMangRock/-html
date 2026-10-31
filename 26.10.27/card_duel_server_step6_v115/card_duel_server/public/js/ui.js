@@ -1165,6 +1165,22 @@ function edAdjust(name, d){
   if(d>0 && edTotal()>=(ed.test?TEST_MAX_DECK:CONFIG.DECK_SIZE)) return;
   ed.counts[name]=n; renderDeckEditor();
 }
+// 낮은 가로 화면에서는 패널 전체가 스크롤된다 → 필터를 바꾸면 카드 목록 맨 위가 보이도록 맞춘다
+function edScrollTop(){
+  const grid=$('edGrid'); grid.scrollTop=0;
+  const panel=document.querySelector('#deckEditor .deck-panel');
+  if(panel && getComputedStyle(grid).overflowY==='visible'){
+    const head=panel.querySelector('.deck-head');
+    panel.scrollTop=Math.min(panel.scrollTop, Math.max(0, grid.offsetTop-(head?head.offsetHeight:0)));
+  }
+}
+// 낮은 가로 화면: 마나 곡선·필터를 접었다 펼 수 있다 (접으면 카드 목록이 넓게 보인다)
+function edUpdateFilterBtn(){
+  const col=$('deckEditor').classList.contains('filters-collapsed'), b=$('edFilterToggle'); if(!b) return;
+  const act=(ed.tab&&ed.tab!=='all')||ed.cost!=null||ed.ownedOnly;
+  b.textContent=`🔍 필터${act?' ●':''} ${col?'▾':'▴'}`;
+}
+$('edFilterToggle').onclick=()=>{ $('deckEditor').classList.toggle('filters-collapsed'); edUpdateFilterBtn(); };
 function renderDeckEditor(){
   const total=edTotal(), size=CONFIG.DECK_SIZE, T=!!ed.test, maxCopies=T?TEST_COPIES:CONFIG.COPIES, saveOk=T?total>=1:total===size, atCap=T?total>=TEST_MAX_DECK:total>=size;
   const spellCnt=CARD_POOL.reduce((n,c)=>n+(c.type==='spell'?(ed.counts[c.name]||0):0),0);
@@ -1183,7 +1199,7 @@ function renderDeckEditor(){
     bars+=`<div class="cv-col${ed.cost===k?' on':''}" data-cost="${k}" title="${k}코 ${n}장 (클릭: ${k}코스트 카드만 보기)"><span class="cv-n">${n}</span><div class="cv-bar" style="height:${n?Math.max(4,Math.round(n/peak*60)):2}px"></div><span class="cv-k">${k}</span></div>`;
   }
   $('edCurve').innerHTML=`<div class="cv-title">마나 곡선 <small>(코스트별 장수 · 막대를 누르면 해당 코스트만 표시)</small></div><div class="cv-chart">${bars}</div>`;
-  $('edCurve').querySelectorAll('.cv-col').forEach(el=>el.onclick=()=>{ const k=+el.dataset.cost; ed.cost=(ed.cost===k?null:k); $('edGrid').scrollTop=0; renderDeckEditor(); });
+  $('edCurve').querySelectorAll('.cv-col').forEach(el=>el.onclick=()=>{ const k=+el.dataset.cost; ed.cost=(ed.cost===k?null:k); edScrollTop(); renderDeckEditor(); });
   if(ed.boss){ $('edTitle').textContent=`보스 덱 — ${ed.bossName||''} ${total} / ${size}장 (주문 ${spellCnt}장)`; $('edNote').textContent = saveOk ? '저장할 수 있습니다. 이 덱이 보스가 쓰는 덱입니다.' : `정확히 ${size}장을 채워야 저장할 수 있습니다 (같은 카드는 최대 ${CONFIG.COPIES}장).`; }
   $('edSave').disabled=!saveOk;
   const grid=$('edGrid'), st=grid.scrollTop; grid.innerHTML='';
@@ -1200,9 +1216,9 @@ function renderDeckEditor(){
   const tabOk=(c,t)=> t==='all' || (t==='minion'||t==='spell' ? c.type===t : t.startsWith('tribe:') ? (c.type==='minion' && (c.tribe||'').includes(t.slice(6))) : t.startsWith('rar:') ? c.rarity===t.slice(4) : runeOf(c).includes(t.slice(5)));
   if(!ed.tab) ed.tab='all';
   $('edTabs').innerHTML=TABS.map(([k,l])=>`<button data-tab="${k}" class="${ed.tab===k?'on':''}">${l}<span class="n">${CARD_POOL.filter(c=>tabOk(c,k)).length}</span></button>`).join('');
-  $('edTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ed.tab=b.dataset.tab; $('edGrid').scrollTop=0; renderDeckEditor(); });
+  $('edTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ed.tab=b.dataset.tab; edScrollTop(); renderDeckEditor(); });
   if(edOwnedMode()){      // 4단계: 보유 카드만 보기 (일반 덱 편집에서만)
-    const ob=document.createElement('button'); ob.className=ed.ownedOnly?'on':''; ob.textContent='보유 카드만'; ob.onclick=()=>{ ed.ownedOnly=!ed.ownedOnly; $('edGrid').scrollTop=0; renderDeckEditor(); };
+    const ob=document.createElement('button'); ob.className=ed.ownedOnly?'on':''; ob.textContent='보유 카드만'; ob.onclick=()=>{ ed.ownedOnly=!ed.ownedOnly; edScrollTop(); renderDeckEditor(); };
     $('edTabs').appendChild(ob);
   }
   // 코스트 필터: 전체 / 0~10 버튼 (탭과 함께 적용). 같은 버튼을 다시 누르면 해제.
@@ -1212,7 +1228,7 @@ function renderDeckEditor(){
   let cb=`<span class="lbl">코스트</span><button data-cost="all" class="${ed.cost==null?'on':''}">전체<span class="n">${inTab.length}</span></button>`;
   for(let k=0;k<=costMax;k++){ const cnt=inTab.filter(c=>c.cost===k).length; cb+=`<button data-cost="${k}" class="${ed.cost===k?'on':''}${cnt?'':' empty'}">${k}<span class="n">${cnt}</span></button>`; }
   $('edCosts').innerHTML=cb;
-  $('edCosts').querySelectorAll('button').forEach(b=>b.onclick=()=>{ const v=b.dataset.cost==='all'?null:+b.dataset.cost; ed.cost=(v!==null && ed.cost===v)?null:v; $('edGrid').scrollTop=0; renderDeckEditor(); });
+  $('edCosts').querySelectorAll('button').forEach(b=>b.onclick=()=>{ const v=b.dataset.cost==='all'?null:+b.dataset.cost; ed.cost=(v!==null && ed.cost===v)?null:v; edScrollTop(); renderDeckEditor(); });
   const sorted=CARD_POOL.filter(c=>tabOk(c,ed.tab) && costOk(c) && !(edOwnedMode() && ed.ownedOnly && !ServerStore.owned(c.name))).sort((a,b)=>{
     const ti=typeOrder.indexOf(a.type)-typeOrder.indexOf(b.type); if(ti) return ti;
     const si=groupIdx(a)-groupIdx(b);
@@ -1243,6 +1259,7 @@ function renderDeckEditor(){
     grid.appendChild(item);
   });
   grid.scrollTop=st;      // 다시 그려도 스크롤 위치 유지
+  edUpdateFilterBtn();
 }
 function updateDeckMenuDesc(){ $('deckMenuDesc').textContent=`내 덱을 직접 구성합니다 (${CONFIG.DECK_SIZE}장, 같은 카드 최대 ${CONFIG.COPIES}장)`; }
 function openDeckEditor(){ ed.test=false; ed.boss=false; $('edClear').style.display='none'; ed.counts=countsOf(DeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }

@@ -67,15 +67,17 @@
   </div>
 </div>
 
-<div id="deckEditor">
+<div id="deckEditor" class="filters-collapsed">
   <div class="deck-panel">
     <div class="deck-head"><h3 id="edTitle"></h3>
-      <div class="ed-btns"><button class="end-turn sub" id="edClear" style="display:none">비우기</button><button class="end-turn sub" id="edReset">추천 덱</button><button class="end-turn" id="edSave">저장</button><button class="end-turn sub" id="edClose">닫기</button></div>
+      <div class="ed-btns"><button class="end-turn sub" id="edFilterToggle" type="button">🔍 필터 ▾</button><button class="end-turn sub" id="edClear" style="display:none">비우기</button><button class="end-turn sub" id="edReset">추천 덱</button><button class="end-turn" id="edSave">저장</button><button class="end-turn sub" id="edClose">닫기</button></div>
     </div>
     <p class="note" id="edNote"></p>
-    <div class="ed-curve" id="edCurve"></div>
-    <div class="ed-tabs" id="edTabs"></div>
-    <div class="ed-tabs ed-costs" id="edCosts"></div>
+    <div id="edFilters">
+      <div class="ed-curve" id="edCurve"></div>
+      <div class="ed-tabs" id="edTabs"></div>
+      <div class="ed-tabs ed-costs" id="edCosts"></div>
+    </div>
     <div class="deck-grid" id="edGrid"></div>
   </div>
 </div>

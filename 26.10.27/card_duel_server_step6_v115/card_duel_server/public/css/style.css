@@ -311,6 +311,7 @@ button.end-turn.sub.armed{background:var(--ember); color:#fff; border-color:var(
 /* ---- 덱 편집 ---- */
 #deckEditor{position:fixed; inset:0; z-index:35; background:rgba(10,8,18,.95); display:none; align-items:center; justify-content:center; padding:1rem;}
 #deckEditor.show{display:flex;}
+#edFilterToggle{display:none;}
 .ed-btns{display:flex; gap:.4rem; flex-wrap:wrap; justify-content:flex-end;}
 .ed-btns button.end-turn{padding:.4rem .9rem; font-size:.85rem;}
 .ed-curve{margin:0 0 .4rem;}
@@ -687,4 +688,27 @@ html,body{overscroll-behavior:none; -webkit-tap-highlight-color:transparent; tou
 @media (orientation:landscape) and (max-height:540px){
   #menu .screen{padding:1rem 0 .8rem;}
   .screen h2{font-size:1.8rem; margin-bottom:.1rem;}
+}
+
+/* ===== 덱 편집 — 낮은 가로 화면(폰 가로): 화면 전체를 쓰고, 패널 전체가 스크롤, 필터는 접기 ===== */
+@media (orientation:landscape) and (max-height:540px){
+  #deckEditor{padding:0; align-items:stretch;}
+  #deckEditor .deck-panel{width:100%; max-height:none; height:100%; border-radius:0; border-width:0; padding:0 calc(.6rem + env(safe-area-inset-right,0px)) .6rem calc(.6rem + env(safe-area-inset-left,0px));
+    display:block; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative;}
+  #deckEditor .deck-head{position:sticky; top:0; z-index:3; padding:.35rem 0; background:#241f38; border-bottom:1px solid rgba(201,162,39,.3);}
+  #deckEditor .deck-head{padding-right:2.6rem;}   /* 우상단 📜 버튼이 닫기를 가리지 않게 */
+  #deckEditor .deck-head h3{font-size:1rem;}
+  #deckEditor .ed-btns{flex-wrap:nowrap; gap:.3rem;}
+  #deckEditor .ed-btns button.end-turn{padding:.3rem .6rem; font-size:.75rem; white-space:nowrap;}
+  #edFilterToggle{display:inline-block;}
+  #deckEditor .deck-panel p.note{margin:.25rem 0 .3rem; font-size:.68rem;}
+  #deckEditor.filters-collapsed #edFilters{display:none;}
+  #deckEditor .cv-chart{height:84px; gap:.3rem;}
+  #deckEditor .cv-title{margin-bottom:.35rem;}
+  #deckEditor .cv-col{width:26px;}
+  #deckEditor .ed-tabs{gap:.2rem; margin-bottom:.25rem;}
+  #deckEditor .ed-tabs button{padding:.2rem .45rem; font-size:.72rem;}
+  #deckEditor .ed-costs button{min-width:0; padding:.2rem .4rem;}
+  #deckEditor .deck-grid{overflow:visible; padding:.4rem .2rem; gap:.6rem .5rem;}
+  #deckEditor .deck-grid .card{zoom:.85;}
 }
