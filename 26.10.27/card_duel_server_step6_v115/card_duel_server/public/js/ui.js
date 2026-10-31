@@ -1262,7 +1262,7 @@ function renderDeckEditor(){
   edUpdateFilterBtn();
 }
 function updateDeckMenuDesc(){ $('deckMenuDesc').textContent=`내 덱을 직접 구성합니다 (${CONFIG.DECK_SIZE}장, 같은 카드 최대 ${CONFIG.COPIES}장)`; }
-function openDeckEditor(){ ed.test=false; ed.boss=false; $('edClear').style.display='none'; ed.counts=countsOf(DeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }
+function openDeckEditor(){ ed.test=false; ed.boss=false; $('edClear').style.display=''; ed.counts=countsOf(DeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }
 function closeDeckEditor(){ $('deckEditor').classList.remove('show'); }
 $('edSave').onclick=()=>{
   if(ed.boss){ if(edTotal()!==CONFIG.DECK_SIZE) return; bossDeckSaved(listOf(ed.counts)); return; }   // v114 보스 덱
