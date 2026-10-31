@@ -114,7 +114,7 @@ function eventText(ev){
     case 'shrink': return `${who(ev.src.seat)} ${ev.src.name}: 덱의 하수인 ${ev.count}장의 비용·공격력 -${ev.amount}`;
     case 'toDeck': return ev.vanish ? `${who(ev.src.seat)} ${ev.src.name}: ${ev.name}은(는) 카드가 될 수 없어 사라졌습니다` : `${who(ev.src.seat)} ${ev.src.name}: ${ev.name}을(를) ${ev.seat===MY?'내':'상대'} 덱에 섞어 넣음`;   // v71
     case 'bounce': return ev.burned ? `${who(ev.src.seat)} ${ev.src.name}: ${ev.name}이(가) ${ev.seat===MY?'내':'상대'} 손으로 돌아가려 했으나 손패가 가득 차 소멸` : `${who(ev.src.seat)} ${ev.src.name}: ${ev.name}을(를) ${ev.seat===MY?'내':'상대'} 손으로 돌려보냄`;   // v72
-    case 'deckCopy': return `${who(ev.src.seat)} ${ev.src.name}: ${ev.name} ${ev.count}장을 복사해 ${ev.seat===MY?'내':'상대'} 덱에 섞어 넣음`;   // v71
+    case 'deckCopy': return ev.name ? `${who(ev.src.seat)} ${ev.src.name}: ${ev.name} ${ev.count}장을 복사해 ${ev.seat===MY?'내':'상대'} 덱에 섞어 넣음` : `${who(ev.src.seat)} ${ev.src.name}: 상대 덱 ${ev.count}장을 복사해 ${ev.seat===MY?'내':'상대'} 덱에 섞어 넣음`; // v71 (이름이 없으면 베네딕투스식 덱 전체 복사)
     case 'reveal': return `${who(ev.seat)} ${ev.src.name}: 덱의 주문 「${ev.name}」(비용 ${ev.cost}) 공개`;
     case 'spellTax': return `${who(ev.src.seat)} ${ev.src.name}: ${ev.seat===MY?'내':'상대'} 다음 턴 주문 비용 +${ev.amount}`;
     case 'board': return null;
@@ -140,7 +140,6 @@ function eventText(ev){
     case 'choicePick': return `${who(ev.seat)} 선택: ${ev.name}${ev.auto?' (혼돈의 주문서 자동 선택)':''}`;
     case 'discoverPick': return ev.seat===MY ? `발견: ${ev.name} 획득 (비용 ${ev.cost})${ev.burned?' — 손패가 가득 차 소각':''}` : '상대가 발견한 카드를 손에 넣었습니다';
     case 'recall': return `${who(ev.src.seat)} ${ev.src.name}: ${ev.name}을(를) 손패로 되돌림`;
-    case 'deckCopy': return `${who(ev.src.seat)} ${ev.src.name}: 상대 덱 ${ev.count}장을 복사해 내 덱에 섞어 넣음`;
     case 'statSet': return `${who(ev.src.seat)} ${ev.src.name}: ${ev.name}의 ${ev.hp!=null?`공격력·생명력이 ${ev.atk}/${ev.hp}`:`공격력이 ${ev.atk}`}(으)로 바뀜`;
     case 'transform': return `${who(ev.src.seat)} ${ev.src.name}: ${ev.name}이(가) ${ev.to||'양'}(으)로 변했습니다`;
     case 'ignored': return ev.fizzle ? `${who(ev.seat)} ${ev.src.name}: 자리·대상이 없어 불발` : `${who(ev.seat)} ${ev.src.name}: 대상이 없어 효과 무시`;
@@ -166,6 +165,7 @@ function eventText(ev){
 const zoneEl = seat => $(seat===MY ? 'playerZone' : 'aiZone');
 const heroEl = seat => $(seat===MY ? 'playerHero' : 'aiHero');
 function elOf(t){
+  if(!t) return null;   // v119: 대상이 없는 이벤트(예: 베네딕투스 덱 복사)에서 오류 나지 않게
   if(t.kind==='hero') return heroEl(t.seat);
   return zoneEl(t.seat).querySelector(`.card[data-id="${t.id}"]`);
 }
@@ -197,7 +197,7 @@ function showEffect(ev){
   else if(ev.type==='transform'){ floatOn(ev.target,'🐑 변이','shield'); }
   else if(ev.type==='toDeck'){ floatOn(ev.target, ev.vanish ? '✕' : '↩ 덱', 'shield'); }   // v71
   else if(ev.type==='bounce'){ floatOn(ev.target, ev.burned ? '🔥 소멸' : '↩ 손', 'shield'); }   // v72
-  else if(ev.type==='deckCopy'){ floatOn(ev.target,'×'+ev.count+' 복사','buff'); }
+  else if(ev.type==='deckCopy'){ floatOn(ev.target||heroT(ev.seat!=null?ev.seat:ev.src.seat),'×'+ev.count+' 복사','buff'); }
 }
 const attackerElOf = ev => ev.attackerId==='hero' ? heroEl(ev.seat) : elOf(minionT(ev.seat, ev.attackerId));   // v80: 영웅도 공격자
 async function lungeApproach(ev){
