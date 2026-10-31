@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>카드 듀얼 튜토리얼</title>
+<style>
+:root{
+  --bg:#120f0d; --bg2:#1c1713; --panel:#241d17; --line:#4a3b2a; --gold:#e8c36a; --gold2:#b98d2f;
+  --ink:#f3e9d6; --dim:#a8977c; --red:#e0584a; --green:#6fd38a; --teal:#6cc3dd; --silver:#c9ccd4;
+  --cw:104px; --ch:150px; --mw:92px; --mh:118px;
+  --font:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --serif:'Noto Serif KR','Nanum Myeongjo','Batang',Georgia,serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--font);overflow:hidden;-webkit-tap-highlight-color:transparent}
+body{background:radial-gradient(120% 80% at 50% 0%,#2a2018 0%,var(--bg) 60%)}
+button{font-family:inherit}
+.app{height:100dvh;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.28)}
+.top h1{font:700 16px var(--serif);margin:0;color:var(--gold);letter-spacing:.02em;white-space:nowrap}
+.chap{flex:1;display:flex;gap:4px;min-width:0}
+.chap i{flex:1;height:6px;border-radius:3px;background:#3a2f23;position:relative;overflow:hidden}
+.chap i.done{background:var(--gold2)} .chap i.cur{background:var(--gold)}
+.chapname{font-size:12px;color:var(--dim);white-space:nowrap}
+.tbtn{background:#2f261c;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+.tbtn:hover{border-color:var(--gold)}
+.layout{flex:1;min-height:0;display:flex}
+.coach{width:340px;flex:none;border-right:1px solid var(--line);background:linear-gradient(180deg,#1f1812,#17120e);padding:16px 16px 12px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.coach .badge{font-size:11px;color:var(--bg);background:var(--gold);padding:2px 8px;border-radius:999px;align-self:flex-start;font-weight:700}
+.coach h2{font:700 20px/1.25 var(--serif);margin:0;color:var(--gold)}
+.coach .body{font-size:14.5px;line-height:1.62;color:var(--ink)}
+.coach .body p{margin:0 0 8px}
+.coach .task{margin-top:2px;padding:10px 12px;border:1px dashed var(--gold2);border-radius:10px;background:rgba(232,195,106,.07);font-size:14px;line-height:1.5}
+.coach .task b{color:var(--gold)}
+.coach .err{display:none;padding:8px 10px;border-radius:8px;background:rgba(224,88,74,.16);border:1px solid var(--red);color:#ffc7c0;font-size:13px}
+.coach .err.show{display:block}
+.coach .nudge{display:none;color:#ffd08a;font-size:13px}
+.coach .nudge.show{display:block}
+.coach.shake{animation:shake .35s}
+@keyframes shake{20%{transform:translateX(-5px)}50%{transform:translateX(5px)}80%{transform:translateX(-3px)}}
+.coach .actions{margin-top:auto;display:flex;gap:8px;padding-top:6px}
+.cbtn{flex:1;background:var(--gold);color:#201505;border:0;border-radius:10px;padding:11px 14px;font-weight:700;font-size:15px;cursor:pointer}
+.cbtn.alt{background:#34291e;color:var(--ink);border:1px solid var(--line)}
+.cbtn:hover{filter:brightness(1.08)}
+.kw{color:var(--gold);font-weight:700}
+.kw2{color:var(--teal);font-weight:700}
+.stage{flex:1;min-width:0;display:flex;flex-direction:column;padding:8px 14px 10px;gap:6px;position:relative}
+.row{display:flex;align-items:center;justify-content:center;gap:14px}
+.sidecol{display:flex;flex-direction:column;align-items:center;gap:4px;width:132px;flex:none}
+.hero{position:relative;width:132px;border-radius:14px;border:2px solid var(--line);background:linear-gradient(160deg,#33281c,#1d1610);padding:8px 8px 7px;text-align:center;cursor:default;transition:box-shadow .2s,border-color .2s}
+.hero .nm{font:700 13px var(--serif);color:var(--gold)}
+.hero .hp{font:800 30px/1 var(--font);margin:3px 0 0;color:#ffb0a6}
+.hero .hp small{font-size:13px;color:var(--dim);font-weight:500}
+.hero .arm{font-size:12px;color:var(--silver)}
+.hero.t-ok{cursor:crosshair}
+.mana{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:5px;min-height:16px}
+.mana i{width:12px;height:14px;background:#2d2a35;clip-path:polygon(50% 0,100% 35%,80% 100%,20% 100%,0 35%);opacity:.8}
+.mana i.on{background:linear-gradient(180deg,#8fe0ff,#2f86c9);opacity:1}
+.mnum{font-size:12px;color:var(--teal);margin-top:2px}
+.mini{font-size:11px;color:var(--dim)}
+.eback{display:flex}
+.eback i{width:16px;height:24px;margin-right:-8px;border-radius:3px;background:linear-gradient(135deg,#4b3a28,#2a2016);border:1px solid #6a5339}
+.board{flex:1;min-height:calc(var(--mh) + 22px);display:flex;align-items:center;justify-content:center;gap:10px;border-radius:14px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.04);padding:6px;position:relative}
+.board .empty{color:#5d4f3d;font-size:13px}
+.mid{display:flex;align-items:center;justify-content:center;gap:12px;min-height:44px}
+.turn{font:700 13px var(--serif);color:var(--dim);padding:4px 14px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.25)}
+.turn.me{color:var(--green);border-color:#356a45}
+.endb{background:linear-gradient(180deg,#f0cc72,#c79a35);color:#2a1c05;border:0;border-radius:999px;padding:10px 24px;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 2px 0 #7a5a16}
+.endb:disabled{filter:grayscale(1) brightness(.6);cursor:default}
+.hand{display:flex;justify-content:center;gap:8px;min-height:calc(var(--ch) + 8px);align-items:flex-end;padding-bottom:2px}
+.me-wrap{display:flex;align-items:flex-end;justify-content:center;gap:14px}
+/* 카드 */
+.mn{position:relative;width:var(--mw);height:var(--mh);border-radius:12px;border:2px solid #6a5339;background:#1b1510;cursor:pointer;flex:none;transition:transform .15s,box-shadow .2s,border-color .2s}
+.mn .art{position:absolute;inset:0;border-radius:10px;overflow:hidden;background:#000}
+.mn .art img{width:100%;height:100%;object-fit:cover;display:block}
+.mn .nm{position:absolute;left:0;right:0;bottom:19px;text-align:center;font-size:11.5px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000,0 0 6px #000;padding:0 20px}
+.mn .st{position:absolute;bottom:-9px;min-width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 17px var(--font);border:2px solid #1a1208;z-index:3;color:#fff}
+.mn .st.a{left:-8px;background:linear-gradient(180deg,#f1c85a,#b98114);color:#2a1a02}
+.mn .st.h{right:-8px;background:linear-gradient(180deg,#f0695b,#a42b21)}
+.mn .st.h.hurt{color:#fff3a0}
+.mn .tags{position:absolute;top:4px;left:4px;right:4px;display:flex;gap:3px;flex-wrap:wrap;z-index:3}
+.tg{font-size:10px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.25)}
+.tg.taunt{color:#e8d9a6;border-color:var(--silver)} .tg.shield{color:#8fd8f0;border-color:#4aa9c7} .tg.rush{color:#ffd09a;border-color:#d08a3c} .tg.charge{color:#ffb3a0;border-color:#d0553c}
+.mn.taunt{border-color:#d7d9e0;box-shadow:0 0 0 3px rgba(210,214,224,.5),0 0 14px rgba(255,255,255,.25)}
+.mn.shielded{box-shadow:0 0 0 2px rgba(108,195,221,.9),0 0 14px rgba(108,195,221,.55)}
+.mn.taunt.shielded{box-shadow:0 0 0 3px rgba(210,214,224,.5),0 0 0 6px rgba(108,195,221,.7),0 0 14px rgba(108,195,221,.5)}
+.mn.ready{border-color:var(--green);box-shadow:0 0 0 2px rgba(111,211,138,.55),0 0 12px rgba(111,211,138,.45)}
+.mn.sleep::after{content:'zZ';position:absolute;right:4px;top:4px;font:700 12px var(--font);color:#cfe0ff;background:rgba(10,20,50,.7);padding:1px 5px;border-radius:6px;z-index:4}
+.mn.picked{transform:translateY(-8px) scale(1.04);border-color:#fff}
+.mn.t-ok{cursor:crosshair;outline:2px dashed var(--red);outline-offset:3px}
+.mn .fxo{position:absolute;inset:-6px;background-size:100% 100%;background-repeat:no-repeat;pointer-events:none;z-index:2;opacity:.8}
+.hc{position:relative;width:var(--cw);height:var(--ch);border-radius:11px;border:2px solid #7a5f3a;background:linear-gradient(180deg,#2b2218,#1a140e);cursor:pointer;flex:none;overflow:visible;transition:transform .15s,box-shadow .2s;display:flex;flex-direction:column}
+.hc:hover{transform:translateY(-10px) scale(1.08);z-index:20}
+.hc .art{height:54px;margin:3px;border-radius:7px;overflow:hidden;background:#000;flex:none}
+.hc .art img{width:100%;height:100%;object-fit:cover;display:block}
+.hc .nm{font-size:12px;font-weight:800;text-align:center;margin:3px 4px 0;color:var(--gold);line-height:1.15}
+.hc .ty{font-size:9.5px;color:var(--dim);text-align:center}
+.hc .tx{font-size:10.5px;line-height:1.3;padding:2px 6px;color:#e6dac2;flex:1;overflow:hidden;text-align:center}
+.hc .cost{position:absolute;left:-9px;top:-9px;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#8fe0ff,#2a78bb);border:2px solid #0d2a42;display:flex;align-items:center;justify-content:center;font:800 17px var(--font);color:#fff;z-index:3}
+.hc .st{position:absolute;bottom:-9px;min-width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 16px var(--font);border:2px solid #1a1208;z-index:3;color:#fff}
+.hc .st.a{left:-8px;background:linear-gradient(180deg,#f1c85a,#b98114);color:#2a1a02}
+.hc .st.h{right:-8px;background:linear-gradient(180deg,#f0695b,#a42b21)}
+.hc.spell{border-color:#5b78b8}
+.hc.poor{filter:saturate(.35) brightness(.7)}
+.hc.new{animation:drawIn .55s ease-out}
+@keyframes drawIn{from{transform:translate(-80px,-60px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+.hc.picked{transform:translateY(-16px) scale(1.1);border-color:#fff;z-index:21}
+.hl{animation:pulse 1.1s infinite;z-index:15}
+@keyframes pulse{0%,100%{outline:3px solid rgba(255,230,120,.95);outline-offset:3px;box-shadow:0 0 0 0 rgba(255,230,120,.7)}50%{outline:3px solid rgba(255,230,120,.35);outline-offset:6px;box-shadow:0 0 22px 6px rgba(255,230,120,.55)}}
+.hero.hl,.endb.hl{border-radius:14px}
+.endb.hl{border-radius:999px}
+/* 효과 */
+.fxl{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden}
+.flt{position:fixed;font:900 30px var(--font);text-shadow:0 2px 6px #000,0 0 10px #000;transform:translate(-50%,-50%);animation:flt 1.1s ease-out forwards}
+.flt.dmg{color:#ff6b5b}.flt.heal{color:#7be07b}.flt.txt{color:var(--gold);font-size:20px}.flt.sh{color:#8fd8f0;font-size:20px}
+@keyframes flt{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-60%) scale(1.25)}100%{opacity:0;transform:translate(-50%,-190%) scale(1)}}
+.fximg{position:fixed;transform:translate(-50%,-50%);animation:fxp .9s ease-out forwards;mix-blend-mode:screen}
+@keyframes fxp{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.35)}}
+.bcb{position:fixed;transform:translate(-50%,-50%);font:900 20px var(--serif);color:#2a1a02;background:linear-gradient(90deg,transparent,#f6d36f 15%,#f6d36f 85%,transparent);padding:5px 34px;letter-spacing:.06em;animation:bcb 1.5s ease-out forwards;white-space:nowrap;text-shadow:0 1px 0 #fff6;filter:drop-shadow(0 2px 6px #000a)}
+@keyframes bcb{0%{opacity:0;transform:translate(-50%,-50%) scaleX(.2)}15%{opacity:1;transform:translate(-50%,-50%) scaleX(1.05)}80%{opacity:1;transform:translate(-50%,-70%) scaleX(1)}100%{opacity:0;transform:translate(-50%,-90%)}}
+.ghost{position:fixed;pointer-events:none;animation:ghost .75s ease-in forwards}
+@keyframes ghost{0%{opacity:1;filter:none}100%{opacity:0;filter:grayscale(1) brightness(.5);transform:translateY(16px) scale(.85)}}
+.spellshow{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);z-index:55;pointer-events:none;animation:sps 1.15s ease-out forwards;text-align:center}
+.spellshow .hc{transform:scale(1.5);cursor:default}
+.spellshow .lbl{font:800 16px var(--serif);color:var(--gold);margin-top:58px;text-shadow:0 2px 6px #000}
+@keyframes sps{0%{opacity:0;transform:translate(-50%,-40%) scale(.7)}20%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-56%)}}
+.banner{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;pointer-events:none;font:900 34px var(--serif);color:var(--gold);padding:14px 46px;background:linear-gradient(90deg,transparent,rgba(0,0,0,.78) 20%,rgba(0,0,0,.78) 80%,transparent);text-shadow:0 2px 10px #000;animation:ban 1.1s ease-out forwards;white-space:nowrap}
+@keyframes ban{0%{opacity:0;transform:translate(-50%,-50%) scaleX(.5)}20%{opacity:1;transform:translate(-50%,-50%) scaleX(1)}80%{opacity:1}100%{opacity:0}}
+.toast{position:fixed;left:50%;bottom:30%;transform:translateX(-50%);background:#3a1713;border:1px solid var(--red);color:#ffd2cb;padding:10px 18px;border-radius:10px;z-index:70;font-size:15px;font-weight:700;animation:ban 2.4s ease-out forwards;box-shadow:0 6px 24px #000a}
+.inspect{position:fixed;right:14px;top:56px;width:200px;z-index:40;pointer-events:none;display:none;background:rgba(18,14,10,.94);border:1px solid var(--gold2);border-radius:12px;padding:10px;font-size:12.5px;line-height:1.5}
+.inspect.show{display:block}
+.inspect b{color:var(--gold);font-size:14px}
+.inspect .s{color:var(--dim);font-size:11.5px;margin:2px 0 5px}
+.over{position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:80;display:none;align-items:center;justify-content:center;padding:16px}
+.over.show{display:flex}
+.modal{width:min(640px,100%);max-height:88dvh;overflow:auto;background:linear-gradient(180deg,#2a2118,#1a140e);border:1px solid var(--gold2);border-radius:16px;padding:20px 22px}
+.modal h3{font:800 22px var(--serif);color:var(--gold);margin:0 0 10px}
+.modal dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:8px 14px;font-size:14px;line-height:1.55}
+.modal dt{font-weight:800;color:var(--gold)} .modal dd{margin:0;color:var(--ink)}
+.modal .x{float:right}
+.vict{text-align:center}
+.vict img{width:110px;height:auto;display:block;margin:0 auto 6px}
+.vict ul{text-align:left;margin:10px auto;padding-left:20px;line-height:1.8;font-size:14.5px;max-width:460px}
+@media (max-width:900px){
+  :root{--cw:84px;--ch:124px;--mw:70px;--mh:92px}
+  .layout{flex-direction:column}
+  .coach{width:auto;border-right:0;border-bottom:1px solid var(--line);max-height:34dvh;padding:10px 12px;gap:6px}
+  .coach h2{font-size:16px}.coach .body{font-size:13px;line-height:1.5}.coach .task{font-size:13px;padding:7px 9px}
+  .sidecol{width:92px}.hero{width:92px;padding:5px}.hero .hp{font-size:22px}.hero .nm{font-size:11px}
+  .hc .art{height:38px}.hc .tx{font-size:9px;padding:1px 4px}.hc .nm{font-size:10.5px}
+  .mn .nm{font-size:10px;padding:0 16px}.mn .st{min-width:26px;height:26px;font-size:15px}
+  .stage{padding:6px 8px;gap:4px}.hand{gap:4px}.board{gap:6px}
+  .chapname{display:none}.top h1{font-size:14px}
+  .inspect{display:none!important}
+  .banner{font-size:24px}
+}
+@media (max-width:560px){ :root{--cw:62px;--ch:98px;--mw:56px;--mh:76px} .hc .tx{display:none} .hc .art{height:44px} .hc .st,.hc .cost{transform:scale(.85)} .row{gap:6px} .sidecol{width:70px}.hero{width:70px}.hero .hp{font-size:17px}.mana i{width:8px;height:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <h1>카드 듀얼 · 튜토리얼</h1>
+    <div class="chap" id="chap"></div>
+    <span class="chapname" id="chapname"></span>
+    <button class="tbtn" id="gloss">규칙 도감</button>
+    <button class="tbtn" id="restart">처음부터</button>
+  </div>
+  <div class="layout">
+    <aside class="coach" id="coach">
+      <span class="badge" id="cbadge"></span>
+      <h2 id="ctitle"></h2>
+      <div class="body" id="cbody"></div>
+      <div class="task" id="ctask"></div>
+      <div class="err" id="cerr"></div>
+      <div class="nudge" id="cnudge"></div>
+      <div class="actions"><button class="cbtn" id="cnext">다음</button></div>
+    </aside>
+    <main class="stage" id="stage">
+      <div class="row" id="eRow">
+        <div class="sidecol" id="eSide"></div>
+        <div style="flex:1"></div>
+        <div class="sidecol" id="eInfo"></div>
+      </div>
+      <div class="board" id="eBoard"></div>
+      <div class="mid"><span class="turn" id="turnLbl"></span><button class="endb" id="endBtn">턴 종료</button></div>
+      <div class="board" id="mBoard"></div>
+      <div class="me-wrap">
+        <div class="sidecol" id="mSide"></div>
+        <div class="hand" id="hand"></div>
+        <div class="sidecol" id="mInfo"></div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="fxl" id="fxl"></div>
+<div class="inspect" id="inspect"></div>
+<div class="over" id="over"><div class="modal" id="modal"></div></div>
+
+<script id="engine">
+//__ENGINE__
+</script>
+
+<script id="tutorial">
+(function(){
+'use strict';
+const ART={"들쥐":"card_i2_101.png","책벌레":"card_i2_100.png","은빛 신병":"card_i2_99.png","견습 검사":"art_apprentice_swordsman.jpg","돌담 견습병":"art_stonewall_apprentice.jpg","불꽃 화살":"card_i3_16.jpg","약초꾼":"art_herbalist.jpg","날쌘 척후병":"card_i2_103.png","불사조":"art_phoenix.jpg","방패병":"card_104.png","숲 늑대":"art_forest_wolf.jpg","화염구":"card_i3_14.jpg","치유의 빛":"card_i3_9.jpg"};
+const artOf=n=>ART[n]?'images/'+ART[n]:'';
+const FX_SPELL={"불꽃 화살":"fx_fire_arrow.png","화염구":"fx_fireball.png","치유의 빛":"fx_holy_heal.png"};
+const $=s=>document.querySelector(s);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- 연습 상황 만들기 (엔진은 그대로, 시작 상태만 고정) ---------- */
+function mkCard(n,s){ const c=CARD_POOL.find(x=>x.name===n); if(!c) throw new Error('카드 없음: '+n); return {...structuredClone(c), inDeck:true, id:s.nextId++}; }
+function buildState(){
+  const s=newGame(()=>0.5,{first:0});
+  s.nextId=1000;
+  const [A,B]=s.seats;
+  A.hand=['책벌레','은빛 신병','견습 검사'].map(n=>mkCard(n,s));
+  // 덱은 끝에서부터 뽑힌다: 책벌레(불꽃 화살) → 2턴(약초꾼) → 3턴(날쌘 척후병) → 4턴(불사조) → 5턴(화염구)
+  A.deck=[...Array(10).fill('들쥐'),'화염구','불사조','날쌘 척후병','약초꾼','불꽃 화살'].map(n=>mkCard(n,s));
+  B.hand=['들쥐','돌담 견습병','방패병','들쥐','숲 늑대'].map(n=>mkCard(n,s));
+  B.deck=Array(10).fill('들쥐').map(n=>mkCard(n,s));
+  A.board=[]; B.board=[];
+  A.mana=1; A.maxMana=1;
+  B.hp=B.maxHp=10;   // 연습 상대는 체력 10 (실전은 30)
+  return s;
+}
+const ENEMY_TURNS=[
+  [{play:'들쥐'}],
+  [{play:'돌담 견습병'},{attack:'들쥐',hero:0}],
+  [{play:'방패병'},{play:'들쥐'}],
+  [{play:'숲 늑대'}]
+];
+
+/* ---------- 챕터·단계 ---------- */
+const CHAPS=['마나와 하수인','전투의 함성','공격','도발','주문','보호막·회복','속공·돌진','승리'];
+const KW='<span class="kw">', K2='<span class="kw2">', E='</span>';
+const STEPS=[
+ {ch:0,type:'info',title:'카드 듀얼에 오신 걸 환영합니다',
+  body:`<p>이 게임의 목표는 하나, <b>상대 영웅의 체력을 0으로</b> 만드는 것입니다. 영웅 체력은 실전에서 각 30이며, 연습에서는 상대 체력이 <b>10</b>입니다.</p>
+        <p><b>위쪽</b>이 상대, <b>아래쪽</b>이 나입니다. 번갈아 턴을 진행하며, 내 턴에는 카드를 내고 하수인으로 공격합니다.</p>
+        <p>이 튜토리얼은 <b>정해진 5턴</b>으로 진행되고, 안내하는 곳이 <span class="kw">노란 테두리</span>로 반짝입니다. 카드 위에 마우스를 올리면 설명이 보여요.</p>`},
+ {ch:0,type:'info',title:'마나와 카드 보는 법',
+  body:`<p>왼쪽 아래 <b>마나 수정</b>이 지금 쓸 수 있는 자원입니다. 매 턴 최대 마나가 <b>1씩 늘고</b>(최대 10), 턴이 시작되면 가득 채워집니다.</p>
+        <p>손패 카드의 <b>왼쪽 위 파란 숫자</b>가 비용, 하수인은 <b>왼쪽 아래 공격력 · 오른쪽 아래 체력</b>입니다. 이번 턴 마나가 모자란 카드는 흐리게 보입니다.</p>
+        <p>하수인은 전장에 남아 싸우고, <b>주문</b>은 효과만 쓰고 사라집니다.</p>`},
+ {ch:0,type:'play',card:'책벌레',title:'하수인 내기',
+  body:`<p>지금 마나는 1입니다. 비용 1짜리 <b>책벌레</b>를 내 봅시다.</p>`,
+  task:`손패의 <b>책벌레</b>를 클릭하세요.`,nudge:'지금은 책벌레를 내 보세요.'},
+ {ch:1,type:'info',title:'전투의 함성!',
+  body:`<p>방금 책벌레가 낼 때 <b>카드를 1장 뽑게</b> 했습니다. 이런 능력이 ${KW}전투의 함성${E}입니다.</p>
+        <p>전투의 함성은 <b>손에서 내는 순간 딱 한 번</b> 발동합니다. 책벌레처럼 카드를 뽑거나, 피해를 주거나, 아군을 회복·강화하는 등 종류가 다양합니다. 카드 설명에 <b>"전투의 함성:"</b>으로 적혀 있어요.</p>
+        <p>새로 뽑은 카드는 <b>불꽃 화살</b>(주문)입니다.</p>`},
+ {ch:0,type:'end',title:'턴 종료',
+  body:`<p>마나를 다 썼으니 턴을 넘깁니다. 하수인은 <b>낸 턴에는 공격할 수 없어서</b> 책벌레는 다음 턴부터 싸울 수 있어요.</p>`,
+  task:`가운데의 <b>턴 종료</b> 버튼을 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
+ {type:'enemy',turn:0},
+ {ch:2,type:'info',title:'내 두 번째 턴',
+  body:`<p>최대 마나가 <b>2</b>로 늘었고, 카드 1장을 뽑았습니다. 상대는 <b>들쥐</b>를 냈네요.</p>
+        <p>내 책벌레는 이제 <span style="color:var(--green);font-weight:700">초록 테두리</span>입니다. 초록 테두리 = <b>지금 공격할 수 있음</b>. 방금 낸 하수인에는 <b>zZ</b>가 붙어 이번 턴엔 공격할 수 없다는 뜻입니다.</p>`},
+ {ch:2,type:'attack',attacker:'책벌레',target:{hero:1},title:'영웅 공격',
+  body:`<p>공격은 <b>내 하수인을 클릭 → 대상 클릭</b> 순서입니다. 상대에게 <b>도발</b> 하수인이 없으니 영웅을 바로 칠 수 있어요. 영웅은 반격하지 않습니다.</p>`,
+  task:`<b>책벌레</b>를 클릭하고, <b>상대 영웅</b>을 클릭하세요.`,nudge:'책벌레로 상대 영웅을 공격해 보세요.'},
+ {ch:0,type:'play',card:'견습 검사',title:'두 번째 하수인',
+  body:`<p>남은 마나 2로 <b>견습 검사</b>(비용 2, 공격력 2 / 체력 2)를 냅니다. 이 카드엔 전투의 함성이 없어요. 모든 하수인이 능력이 있는 건 아닙니다.</p>`,
+  task:`손패의 <b>견습 검사</b>를 클릭하세요.`,nudge:'견습 검사를 내 보세요.'},
+ {ch:0,type:'end',title:'턴 종료',body:`<p>이번에도 마나를 다 썼습니다. 턴을 넘기세요.</p>`,task:`<b>턴 종료</b>를 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
+ {type:'enemy',turn:1},
+ {ch:3,type:'info',title:'도발 하수인',
+  body:`<p>상대가 <b>돌담 견습병</b>을 냈고, 들쥐가 내 영웅을 때렸습니다(영웅 체력 29).</p>
+        <p>은색으로 빛나는 하수인이 ${KW}도발${E}입니다. 도발 하수인이 있으면 상대는 <b>영웅이든 다른 하수인이든 도발부터 공격해야</b> 합니다. 정말 막히는지 직접 해 봅시다.</p>`},
+ {ch:3,type:'probe',attacker:'견습 검사',target:{hero:1},title:'도발에 막혀 보기',
+  body:`<p>일부러 도발을 무시하고 영웅을 공격해 보세요. 게임이 막아 줍니다.</p>`,
+  task:`<b>견습 검사</b> → <b>상대 영웅</b> 순서로 클릭하세요.`,nudge:'견습 검사로 상대 영웅을 눌러 보세요(막힐 거예요).'},
+ {ch:3,type:'info',title:'먼저 도발을 치워야 해요',
+  body:`<p>방금 뜬 빨간 메시지처럼 도발이 있으면 영웅을 칠 수 없습니다. 도발을 없애는 방법은 둘: <b>공격으로 때려 눕히거나, 주문으로 처리</b>하는 것.</p>
+        <p>이번에는 주문으로 해결해 봅니다. 손패의 <b>불꽃 화살</b>이 있죠?</p>`},
+ {ch:4,type:'play',card:'불꽃 화살',target:{seat:1,name:'돌담 견습병'},title:'주문 쓰기',
+  body:`<p><b>불꽃 화살</b>(비용 2)은 <b>대상 하나에 피해 3</b>을 주는 주문입니다. 주문은 쓰면 사라지고 효과만 남습니다.</p>
+        <p>돌담 견습병의 체력이 3이라 한 방에 쓰러집니다.</p>`,
+  task:`<b>불꽃 화살</b>을 클릭하고, 대상으로 <b>돌담 견습병</b>을 클릭하세요.`,nudge:'불꽃 화살을 돌담 견습병에게 써 보세요.'},
+ {ch:2,type:'attack',attacker:'견습 검사',target:{seat:1,name:'들쥐'},title:'하수인끼리 싸우기',
+  body:`<p>도발이 사라졌습니다. 하수인이 하수인을 공격하면 <b>서로의 공격력만큼 피해를 입습니다</b>. 견습 검사(공격력 2)가 들쥐(1/2)를 치면 들쥐는 쓰러지고, 검사는 1 피해를 받아 체력 1이 됩니다.</p>`,
+  task:`<b>견습 검사</b> → 상대 <b>들쥐</b>를 클릭하세요.`,nudge:'견습 검사로 들쥐를 공격해 보세요.'},
+ {ch:2,type:'attack',attacker:'책벌레',target:{hero:1},title:'다시 영웅 공격',
+  body:`<p>상대 전장이 비었습니다. 책벌레로 영웅을 한 번 더 칩니다.</p>`,
+  task:`<b>책벌레</b> → <b>상대 영웅</b>을 클릭하세요.`,nudge:'책벌레로 상대 영웅을 공격하세요.'},
+ {ch:5,type:'play',card:'은빛 신병',title:'보호막',
+  body:`<p>마나 1이 남았으니 <b>은빛 신병</b>을 냅니다. 이 하수인은 ${K2}보호막${E}(파란 빛)을 가지고 있습니다. 보호막은 <b>다음에 받는 피해를 한 번 완전히 막고</b> 사라집니다.</p>`,
+  task:`손패의 <b>은빛 신병</b>을 클릭하세요.`,nudge:'은빛 신병을 내 보세요.'},
+ {ch:5,type:'end',title:'턴 종료',body:`<p>턴을 넘깁니다.</p>`,task:`<b>턴 종료</b>를 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
+ {type:'enemy',turn:2},
+ {ch:5,type:'play',card:'약초꾼',target:{seat:0,name:'견습 검사'},title:'치유의 전투의 함성',
+  body:`<p>내 네 번째 턴, 마나는 <b>4</b>입니다. 상대는 방패병과 들쥐를 냈어요. 견습 검사가 체력 1로 다쳐 있죠.</p>
+        <p><b>약초꾼</b>의 전투의 함성은 <b>대상 하나의 체력을 3 회복</b>입니다. 전투의 함성 중에는 이렇게 <b>대상을 직접 고르는 것</b>도 있어요. (체력은 최대치까지만 회복)</p>`,
+  task:`<b>약초꾼</b>을 클릭하고, 대상으로 <b>견습 검사</b>를 클릭하세요.`,nudge:'약초꾼을 내고 견습 검사를 회복시켜 보세요.'},
+ {ch:6,type:'play',card:'날쌘 척후병',title:'속공',
+  body:`<p><b>날쌘 척후병</b>은 ${KW}속공${E}입니다. 속공 하수인은 <b>낸 턴에도 하수인을 공격</b>할 수 있습니다. 단, 낸 턴에 <b>영웅은 공격할 수 없습니다</b>.</p>`,
+  task:`손패의 <b>날쌘 척후병</b>을 클릭하세요.`,nudge:'날쌘 척후병을 내 보세요.'},
+ {ch:6,type:'probe',attacker:'날쌘 척후병',target:{hero:1},title:'속공의 한계 확인',
+  body:`<p>척후병으로 영웅을 공격해 보세요. 어떻게 되는지 확인합니다.</p>`,
+  task:`<b>날쌘 척후병</b> → <b>상대 영웅</b>을 클릭하세요.`,nudge:'날쌘 척후병으로 상대 영웅을 눌러 보세요(막힐 거예요).'},
+ {ch:6,type:'attack',attacker:'날쌘 척후병',target:{seat:1,name:'들쥐'},title:'속공으로 하수인 공격',
+  body:`<p>영웅은 안 되지만 <b>하수인은 바로</b> 칠 수 있습니다. 들쥐(1/2)를 공격하세요. 척후병도 반격으로 1 피해를 받습니다.</p>`,
+  task:`<b>날쌘 척후병</b> → 상대 <b>들쥐</b>를 클릭하세요.`,nudge:'척후병으로 들쥐를 공격하세요.'},
+ {ch:5,type:'attack',attacker:'은빛 신병',target:{seat:1,name:'방패병'},title:'보호막의 효과',
+  body:`<p>보호막이 있는 은빛 신병으로 방패병(공격력 1)을 공격합니다. 반격 피해를 <b>보호막이 대신 막아</b> 체력이 그대로인지 보세요.</p>`,
+  task:`<b>은빛 신병</b> → 상대 <b>방패병</b>을 클릭하세요.`,nudge:'은빛 신병으로 방패병을 공격하세요.'},
+ {ch:5,type:'end',title:'턴 종료',body:`<p>손에는 <b>불사조</b>가 있지만 비용 4라 이번 턴엔 쓸 수 없었어요. 다음 턴에 씁니다.</p>`,task:`<b>턴 종료</b>를 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
+ {type:'enemy',turn:3},
+ {ch:6,type:'play',card:'불사조',title:'돌진',
+  body:`<p>마지막 턴입니다. 상대 영웅 체력은 8, 도발은 없습니다. <b>불사조</b>는 ${KW}돌진${E} 하수인입니다. 돌진은 <b>낸 턴에 영웅까지 바로 공격</b>할 수 있습니다. 속공과 달리 영웅도 칠 수 있다는 점이 다릅니다.</p>`,
+  task:`손패의 <b>불사조</b>를 클릭하세요.`,nudge:'불사조를 내 보세요.'},
+ {ch:7,type:'attackAll',title:'모든 하수인으로 마무리!',
+  body:`<p>내 하수인 전부 초록 테두리죠? 상대 전장엔 도발이 없으니 <b>전부 영웅에게</b> 공격하면 체력 8을 모두 깎을 수 있습니다.</p>`,
+  task:`초록 테두리 하수인을 하나씩 클릭하고 <b>상대 영웅</b>을 클릭하세요.`,nudge:'초록 테두리 하수인으로 상대 영웅을 공격하세요.'},
+ {ch:7,type:'win'}
+];
+
+/* ---------- 상태 ---------- */
+let S, stepIdx=0, sel=null, busy=false, lastHand=new Set();
+const stepNow=()=>STEPS[stepIdx];
+const el=(tag,cls,html)=>{const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;};
+const findMin=(seat,id)=>S.seats[seat].board.find(m=>m.id===id);
+const canAttack=m=>S.turn===0 && !S.over && m.atk>0 && !m.attacked && !m.frozen && (!m.summoned||m.charge||m.rush);
+const keyOf=t=>t.kind==='hero'?`h:${t.seat}`:`m:${t.seat}:${t.id}`;
+const tdesc=t=>t.kind==='hero'?{hero:t.seat}:{seat:t.seat,name:findMin(t.seat,t.id)?.name};
+const sameT=(a,b)=>JSON.stringify(a||null)===JSON.stringify(b||null);
+
+/* ---------- 카드 표시 ---------- */
+function tagsOf(c){ const t=[]; if(c.taunt)t.push(['taunt','도발']); if(c.shield)t.push(['shield','보호막']); if(c.charge)t.push(['charge','돌진']); else if(c.rush)t.push(['rush','속공']); if(c.frozen)t.push(['shield','얼음']); return t; }
+function cardText(c){
+  let tx=''; try{ tx=(typeof effectText==='function')?effectText(c):''; }catch(e){}
+  const kws=[]; if(c.taunt)kws.push('도발'); if(c.shield)kws.push('보호막'); if(c.charge)kws.push('돌진'); else if(c.rush)kws.push('속공');
+  const kw=kws.length?'<b>'+kws.join(' · ')+'</b>':'';
+  if(c.effect && c.effect.type==='mana') tx='이번 턴 마나 +'+c.effect.value;
+  return [kw,tx].filter(Boolean).join('<br>');
+}
+function handCard(c){
+  const d=el('div','hc'+(c.type==='spell'?' spell':''));
+  d.dataset.name=c.name; d.dataset.id=c.id;
+  const cost=effCost(S.seats[0],c);
+  if(cost>S.seats[0].mana || S.turn!==0) d.classList.add('poor');
+  d.innerHTML=`<div class="cost">${cost}</div><div class="art">${artOf(c.name)?`<img src="${artOf(c.name)}" alt="">`:''}</div><div class="nm">${c.name}</div><div class="ty">${c.type==='spell'?'주문':'하수인'}</div><div class="tx">${cardText(c)}</div>${c.type==='minion'?`<div class="st a">${c.atk}</div><div class="st h">${c.hp}</div>`:''}`;
+  d.onclick=ev=>{ev.stopPropagation(); onHand(c);};
+  d.onmouseenter=()=>inspect(c); d.onmouseleave=()=>inspect(null);
+  return d;
+}
+function minionEl(m,seat){
+  const d=el('div','mn');
+  d.dataset.seat=seat; d.dataset.name=m.name; d.dataset.id=m.id; d.dataset.key=`m:${seat}:${m.id}`;
+  if(m.taunt)d.classList.add('taunt'); if(m.shield)d.classList.add('shielded');
+  if(seat===0 && S.turn===0){ if(canAttack(m))d.classList.add('ready'); else if(m.summoned && !m.charge && !m.rush)d.classList.add('sleep'); }
+  const hurt=m.hp<m.maxHp;
+  d.innerHTML=`<div class="art">${artOf(m.name)?`<img src="${artOf(m.name)}" alt="">`:''}</div>`+
+    (m.taunt?`<div class="fxo" style="background-image:url(images/fx_taunt.png);opacity:.55"></div>`:'')+
+    (m.shield?`<div class="fxo" style="background-image:url(images/fx_holy_shield.png);opacity:.45"></div>`:'')+
+    `<div class="tags">${tagsOf(m).map(([k,t])=>`<span class="tg ${k}">${t}</span>`).join('')}</div><div class="nm">${m.name}</div><div class="st a">${m.atk}</div><div class="st h${hurt?' hurt':''}">${m.hp}</div>`;
+  d.onclick=ev=>{ev.stopPropagation(); onMinion(m,seat);};
+  d.onmouseenter=()=>inspect(m); d.onmouseleave=()=>inspect(null);
+  return d;
+}
+function inspect(c){
+  const b=$('#inspect');
+  if(!c){b.classList.remove('show');return;}
+  const isM=c.type!=='spell';
+  b.innerHTML=`<b>${c.name}</b><div class="s">${isM?`하수인 · 공격력 ${c.atk} / 체력 ${c.hp}`:'주문'} · 비용 ${c.cost}</div>${cardText(c)||'<span style="color:var(--dim)">특수 능력 없음</span>'}`;
+  b.classList.add('show');
+}
+
+/* ---------- 렌더 ---------- */
+function heroPanel(seat){
+  const P=S.seats[seat], d=el('div','hero'+(seat===1&&sel&&sel.kind==='atk'?' t-ok':''));
+  d.dataset.seat=seat; d.dataset.key=`h:${seat}`;
+  d.innerHTML=`<div class="nm">${seat===0?'나':'연습 상대'}</div><div class="hp">${Math.max(0,P.hp)}<small> / ${P.maxHp}</small></div>${P.armor?`<div class="arm">방어도 ${P.armor}</div>`:''}`;
+  d.onclick=ev=>{ev.stopPropagation(); onHero(seat);};
+  return d;
+}
+function manaRow(seat){
+  const P=S.seats[seat], w=el('div');
+  const m=el('div','mana'); for(let i=0;i<P.maxMana;i++)m.appendChild(el('i',i<P.mana?'on':''));
+  w.appendChild(m); w.appendChild(el('div','mnum',`마나 ${P.mana} / ${P.maxMana}`));
+  return w;
+}
+function render(){
+  const E_=S.seats[1], M_=S.seats[0];
+  const es=$('#eSide'); es.innerHTML=''; es.appendChild(heroPanel(1));
+  const ei=$('#eInfo'); ei.innerHTML=''; const eb=el('div','eback'); for(let i=0;i<Math.min(E_.hand.length,6);i++)eb.appendChild(el('i')); ei.appendChild(eb); ei.appendChild(el('div','mini',`상대 손패 ${E_.hand.length}장 · 덱 ${E_.deck.length}`));
+  const ms=$('#mSide'); ms.innerHTML=''; ms.appendChild(heroPanel(0));
+  const mi=$('#mInfo'); mi.innerHTML=''; mi.appendChild(manaRow(0)); mi.appendChild(el('div','mini',`덱 ${M_.deck.length}장`));
+  for(const [id,seat] of [['#eBoard',1],['#mBoard',0]]){
+    const b=$(id); b.innerHTML='';
+    if(!S.seats[seat].board.length) b.appendChild(el('span','empty',seat?'상대 전장이 비었습니다':'내 전장이 비었습니다'));
+    S.seats[seat].board.forEach(m=>{ const e=minionEl(m,seat); if(sel&&sel.kind==='atk'&&seat===0&&sel.id===m.id)e.classList.add('picked'); if(sel&&sel.kind==='atk'&&seat===1)e.classList.add('t-ok'); if(sel&&sel.kind==='cast'&&sel.targets.some(t=>t.kind==='minion'&&t.seat===seat&&t.id===m.id))e.classList.add('t-ok'); b.appendChild(e); });
+  }
+  const h=$('#hand'); h.innerHTML='';
+  M_.hand.forEach(c=>{ const e=handCard(c); if(!lastHand.has(c.id))e.classList.add('new'); if(sel&&sel.kind==='cast'&&sel.card.id===c.id)e.classList.add('picked'); h.appendChild(e); });
+  lastHand=new Set(M_.hand.map(c=>c.id));
+  const tl=$('#turnLbl'); tl.textContent=S.over?'게임 종료':S.turn===0?'내 턴':'상대 턴'; tl.className='turn'+(S.turn===0&&!S.over?' me':'');
+  $('#endBtn').disabled=busy||S.turn!==0||S.over;
+  applyHL();
+}
+function applyHL(){
+  document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));
+  const st=stepNow(); if(!st||busy) return;
+  const add=q=>document.querySelectorAll(q).forEach(e=>e.classList.add('hl'));
+  const tgtSel=t=>!t?null:t.hero!=null?`.hero[data-seat="${t.hero}"]`:`.mn[data-seat="${t.seat}"][data-name="${t.name}"]`;
+  if(st.type==='play'){
+    if(sel&&sel.kind==='cast'){ const q=tgtSel(st.target); if(q)add(q); }
+    else add(`.hc[data-name="${st.card}"]`);
+  } else if(st.type==='attack'||st.type==='probe'){
+    if(sel&&sel.kind==='atk') add(tgtSel(st.target)); else add(`.mn[data-seat="0"][data-name="${st.attacker}"]`);
+  } else if(st.type==='attackAll'){
+    if(sel&&sel.kind==='atk') add('.hero[data-seat="1"]'); else S.seats[0].board.forEach(m=>{ if(canAttack(m)) add(`.mn[data-seat="0"][data-id="${m.id}"]`); });
+  } else if(st.type==='end') add('#endBtn');
+}
+
+/* ---------- 코치 패널 ---------- */
+function renderChap(){
+  const st=STEPS.slice(0,stepIdx+1).reverse().find(s=>s.ch!=null)||STEPS[0];
+  const c=$('#chap'); c.innerHTML='';
+  CHAPS.forEach((n,i)=>c.appendChild(el('i',i<st.ch?'done':i===st.ch?'cur':'')));
+  $('#chapname').textContent=`${st.ch+1}/${CHAPS.length} · ${CHAPS[st.ch]}`;
+}
+function showStep(){
+  const st=stepNow(); if(!st) return;
+  if(st.type==='enemy'||st.type==='win'){ if(st.type==='win')showWin(); return; }
+  renderChap();
+  const visible=STEPS.filter(s=>s.type!=='enemy'&&s.type!=='win');
+  $('#cbadge').textContent=`${visible.indexOf(st)+1} / ${visible.length}`;
+  $('#ctitle').textContent=st.title; $('#cbody').innerHTML=st.body;
+  const task=$('#ctask'); if(st.task){task.innerHTML='<b>해 보기</b> · '+st.task; task.style.display='';} else task.style.display='none';
+  $('#cerr').className='err'; $('#cnudge').className='nudge';
+  const nb=$('#cnext'); nb.style.display=st.type==='info'?'':'none'; nb.disabled=busy;
+  sel=null; render();
+}
+function nudge(msg){
+  const n=$('#cnudge'); n.textContent=msg; n.classList.add('show');
+  const c=$('#coach'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+}
+function toast(msg){ const t=el('div','toast',msg); document.body.appendChild(t); setTimeout(()=>t.remove(),2500); }
+function banner(msg){ const b=el('div','banner',msg); document.body.appendChild(b); setTimeout(()=>b.remove(),1200); }
+
+/* ---------- 입력 처리 ---------- */
+function onHand(c){
+  if(busy||S.over) return;
+  const st=stepNow();
+  if(st.type!=='play'){ return nudge(st.type==='info'?'오른쪽 아래(또는 위쪽) "다음" 버튼을 눌러 주세요.':(st.nudge||'안내를 따라 주세요.')); }
+  if(c.name!==st.card) return nudge(st.nudge);
+  if(effCost(S.seats[0],c)>S.seats[0].mana) return toast('마나가 부족합니다.');
+  const ts=cardTargets(S,0,c);
+  if(ts.length){ sel={kind:'cast',card:c,targets:ts}; render(); return; }
+  dispatch({type:'PLAY_CARD',cardId:c.id,target:null});
+}
+function onMinion(m,seat){
+  if(busy||S.over) return;
+  const st=stepNow();
+  if(sel&&sel.kind==='cast'&&seat!==undefined){ return castOn({kind:'minion',seat,id:m.id}); }
+  if(seat===0){
+    if(st.type!=='attack'&&st.type!=='probe'&&st.type!=='attackAll') return nudge(st.type==='info'?'"다음" 버튼을 눌러 주세요.':(st.nudge||''));
+    if(!canAttack(m)) return toast(m.summoned&&!m.charge&&!m.rush?'소환 직후라 공격할 수 없습니다. (zZ)':'지금은 공격할 수 없습니다.');
+    if(st.type!=='attackAll'&&m.name!==st.attacker) return nudge(st.nudge);
+    sel=(sel&&sel.kind==='atk'&&sel.id===m.id)?null:{kind:'atk',id:m.id}; render();
+  } else {
+    if(sel&&sel.kind==='atk') return attackWith({kind:'minion',seat:1,id:m.id});
+    nudge(st.type==='info'?'"다음" 버튼을 눌러 주세요.':(st.nudge||'먼저 공격할 내 하수인을 고르세요.'));
+  }
+}
+function onHero(seat){
+  if(busy||S.over) return;
+  if(sel&&sel.kind==='cast') return castOn(heroT(seat));
+  if(sel&&sel.kind==='atk'&&seat===1) return attackWith(heroT(1));
+  if(seat===1){ const st=stepNow(); nudge(st.type==='info'?'"다음" 버튼을 눌러 주세요.':(st.nudge||'')); }
+}
+function castOn(t){ const c=sel.card; if(!sel.targets.some(x=>keyOf(x)===keyOf(t))) return toast('그 대상은 고를 수 없습니다.'); dispatch({type:'PLAY_CARD',cardId:c.id,target:t}); }
+function attackWith(t){ dispatch({type:'ATTACK',attackerId:sel.id,target:t}); }
+$('#endBtn').onclick=()=>{ if(busy||S.over||S.turn!==0)return; dispatch({type:'END_TURN'}); };
+$('#cnext').onclick=()=>{ if(busy)return; const st=stepNow(); if(st.type==='info')advance(); };
+$('#stage').onclick=()=>{ if(sel){sel=null;render();} };
+$('#restart').onclick=()=>init();
+
+function describe(a){
+  if(a.type==='PLAY_CARD'){ const c=S.seats[0].hand.find(x=>x.id===a.cardId); return {t:'play',card:c.name,target:a.target?tdesc(a.target):null}; }
+  if(a.type==='ATTACK'){ const m=findMin(0,a.attackerId); return {t:'attack',attacker:m.name,target:tdesc(a.target)}; }
+  return {t:'end'};
+}
+async function dispatch(a){
+  if(busy) return;
+  const st=stepNow(), d=describe(a); let verdict=false;
+  if(st.type==='play') verdict=d.t==='play'&&d.card===st.card&&sameT(d.target,st.target||null)?'ok':false;
+  else if(st.type==='attack') verdict=d.t==='attack'&&d.attacker===st.attacker&&sameT(d.target,st.target)?'ok':false;
+  else if(st.type==='probe') verdict=d.t==='attack'&&d.attacker===st.attacker&&sameT(d.target,st.target)?'probe':false;
+  else if(st.type==='attackAll') verdict=d.t==='attack'&&d.target.hero===1?'ok':false;
+  else if(st.type==='end') verdict=d.t==='end'?'ok':false;
+  if(!verdict){ sel=null; render(); return nudge(st.nudge||'안내를 따라 주세요.'); }
+  if(verdict==='probe'){
+    const r=apply(S,a,0); sel=null;
+    if(r.ok) return nudge(st.nudge);
+    const e=$('#cerr'); e.textContent='게임의 대답: "'+r.error+'"'; e.classList.add('show'); toast(r.error); render();
+    $('#cnudge').className='nudge';
+    await sleep(900); return advance();
+  }
+  await perform(a,0);
+  sel=null;
+  if(st.type==='attackAll' && !S.over){ render(); return; }
+  advance();
+}
+
+/* ---------- 실행 + 연출 ---------- */
+function rectOf(key){ const e=document.querySelector(`[data-key="${key}"]`); return e?e.getBoundingClientRect():null; }
+const center=r=>r?{x:r.left+r.width/2,y:r.top+r.height/2}:{x:innerWidth/2,y:innerHeight/2};
+function fxImg(file,pos,size=140){ const i=el('img','fximg'); i.src='images/'+file; i.style.left=pos.x+'px'; i.style.top=pos.y+'px'; i.style.width=size+'px'; $('#fxl').appendChild(i); setTimeout(()=>i.remove(),1000); }
+function floatTxt(txt,cls,pos){ const f=el('div','flt '+cls,txt); f.style.left=pos.x+'px'; f.style.top=pos.y+'px'; $('#fxl').appendChild(f); setTimeout(()=>f.remove(),1150); }
+async function lunge(atkKey,tgtKey){
+  const a=document.querySelector(`[data-key="${atkKey}"]`), t=document.querySelector(`[data-key="${tgtKey}"]`); if(!a||!t) return;
+  const ra=a.getBoundingClientRect(), rt=t.getBoundingClientRect();
+  const dx=(rt.left+rt.width/2)-(ra.left+ra.width/2), dy=(rt.top+rt.height/2)-(ra.top+ra.height/2);
+  a.style.zIndex=30;
+  const an=a.animate([{transform:'translate(0,0)'},{transform:`translate(${dx*0.85}px,${dy*0.85}px) scale(1.12)`,offset:.55},{transform:'translate(0,0)'}],{duration:420,easing:'ease-in-out'});
+  await sleep(230); return an;
+}
+async function perform(a,actor){
+  busy=true; $('#endBtn').disabled=true; applyHL();
+  // 실행 전에 위치·모양을 기억한다 (죽은 하수인·피해 숫자를 그 자리에 띄우기 위해)
+  const rects={}, clones={};
+  document.querySelectorAll('[data-key]').forEach(e=>{ rects[e.dataset.key]=e.getBoundingClientRect(); if(e.classList.contains('mn'))clones[e.dataset.key]=e.cloneNode(true); });
+  const playedCard = a.type==='PLAY_CARD' ? S.seats[actor].hand.find(c=>c.id===a.cardId) : null;
+  if(a.type==='ATTACK'){ const tk=a.target.kind==='hero'?`h:${a.target.seat}`:`m:${a.target.seat}:${a.target.id}`; await lunge(`m:${actor}:${a.attackerId}`,tk); }
+  const r=apply(S,a,actor);
+  if(!r.ok){ busy=false; toast(r.error); render(); throw new Error(r.error); }
+  const before=S; S=r.state;
+  render();
+  await playEvents(r.events,rects,clones,playedCard,actor);
+  busy=false; render();
+}
+async function playEvents(evs,rects,clones,playedCard,actor){
+  let summonKey=null;
+  for(const e of evs){
+    if(e.type==='spell'){
+      const wrap=el('div','spellshow'); const hc=el('div','hc spell'); const c=e.card;
+      hc.innerHTML=`<div class="cost">${c.cost}</div><div class="art">${artOf(c.name)?`<img src="${artOf(c.name)}" alt="">`:''}</div><div class="nm">${c.name}</div><div class="ty">주문</div><div class="tx">${cardText(c)}</div>`;
+      wrap.appendChild(hc); document.body.appendChild(wrap); setTimeout(()=>wrap.remove(),1200); await sleep(650);
+    }
+    else if(e.type==='summon'){
+      summonKey=`m:${e.seat}:${e.id}`; const p=center(rectOf(summonKey)); fxImg('fx_summon_crack.png',p,150);
+      if(playedCard&&playedCard.effect&&playedCard.type==='minion'){ const b=el('div','bcb','전투의 함성!'); b.style.left=p.x+'px'; b.style.top=(p.y-(e.seat?-10:10))+'px'; $('#fxl').appendChild(b); setTimeout(()=>b.remove(),1550); }
+      await sleep(450);
+    }
+    else if(e.type==='draw'){
+      if(e.count>0&&e.seat===0&&e.src){ const p=center(rectOf('h:0')); floatTxt(`카드 ${e.count}장 뽑기`,'txt',{x:p.x+60,y:p.y-30}); await sleep(450); }
+    }
+    else if(e.type==='damage'){
+      const k=keyOf(e.target), p=center(rects[k]||rectOf(k));
+      const spellName=e.src&&e.src.spell?e.src.name:null;
+      if(e.absorbed){ fxImg('fx_a_shield.png',p,130); floatTxt('보호막!','sh',p); }
+      else if(e.amount>0){ if(spellName&&FX_SPELL[spellName])fxImg(FX_SPELL[spellName],p,170); else fxImg('fx_a_slash.png',p,110); floatTxt('-'+e.amount,'dmg',p); }
+      await sleep(e.absorbed||e.amount>0?420:0);
+    }
+    else if(e.type==='heal'){
+      if(e.amount>0){ const k=keyOf(e.target), p=center(rectOf(k)||rects[k]); fxImg('fx_holy_heal.png',p,130); floatTxt('+'+e.amount,'heal',p); sleep(0); await sleep(450); }
+    }
+    else if(e.type==='death'){
+      const k=`m:${e.seat}:${e.id}`, c=clones[k], r=rects[k];
+      if(c&&r){ c.className+=' ghost'; c.style.left=r.left+'px'; c.style.top=r.top+'px'; c.style.width=r.width+'px'; c.style.height=r.height+'px'; c.style.margin=0; document.body.appendChild(c); setTimeout(()=>c.remove(),800); }
+      await sleep(300);
+    }
+    else if(e.type==='turn_start'){ if(e.seat===0){ banner('내 턴'); await sleep(500);} }
+  }
+}
+
+/* ---------- 상대 턴(고정 대본) ---------- */
+async function runEnemy(n){
+  busy=true; render(); banner('상대 턴'); await sleep(1000);
+  for(const act of ENEMY_TURNS[n]){
+    if(act.play){ const c=S.seats[1].hand.find(x=>x.name===act.play); await perform({type:'PLAY_CARD',cardId:c.id,target:null},1); }
+    else if(act.attack){ const m=S.seats[1].board.find(x=>x.name===act.attack); await perform({type:'ATTACK',attackerId:m.id,target:heroT(act.hero)},1); }
+    await sleep(500);
+  }
+  await perform({type:'END_TURN'},1);
+  await sleep(300);
+}
+async function advance(){
+  stepIdx++; sel=null;
+  while(stepNow()&&stepNow().type==='enemy'){ await runEnemy(stepNow().turn); stepIdx++; }
+  busy=false; showStep();
+}
+
+/* ---------- 도감·승리 ---------- */
+const GLOSS=[
+ ['마나','매 턴 최대 마나가 1씩 늘고(최대 10), 턴 시작에 가득 찹니다. 카드를 내면 비용만큼 씁니다.'],
+ ['하수인','전장에 남아 싸우는 카드. 전장에는 최대 7기, 손패는 최대 10장까지.'],
+ ['주문','효과만 쓰고 사라지는 카드. 대상을 골라야 하는 주문도 있습니다.'],
+ ['전투의 함성','손에서 낼 때 한 번 발동하는 능력 (카드 뽑기, 피해, 회복, 강화 등). 대상을 직접 고르는 것도 있습니다.'],
+ ['죽음의 메아리','하수인이 쓰러질 때 발동하는 능력. 예: 유물 수집가는 쓰러지면 손패에서 비용이 가장 높은 주문을 복사합니다.'],
+ ['도발','도발 하수인이 있으면 상대는 영웅·다른 하수인보다 도발을 먼저 공격해야 합니다.'],
+ ['보호막','다음에 받는 피해를 한 번 완전히 막고 사라집니다.'],
+ ['속공','낸 턴에도 상대 하수인을 공격할 수 있지만, 영웅은 공격할 수 없습니다.'],
+ ['돌진','낸 턴에 영웅까지 바로 공격할 수 있습니다.'],
+ ['얼음(동결)','얼어붙은 하수인은 공격할 수 없습니다.'],
+ ['은신','은신한 하수인은 공격하기 전까지 상대가 대상으로 지정할 수 없습니다.'],
+ ['발견','카드 세 장 중 하나를 골라 손패로 가져옵니다.'],
+ ['탈진','덱이 빈 채로 카드를 뽑아야 하면 영웅이 피해를 받습니다. 1, 2, 3… 으로 점점 커집니다.'],
+ ['후공 보정','후공은 시작 손패 1장을 더 받고, 이번 턴 마나 +2를 주는 주문 "동전"을 받습니다.']
+];
+function modal(html){ $('#modal').innerHTML=html; $('#over').classList.add('show'); }
+function closeModal(){ $('#over').classList.remove('show'); }
+$('#over').onclick=e=>{ if(e.target.id==='over')closeModal(); };
+$('#gloss').onclick=()=>modal(`<button class="tbtn x" onclick="closeModal()">닫기</button><h3>규칙 도감</h3><dl>${GLOSS.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`);
+function showWin(){
+  renderChap(); $('#ctitle').textContent='승리!'; $('#cbody').innerHTML='<p>상대 영웅의 체력을 0으로 만들었습니다.</p>'; $('#ctask').style.display='none'; $('#cbadge').textContent='완료'; $('#cnext').style.display='none';
+  setTimeout(()=>modal(`<div class="vict"><img src="images/fx_victory.png" alt=""><h3>튜토리얼 완료!</h3>
+  <ul><li><b>마나</b>는 매 턴 1씩 늘고, 카드를 내는 데 씁니다.</li><li><b>전투의 함성</b>은 낼 때 한 번 발동합니다.</li><li>하수인은 낸 다음 턴부터 공격하고, <b>속공</b>은 하수인만, <b>돌진</b>은 영웅까지 바로 공격합니다.</li><li><b>도발</b>은 먼저 처리해야 하고, <b>보호막</b>은 피해를 한 번 막아 줍니다.</li><li><b>주문</b>은 효과만 쓰고 사라집니다.</li></ul>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn" style="flex:none" onclick="closeModal();init()">다시 하기</button></div></div>`),900);
+}
+
+function init(){
+  closeModal(); S=buildState(); stepIdx=0; sel=null; busy=false; lastHand=new Set(S.seats[0].hand.map(c=>c.id));
+  document.querySelectorAll('.fxl>*').forEach(e=>e.remove());
+  showStep();
+}
+window.closeModal=closeModal; window.init=init;
+window.T={get S(){return S},get busy(){return busy},get stepIdx(){return stepIdx},STEPS,canAttack};
+init();
+})();
+</script>
+</body>
+</html>
