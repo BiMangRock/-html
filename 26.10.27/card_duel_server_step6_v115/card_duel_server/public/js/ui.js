@@ -2020,8 +2020,6 @@ function bossImport(){
   }catch(e){ $('bossJsonMsg').textContent='⚠ 가져오기 실패: '+e.message; }
 }
 function bossResetAll(){ if(!confirm('서버에 저장된 보스 목록을 지우고 코드의 기본값(BOSS_DEFAULT)으로 되돌릴까요? 모든 유저에게 적용됩니다.')) return; BossBook.reset(); openBossEdit(); }
-if(isDev()) $('btnBossEdit').style.display='';
-if(isDev()) $('btnTest').style.display='';
 
 // ---------- 5단계: 상점 · 팩 개봉 ----------
 // 난수·골드 차감·카드 지급은 전부 서버(/api/shop/open)가 한다. 여기서는 확률표를 보여 주고, 서버가 준 결과를 연출만 한다.
@@ -2178,7 +2176,9 @@ function closePacks(){
 $('pkFlipAll').onclick=()=>{ if(!pk) return; const p=pk.r.packs[pk.i]; document.querySelectorAll('#pkStage .pk-slot:not(.flipped)').forEach(s=>flipSlot(s,p.cards[+s.dataset.i],p)); };
 
 // ---------- 시작: 메뉴 화면부터 ----------
-ServerStore.ready.then(() => {                       // 서버에서 내 저장 데이터를 불러온 뒤에 시작
+ServerStore.ready.then(() => {
+  if(isDev()){ $('btnBossEdit').style.display=''; $('btnTest').style.display=''; }   // 서버에서 개발자 여부를 받은 뒤에 개발자 메뉴 표시
+  // (아래는 서버에서 내 저장 데이터를 불러온 뒤에 시작)
 Economy.load();
 buildDifficultyButtons();
 updateWallet();
