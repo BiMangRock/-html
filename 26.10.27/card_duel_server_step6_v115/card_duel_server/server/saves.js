@@ -12,6 +12,7 @@ const { validateDeckList } = require(path.join(JS, 'engine.js'));
 const { validateDeckOwned } = require(path.join(JS, 'collection.js'));
 const { ensureCollection, collectionOf } = require('./collection');
 const { walletRow, walletOut, ensureWallet } = require('./wallet');
+const { readBosses } = require('./bosses');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -31,7 +32,7 @@ router.get('/save', (req, res) => {
   const cleared = {};
   for (const r of db.prepare('SELECT boss_id, cleared_at FROM adventure_progress WHERE user_id=?').all(uid)) cleared[r.boss_id] = r.cleared_at;
   res.set('Cache-Control', 'no-store');
-  res.json({ wallet: walletOut(w), deck, collection, adventure: { cleared } });
+  res.json({ wallet: walletOut(w), deck, collection, adventure: { cleared }, isAdmin: !!req.user.isAdmin, bosses: readBosses() });
 });
 
 // ---------- 골드 저장 ----------

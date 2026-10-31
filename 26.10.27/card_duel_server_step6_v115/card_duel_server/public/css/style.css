@@ -712,3 +712,23 @@ html,body{overscroll-behavior:none; -webkit-tap-highlight-color:transparent; tou
   #deckEditor .deck-grid{overflow:visible; padding:.4rem .2rem; gap:.6rem .5rem;}
   #deckEditor .deck-grid .card{zoom:.85;}
 }
+
+/* ===== 덱 편집 — 모든 터치 기기(세로 화면 포함): 마나 곡선·필터·카드 목록이 한 덩어리로 같이 스크롤 =====
+   제목/저장·닫기 버튼 줄만 위에 고정하고, 그래프·통계·필터는 스크롤하면 위로 밀려 사라진다.
+   (낮은 가로 화면 규칙은 위에 그대로 있으며, 필터 접기 버튼은 그쪽에서만 쓴다) */
+@media (pointer:coarse){
+  #deckEditor{padding:0; align-items:stretch;}
+  #deckEditor .deck-panel{width:100%; max-height:none; height:100%; border-radius:0; border-width:0;
+    padding:0 calc(.6rem + env(safe-area-inset-right,0px)) .6rem calc(.6rem + env(safe-area-inset-left,0px));
+    display:block; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative;}
+  #deckEditor .deck-head{position:sticky; top:0; z-index:3; padding:.4rem 2.6rem .4rem 0; background:#241f38; border-bottom:1px solid rgba(201,162,39,.3);}
+  #deckEditor .deck-head h3{font-size:1.05rem;}
+  #deckEditor .ed-btns{flex-wrap:nowrap; gap:.3rem;}
+  #deckEditor .ed-btns button.end-turn{padding:.3rem .6rem; font-size:.75rem; white-space:nowrap;}
+  #deckEditor .deck-grid{overflow:visible;}
+}
+/* 세로 화면에서는 필터를 접지 않고 항상 보여준다(스크롤하면 같이 올라가므로 공간을 차지하지 않음) */
+@media (pointer:coarse) and (orientation:portrait){
+  #deckEditor.filters-collapsed #edFilters{display:block;}
+  #edFilterToggle{display:none !important;}
+}

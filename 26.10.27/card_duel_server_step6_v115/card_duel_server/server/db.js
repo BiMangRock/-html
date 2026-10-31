@@ -96,4 +96,15 @@ CREATE INDEX IF NOT EXISTS idx_pvp_winner_day ON pvp_matches(winner, day);
 CREATE INDEX IF NOT EXISTS idx_pvp_pair_day   ON pvp_matches(p0, p1, day);
 `);
 
+// v116: 개발자 권한 + 서버 공용 설정 (보스 목록 등)
+if (!db.prepare('PRAGMA table_info(users)').all().some(c => c.name === 'is_admin'))
+  db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
+db.exec(`
+CREATE TABLE IF NOT EXISTS app_config (                 -- 모든 유저가 같이 쓰는 설정 (key 하나당 JSON 하나). 지금은 'bosses' 만 사용
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+`);
+
 module.exports = db;

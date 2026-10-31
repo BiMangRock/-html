@@ -5,11 +5,11 @@
 //  - 로드 순서: economy.js 다음, ui.js 앞.  ui.js 는 ServerStore.ready 가 끝난 뒤에 시작한다.
 (() => {
   'use strict';
-  const S = { wallet: null, deck: null, cleared: {}, collection: {}, locked: false };
+  const S = { wallet: null, deck: null, cleared: {}, collection: {}, locked: false, isAdmin: false, bosses: null };
   window.ServerStore = S;
 
   let rev = 0, lastSnap = '', running = false;
-  const pending = { wallet: null, deck: null, clears: new Set() };
+  const pending = { wallet: null, deck: null, clears: new Set(), bosses: undefined };   // bosses: undefined=보낼 것 없음 / null=기본값으로 되돌리기 / 배열=저장
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const J = { 'Content-Type': 'application/json' };
 
@@ -42,6 +42,7 @@
     try {
       if (job.k === 'wallet') res = await call('PUT', '/api/wallet', { ...job.v, rev });
       else if (job.k === 'deck') res = await call('PUT', '/api/deck', { deck: job.v });
+      else if (job.k === 'bosses') res = await call('PUT', '/api/bosses', { bosses: job.v });
       else res = await call('POST', '/api/adventure/clear', { bossId: job.v });
     } catch (e) { return 'retry'; }
     if (res.ok) { if (job.k === 'wallet' && res.data.wallet) rev = res.data.wallet.rev; return 'ok'; }
@@ -49,6 +50,7 @@
     if (res.status >= 500 || res.status === 429) return 'retry';
     console.warn('저장 거부됨:', job.k, res.status, res.data && res.data.error);
     banner('⚠ 저장이 거부되었어요: ' + ((res.data && res.data.error) || res.status), false);
+    if (job.k === 'bosses') bossMsg('⚠ 저장 거부: ' + ((res.data && res.data.error) || res.status));
     return 'drop';
   }
   async function flush() {
@@ -60,6 +62,7 @@
         let job = null;
         if (pending.wallet) job = { k: 'wallet', v: pending.wallet };
         else if (pending.deck) job = { k: 'deck', v: pending.deck };
+        else if (pending.bosses !== undefined) job = { k: 'bosses', v: pending.bosses };
         else if (pending.clears.size) job = { k: 'clear', v: pending.clears.values().next().value };
         if (!job) break;
         const r = await send(job);
@@ -75,6 +78,7 @@
         }
         if (job.k === 'wallet') { if (pending.wallet === job.v) pending.wallet = null; }
         else if (job.k === 'deck') { if (pending.deck === job.v) pending.deck = null; }
+        else if (job.k === 'bosses') { if (pending.bosses === job.v) pending.bosses = undefined; if (r === 'ok') bossMsg('✔ 서버에 저장됨 (' + new Date().toLocaleTimeString() + ')'); }
         else pending.clears.delete(job.v);
       }
       if (warned) banner(null);                        // 재시도 끝에 다 저장됐으면 알림 지우기
@@ -88,6 +92,10 @@
   S.owned = name => S.collection[name] || 0;       // 내가 가진 카드 장수 (4단계)
   S.hasCleared = id => !!S.cleared[id];
   S.markCleared = id => { if (!S.cleared[id]) S.cleared[id] = Date.now(); pending.clears.add(id); flush(); };
+  // 보스 목록 (v116): 읽기는 메모리, 쓰기는 개발자만 서버로 (서버가 한 번 더 권한·덱을 검사한다)
+  S.onBossMsg = null;
+  const bossMsg = t => { if (S.onBossMsg) S.onBossMsg(t); };
+  S.setBosses = list => { if (!S.isAdmin) return; S.bosses = list === null ? null : list.slice(); pending.bosses = S.bosses; bossMsg('저장 중…'); flush(); };
   S.flushNow = flush;
 
   // Economy 에 꽂는 저장소: 읽기는 메모리, 쓰기는 서버로
@@ -118,7 +126,7 @@
   // 대전은 서버에 저장된 내 덱으로 하므로, 밀려 있는 저장이 모두 끝날 때까지 기다린다. 반환: 저장 완료 여부
   S.waitSaved = async () => {
     const t0 = Date.now();
-    while (!S.locked && (running || pending.wallet || pending.deck || pending.clears.size)) {
+    while (!S.locked && (running || pending.wallet || pending.deck || pending.clears.size || pending.bosses !== undefined)) {
       if (Date.now() - t0 > 15000) return false;
       if (!running) flush();
       await sleep(60);
@@ -170,6 +178,7 @@
         S.deck = Array.isArray(d.deck) ? d.deck : null;
         S.cleared = (d.adventure && d.adventure.cleared) || {};
         S.collection = d.collection || {};
+        S.isAdmin = !!d.isAdmin; S.bosses = Array.isArray(d.bosses) ? d.bosses : null;
         Economy.useStore(walletStore);
         overlayOff();
         return;

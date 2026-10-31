@@ -18,6 +18,7 @@ const IMAGES = path.join(ROOT, 'images');
 const app = express();
 app.disable('x-powered-by');
 if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY === '1' ? 1 : process.env.TRUST_PROXY);  // 터널/프록시 뒤에서 실제 IP·https 인식
+app.use('/api/bosses', express.json({ limit: '1mb' }));      // 보스 목록은 덱이 여러 개라 크다 (개발자 전용 저장 경로만 크게 허용)
 app.use(express.json({ limit: '20kb' }));
 
 // 기본 보안 헤더
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api', auth.router);
 app.use('/api', saves.router);
+app.use('/api', require('./bosses').router);           // v116: 보스 목록 (읽기: 로그인 / 쓰기: 개발자)
 app.use('/api', shop.router);
 app.use('/api', pvp.router);                             // 유저 대전: /api/pvp/stream(SSE) · queue · cancel · mulligan · action · status
 app.use('/api', (req, res) => res.status(404).json({ error: '없는 API예요.' }));

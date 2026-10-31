@@ -9,8 +9,9 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "grant": "node server/grant.js",
+    "make-admin": "node server/make-admin.js",
     "seed": "node server/seed-samples.js",
-    "test": "node server/test-engine.js && node server/test-auth.js && node server/test-saves.js && node server/test-shop.js && node server/test-pvp-db.js && node server/test-pvp.js"
+    "test": "node server/test-engine.js && node server/test-auth.js && node server/test-saves.js && node server/test-shop.js && node server/test-pvp-db.js && node server/test-pvp.js && node server/test-bosses.js"
   },
   "dependencies": {
     "express": "^4.21.0"

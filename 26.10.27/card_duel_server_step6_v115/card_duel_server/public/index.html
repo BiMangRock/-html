@@ -100,7 +100,7 @@
     <button class="menu-btn" onclick="openShop()">🛒 상점<span class="desc" id="shopMenuDesc">카드 팩을 열어 새 카드를 모읍니다 · 중복 카드는 골드로 환급</span></button>
     <button class="menu-btn" onclick="openGuide()">📖 가이드<span class="desc">초보자용 · 효과 설명(애니메이션) · 카드 읽는 법 · 게임 규칙</span></button>
     <button class="menu-btn" onclick="openDeckEditor()">덱 편집<span class="desc" id="deckMenuDesc"></span></button>
-    <button class="menu-btn" onclick="openTestScreen()">테스트<span class="desc">중급2 AI와 연습 · 내 영웅 체력·시작 마나·덱 장수를 직접 설정 (보상·골드 없음)</span></button>
+    <button class="menu-btn dev" id="btnTest" style="display:none" onclick="openTestScreen()">🛠 테스트<span class="desc">개발자 전용 · 중급2 AI와 연습 · 내 영웅 체력·시작 마나·덱 장수를 직접 설정 (보상·골드 없음)</span></button>
     <button class="menu-btn dev" id="btnBossEdit" style="display:none" onclick="openBossEdit()">🛠 보스 덱 편집<span class="desc">개발자 전용 · 보스 목록·덱·AI 모델 설정</span></button>
   </div>
   <div class="screen" id="screen-shop">
@@ -150,20 +150,16 @@
   </div>
   <div class="screen" id="screen-bossedit">
     <h3>🛠 보스 덱 편집</h3>
-    <p class="dev-warn">개발자 전용. 파일을 연결하지 않으면 수정 내용은 이 브라우저에만 저장됩니다. bosses.json 을 연결하면 저장할 때마다 파일에 기록됩니다. 배포: 이 파일을 HTML 옆에 두고 서버로 열거나, 내용을 코드의 BOSS_DEFAULT 에 붙여 넣으세요.</p>
+    <p class="dev-warn">개발자 전용. 여기서 저장한 보스 목록은 서버에 저장되어 모든 유저에게 바로 적용됩니다.</p>
     <div class="boss-list" id="bossEditList"></div>
     <button class="menu-btn" onclick="bossAdd()">＋ 보스 추가</button>
     <p class="dev-warn" id="bossFileStat"></p>
-    <button class="menu-btn" id="bfConnect" onclick="BossFile.connect()">📂 bosses.json 연결<span class="desc">기존 파일을 열고, 이후 저장할 때마다 그 파일에 자동 기록 (Chrome·Edge)</span></button>
-    <button class="menu-btn" id="bfCreate" onclick="BossFile.create()">🆕 새 bosses.json 만들기<span class="desc">저장 위치를 한 번 고르면 자동 기록</span></button>
-    <button class="menu-btn" id="bfReconnect" style="display:none" onclick="BossFile.reconnect()">🔄 이전 파일 다시 연결<span class="desc">브라우저가 쓰기 권한을 다시 물어봅니다</span></button>
-    <button class="menu-btn" onclick="BossFile.download()">⬇ bosses.json 다운로드</button>
     <button class="menu-btn" onclick="$('regFile').click()">🔢 번호표(card_registry.json) 불러오기<span class="desc" id="regDesc"></span></button>
     <input type="file" id="regFile" accept=".json" style="display:none" onchange="bossLoadRegistry(this.files[0]); this.value=''">
     <button class="menu-btn" onclick="bossExport()">📋 JSON 보기·복사</button>
     <button class="menu-btn" onclick="bossImport()">📥 JSON 붙여넣어 가져오기</button>
     <div class="bf-box" id="bossJsonBox" style="display:none"><textarea id="bossJson" spellcheck="false"></textarea><span class="hint" id="bossJsonMsg"></span></div>
-    <button class="menu-btn" onclick="bossResetAll()">↺ 코드 기본값으로 되돌리기</button>
+    <button class="menu-btn" onclick="bossResetAll()">↺ 코드 기본값으로 되돌리기 (서버 목록 삭제)</button>
     <button class="menu-btn back" onclick="showScreen('main')">뒤로</button>
   </div>
   <div class="screen" id="screen-bossform">

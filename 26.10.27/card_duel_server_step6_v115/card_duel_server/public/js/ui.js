@@ -1296,8 +1296,8 @@ function readTestCfg(){
   $('tHp').value=testCfg.hp; $('tMana').value=testCfg.mana;
   TestBook.set(testCfg); return testCfg;
 }
-function openTestScreen(){ testCfg=TestBook.get(); $('tHp').value=testCfg.hp; $('tMana').value=testCfg.mana; refreshTestUI(); showScreen('test'); }
-function openTestDeckEditor(){ readTestCfg(); refreshTestUI(); ed.test=true; ed.boss=false; $('edClear').style.display=''; ed.counts=countsOf(testCfg.deck); renderDeckEditor(); $('deckEditor').classList.add('show'); }
+function openTestScreen(){ if(!isDev()) return; testCfg=TestBook.get(); $('tHp').value=testCfg.hp; $('tMana').value=testCfg.mana; refreshTestUI(); showScreen('test'); }
+function openTestDeckEditor(){ if(!isDev()) return; readTestCfg(); refreshTestUI(); ed.test=true; ed.boss=false; $('edClear').style.display=''; ed.counts=countsOf(testCfg.deck); renderDeckEditor(); $('deckEditor').classList.add('show'); }
 $('tHp').addEventListener('change', ()=>{ readTestCfg(); refreshTestUI(); });
 $('tMana').addEventListener('change', ()=>{ readTestCfg(); refreshTestUI(); });
 function startTest(){
@@ -1579,10 +1579,10 @@ function goToMenu(){
 // ======================================================================
 // v114 모험 모드 · 보스 · 보스 덱 편집 (개발자 전용)
 //  - 보스 = 고정 덱 + 영웅 체력 보너스 + AI(규칙 봇 또는 학습 모델)
-//  - 보스 데이터의 기준은 코드의 BOSS_DEFAULT. DEV_MODE 일 때만 localStorage 로 덮어쓴 값을 쓴다.
-//  - 개발 끝나면 DEV_MODE=false 로 바꾸면 편집 버튼이 사라지고 BOSS_DEFAULT 만 사용된다.
+//  - v116: 보스 목록은 서버(/api/bosses)에 저장된 값을 모든 유저가 쓴다. 서버에 아직 저장된 게 없으면 코드의 BOSS_DEFAULT.
+//  - 보스 덱 편집·테스트 메뉴는 개발자 계정(node server/make-admin.js 아이디)에게만 보인다. 저장 권한은 서버가 다시 검사한다.
 // ======================================================================
-const DEV_MODE = true;
+const isDev = () => !!ServerStore.isAdmin;
 const BOSS_DEFAULT = [
  {id:'boss1', name:'불꽃 약탈자', icon:'🔥', desc:'싼 하수인으로 몰아치는 어그로 덱', cheats:[], tier:'mid', bot:'rule2', model:'',
   deck:["책벌레", "방패병", "죄악석 토템", "보석 박힌 딱정벌레", "카인 선퓨리", "점화", "혈기술사", "명암의 사도", "주문사수", "부상당한 크발디르", "치유의 빛", "강철 파수대장", "검 제작의 대가", "공허의 영혼", "날쌘 척후병", "번개 폭풍", "복제", "성게 가시", "강화", "죄악석 토템", "분열하는 점액", "오늘의 월척", "날쌘 척후병", "수정 골렘", "강철 파수대장", "번개", "주문사수", "검 제작의 대가", "약초꾼", "대사제 데칼"]},
@@ -1607,21 +1607,16 @@ const rankTag=k=>`<span class="tier-tag" style="color:${rankInfo(k)[2]};border-c
 const bossReward=b=>b.reward>0 ? b.reward : rankInfo(bossRank(b))[3];
 const bossCheatList=b=>(b.cheats||[]).map(id=>CHEATS.find(c=>c.id===id)).filter(Boolean);
 const bossMods=b=>{ const m={}; bossCheatList(b).forEach(c=>{ m[c.id]=cheatValue(c,0); }); return m; };
-let bossRemote=null;     // 서버(http)로 열었을 때 같은 폴더의 bosses.json 이 있으면 그걸 기준 데이터로 쓴다
-if(/^https?:/.test(location.protocol)) fetch('bosses.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(v=>{ if(Array.isArray(v)&&v.length&&v.every(b=>b&&typeof b.id==='string')) bossRemote=v; }).catch(()=>{});
 const BossBook = (() => {
-  const KEY='cardDuel.bosses'; let memory=null;
-  const read=()=>{ try{ const t=localStorage.getItem(KEY); return t?JSON.parse(t):memory; }catch(e){ return memory; } };
-  const write=v=>{ memory=v; try{ if(v===null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, JSON.stringify(v)); }catch(e){} };
   const clean=b=>({id:String(b.id), name:String(b.name||'이름 없음').slice(0,20), icon:String(b.icon||'👹').slice(0,4), desc:String(b.desc||'').slice(0,80),
     cheats:[...new Set((Array.isArray(b.cheats)?b.cheats:[]).map(String))].filter(id=>CHEATS.some(c=>c.id===id)), reward:Math.max(0,Math.min(1000000,Math.floor(Number(b.reward)||0))), tier:(b.tier==='high'||(b.tier==null&&b.bot==='model'))?'high':'mid',
     bot:(b.tier==='high'||(b.tier==null&&b.bot==='model'))?'model':(b.bot==='rule'?'rule':'rule2'), model:String(b.model||''),
     deck:Array.isArray(b.deck)?b.deck.map(String):[]});
   const ok=l=>Array.isArray(l) && l.length>0 && l.every(b=>b && typeof b.id==='string');
   return {
-    get(){ const raw=DEV_MODE?read():null; return (ok(raw)?raw:ok(bossRemote)?bossRemote:BOSS_DEFAULT).map(clean); },
-    set(list, fromFile){ write(list.map(clean)); if(!fromFile) BossFile.write(); },
-    reset(){ write(null); BossFile.write(); },
+    get(){ return (ok(ServerStore.bosses)?ServerStore.bosses:BOSS_DEFAULT).map(clean); },     // 서버에 저장된 목록 (없으면 코드 기본값)
+    set(list){ ServerStore.setBosses(list.map(clean)); },                                       // 개발자만 (서버가 다시 검사)
+    reset(){ ServerStore.setBosses(null); },
     toJson(list){ return '[\n'+(list||this.get()).map(b=>' '+JSON.stringify(b)).join(',\n')+'\n]\n'; },
     deckError(b){ return validateDeckList(b.deck); },       // null 이면 정상
     clean, ok,
@@ -1830,40 +1825,9 @@ const ModelStore = (() => {
 })();
 ModelStore.get('registry').then(t => { if (t) { try { PolicyNet.setRegistry(JSON.parse(t), '불러옴'); } catch (e) { console.warn('저장된 번호표 사용 안 함:', e.message); } } });
 
-// ---- 개발자: bosses.json 파일 연결 (Chrome/Edge). 연결하면 저장할 때마다 그 파일에 자동으로 기록한다 ----
-const BossFile = (() => {
-  const api = typeof window.showOpenFilePicker==='function' && typeof window.showSaveFilePicker==='function';
-  const types=[{description:'보스 JSON', accept:{'application/json':['.json']}}];
-  let handle=null, pending=null, msg='';
-  const idb=(mode,fn)=>new Promise(res=>{ try{
-    const r=indexedDB.open('cardDuelDev',1); r.onupgradeneeded=()=>r.result.createObjectStore('h');
-    r.onsuccess=()=>{ try{ const tx=r.result.transaction('h',mode); const out=fn(tx.objectStore('h')); tx.oncomplete=()=>res(out&&out.result); tx.onerror=()=>res(null); }catch(e){ res(null); } };
-    r.onerror=()=>res(null); }catch(e){ res(null); } });
-  const status=m=>{ msg=m; const el=document.getElementById('bossFileStat'); if(el) el.textContent=m; };
-  const perm=async(h,ask)=>{ try{ const o={mode:'readwrite'}; if(await h.queryPermission(o)==='granted') return true; return ask && await h.requestPermission(o)==='granted'; }catch(e){ return false; } };
-  async function load(h){                       // 파일 내용을 읽어 보스 목록으로 적용 (파일이 비어 있으면 현재 목록을 기록)
-    const text=await (await h.getFile()).text();
-    if(text.trim()){ const v=JSON.parse(text); if(!BossBook.ok(v)) throw new Error('보스 배열 형식이 아닙니다'); BossBook.set(v, true); }
-    handle=h; pending=null; await idb('readwrite', s=>s.put(h,'boss')); if(!text.trim()) await write();
-    status(`연결됨: ${h.name} · 저장할 때마다 자동 기록`);
-  }
-  async function write(){
-    if(!handle) return;
-    try{ const w=await handle.createWritable(); await w.write(BossBook.toJson()); await w.close(); status(`✔ ${handle.name} 에 저장됨 (${new Date().toLocaleTimeString()})`); }
-    catch(e){ status('⚠ 파일 쓰기 실패: '+e.message+' — 다시 연결하세요'); handle=null; }
-  }
-  return {
-    api, write, get connected(){ return !!handle; }, get pending(){ return !!pending; },
-    async connect(){ try{ const [h]=await showOpenFilePicker({types}); if(!await perm(h,true)) return status('⚠ 쓰기 권한이 없습니다'); await load(h); openBossEdit(); }catch(e){ if(e.name!=='AbortError') status('⚠ '+e.message); } },
-    async create(){ try{ const h=await showSaveFilePicker({suggestedName:'bosses.json', types}); if(!await perm(h,true)) return status('⚠ 쓰기 권한이 없습니다'); handle=h; await idb('readwrite', s=>s.put(h,'boss')); await write(); openBossEdit(); }catch(e){ if(e.name!=='AbortError') status('⚠ '+e.message); } },
-    async reconnect(){ try{ if(!pending||!await perm(pending,true)) return status('⚠ 권한이 거부되었습니다'); await load(pending); openBossEdit(); }catch(e){ status('⚠ '+e.message); } },
-    async restore(){ if(!api) return; const h=await idb('readonly', s=>s.get('boss')); if(!h) return; if(await perm(h,false)){ try{ await load(h); }catch(e){ pending=h; } } else pending=h; bossEditRefresh(); },
-    download(){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([BossBook.toJson()],{type:'application/json'})); a.download='bosses.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); status('bosses.json 을 내려받았습니다'); },
-    status, get msg(){ return msg; },
-  };
-})();
+// ---- 개발자: 보스 저장 상태 표시 (저장은 ServerStore 가 서버로 보낸다) ----
 function bossEditRefresh(){ if(document.getElementById('screen-bossedit').classList.contains('show')) openBossEdit(); }
-BossFile.restore();
+ServerStore.onBossMsg=m=>{ const el=document.getElementById('bossFileStat'); if(el) el.textContent=m; };
 
 // ---- 보스 AI: 중급 = 규칙 봇 / 상급 = 학습 모델 ----
 // 모델 찾는 순서: ① 이미 불러온 것 ② 이 브라우저에 넣어 둔 파일(편집 화면에서 선택) ③ boss.model 주소에서 fetch (서버로 열었을 때)
@@ -1943,7 +1907,7 @@ async function startBoss(idx, opts={}){
 let bossDraft=null, bossDraftIdx=-1;
 function bossListSave(list){ BossBook.set(list); }
 function openBossEdit(){
-  if(!DEV_MODE) return;
+  if(!isDev()) return;
   const list=BossBook.get(), box=$('bossEditList'); box.innerHTML='';
   list.forEach((b,i)=>{
     const row=document.createElement('div'); row.className='boss-row';
@@ -1958,9 +1922,7 @@ function openBossEdit(){
     row.append(main, up, dn, del); box.appendChild(row);
   });
   $('bossJsonBox').style.display='none'; $('regDesc').textContent=PolicyNet.regInfo()+' · 학습 쪽 번호표가 바뀌면 새 파일을 불러오세요';
-  $('bfConnect').style.display=$('bfCreate').style.display=BossFile.api?'':'none';
-  $('bfReconnect').style.display=BossFile.pending?'':'none';
-  $('bossFileStat').textContent=BossFile.connected?(BossFile.msg||'연결됨'):BossFile.pending?'이전에 연결한 파일이 있습니다. 다시 연결하세요.':BossFile.api?'파일 미연결 — 지금 수정 내용은 이 브라우저에만 저장됩니다.':'이 브라우저는 파일 자동 저장을 지원하지 않습니다. 수정 후 "다운로드"를 쓰세요.';
+  $('bossFileStat').textContent=ServerStore.bosses?'서버에 저장된 보스 목록을 편집 중입니다. 저장하면 모든 유저에게 바로 적용돼요.':'아직 서버에 저장된 목록이 없어 코드 기본값을 보여줍니다. 무엇이든 저장하면 이 목록이 서버에 올라가요.';
   showScreen('bossedit');
 }
 function bossAdd(){
@@ -2047,7 +2009,7 @@ function bossExport(){
   const list=BossBook.get(), ta=$('bossJson');
   ta.value=BossBook.toJson(list); $('bossJsonBox').style.display='flex';
   ta.select(); let copied=false; try{ copied=document.execCommand('copy'); }catch(e){}
-  $('bossJsonMsg').textContent=(copied?'클립보드에 복사했습니다. ':'')+'이 내용을 코드의 BOSS_DEFAULT = ... 자리에 붙여 넣으면 배포 데이터가 됩니다.';
+  $('bossJsonMsg').textContent=(copied?'클립보드에 복사했습니다. ':'')+'백업용으로 보관하세요. (가져오기로 다시 붙여 넣을 수 있어요)';
 }
 function bossImport(){
   const box=$('bossJsonBox'), ta=$('bossJson');
@@ -2057,8 +2019,9 @@ function bossImport(){
     BossBook.set(v); openBossEdit();
   }catch(e){ $('bossJsonMsg').textContent='⚠ 가져오기 실패: '+e.message; }
 }
-function bossResetAll(){ if(!confirm('이 브라우저에 저장한 보스 수정 내용을 지우고 코드의 기본값으로 되돌릴까요?')) return; BossBook.reset(); openBossEdit(); }
-if(DEV_MODE) $('btnBossEdit').style.display='';
+function bossResetAll(){ if(!confirm('서버에 저장된 보스 목록을 지우고 코드의 기본값(BOSS_DEFAULT)으로 되돌릴까요? 모든 유저에게 적용됩니다.')) return; BossBook.reset(); openBossEdit(); }
+if(isDev()) $('btnBossEdit').style.display='';
+if(isDev()) $('btnTest').style.display='';
 
 // ---------- 5단계: 상점 · 팩 개봉 ----------
 // 난수·골드 차감·카드 지급은 전부 서버(/api/shop/open)가 한다. 여기서는 확률표를 보여 주고, 서버가 준 결과를 연출만 한다.

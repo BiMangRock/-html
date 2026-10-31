@@ -63,10 +63,10 @@ function parseCookies(req) {
 function getSessionUser(req) {
   const token = parseCookies(req)[COOKIE_NAME];
   if (!token) return null;
-  const row = db.prepare(`SELECT u.id, u.username, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id
+  const row = db.prepare(`SELECT u.id, u.username, u.is_admin, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id
                           WHERE s.token_hash=?`).get(sha256(token));
   if (!row || row.expires_at < Date.now()) return null;
-  return { id: row.id, username: row.username };
+  return { id: row.id, username: row.username, isAdmin: !!row.is_admin };
 }
 function setCookie(req, res, token) {
   const secure = process.env.COOKIE_SECURE === '1' || req.secure;      // https(터널/프록시) 뒤에서는 Secure
@@ -169,5 +169,12 @@ function requireAuth(req, res, next) {
   if (!user) return res.status(401).json({ error: '로그인이 필요해요.' });
   req.user = user; next();
 }
+// 개발자 전용 라우트용 (v116): 로그인 + is_admin=1
+function requireAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    if (!req.user.isAdmin) return res.status(403).json({ error: '개발자만 쓸 수 있어요.' });
+    next();
+  });
+}
 
-module.exports = { router, requireAuth, getSessionUser, validateCredentials, hashPassword, verifyPassword };
+module.exports = { router, requireAuth, requireAdmin, getSessionUser, validateCredentials, hashPassword, verifyPassword };
