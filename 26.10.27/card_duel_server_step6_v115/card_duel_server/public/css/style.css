@@ -997,3 +997,71 @@ body.boss-portrait #aiAvatar>span{background-size:cover; background-position:cen
 #confirmBox .cb-btns{display:flex; justify-content:flex-end; gap:.5rem;}
 #confirmBox .danger .cb-ok{background:#b3392c; color:#fff;}
 #craftExtra{background:#2b3f22; color:#d6ffc8; border-color:#5fa04a;}
+
+/* ===== v135 덱 슬롯 목록 · 입력 창 ===== */
+#deckListModal{position:fixed; inset:0; z-index:34; background:rgba(10,8,18,.95); display:none; align-items:center; justify-content:center; padding:1rem;}
+#deckListModal.show{display:flex;}
+#deckListModal .deck-panel{width:min(900px,96vw); max-height:94vh; display:flex; flex-direction:column;}
+.dslots{display:flex; flex-direction:column; gap:.5rem; overflow-y:auto; padding:.3rem .1rem;}
+.dslot{display:flex; align-items:center; gap:.7rem; padding:.55rem .7rem; border-radius:10px; border:1px solid #4a3d1e; background:linear-gradient(180deg,#221d35,#17132a);}
+.dslot.active{border-color:var(--teal-l); box-shadow:0 0 0 1px var(--teal-l), 0 0 14px rgba(80,220,200,.25);}
+.dslot.incomplete .ds-main small{color:#ffb38a;}
+.ds-pic{width:3.4rem; height:3.4rem; flex:none; border-radius:50%; border:3px solid #8d8a94; background:#1b1730 center 25%/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:1.5rem;}
+.dslot.active .ds-pic{border-color:#d4af37;}
+.ds-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:.15rem;}
+.ds-main b{color:var(--gold); font-size:1rem;} .ds-main small{color:var(--parch-d); font-size:.78rem;}
+.ds-hp select{max-width:100%; margin-top:.15rem; background:#14111f; color:var(--parch); border:1px solid #5b4a1e; border-radius:5px; padding:.15rem .3rem; font-size:.75rem;}
+.ds-btns{display:flex; flex-wrap:wrap; gap:.3rem; justify-content:flex-end; max-width:23rem;}
+.ds-btns button{padding:.3rem .6rem; font-size:.78rem;}
+.ds-btns .ds-use:not(:disabled){background:var(--gold); color:var(--ink);}
+.ds-btns .ds-del{color:#ffaaa0; border-color:#7a3a30;}
+#confirmBox input, #confirmBox textarea{width:100%; box-sizing:border-box; margin:0 0 1rem; padding:.5rem .6rem; border-radius:6px; border:1px solid var(--gold-d); background:#14111f; color:var(--parch); font:inherit; font-size:.85rem;}
+#confirmBox textarea{font-family:ui-monospace,Consolas,monospace; font-size:.75rem; resize:vertical;}
+#confirmBox .cb-panel:has(textarea){width:min(560px,94vw);}
+@media (max-width:640px), (orientation:landscape) and (max-height:540px){
+  .dslot{flex-wrap:wrap;} .ds-btns{max-width:none; width:100%; justify-content:flex-start;} .ds-pic{width:2.6rem; height:2.6rem;}
+}
+
+/* ---------- v136 친구 · 닉네임 · 친구 대전 신청 · 관전 ---------- */
+.menu-btn{position:relative;}
+.fr-badge{position:absolute; top:.45rem; right:.6rem; min-width:1.3rem; height:1.3rem; padding:0 .35rem; border-radius:999px; background:#c0392b; color:#fff; font-size:.75rem; line-height:1.3rem; text-align:center; box-shadow:0 0 8px rgba(192,57,43,.6);}
+.fr-badge[hidden]{display:none;}
+#screen-friends{gap:.55rem;}
+.fr-box{width:100%; padding:.6rem .7rem; border:1px solid var(--gold-d); border-radius:10px; background:rgba(0,0,0,.22); box-sizing:border-box;}
+.fr-me{display:flex; flex-wrap:wrap; gap:.4rem 1.2rem; font-size:.82rem; color:var(--parch-d); margin-bottom:.45rem;}
+.fr-me b{color:var(--gold);}
+.fr-row{display:flex; gap:.4rem; flex-wrap:wrap;}
+.fr-row input{flex:1 1 10rem; min-width:0; padding:.45rem .6rem; border-radius:8px; border:1px solid var(--gold-d); background:#120f1e; color:var(--parch); font-size:.9rem;}
+.fr-row .end-turn{padding:.45rem .8rem; font-size:.82rem;}
+.fr-note{font-size:.72rem; color:var(--parch-d); margin:.4rem 0 0;}
+.notice.good{color:#8fd19e;}
+.fr-section{width:100%;}
+.fr-section h4{margin:.3rem 0 .35rem; color:var(--gold); font-size:.92rem; text-align:left;}
+.fr-section h4 small{color:var(--parch-d); font-weight:400;}
+.fr-list{display:flex; flex-direction:column; gap:.35rem;}
+.fr-item{display:flex; align-items:center; gap:.55rem; padding:.45rem .6rem; border-radius:9px; border:1px solid rgba(201,162,39,.25); background:rgba(28,25,48,.75); text-align:left;}
+.fr-item.on{border-color:rgba(201,162,39,.55);}
+.fr-who{flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden;}
+.fr-who b{color:var(--parch); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.fr-id{color:var(--parch-d); font-weight:400; font-size:.72rem;}
+.fr-st{color:var(--parch-d); font-size:.72rem;}
+.fr-item.on .fr-st{color:#8fd19e;}
+.fr-btns{display:flex; gap:.3rem; flex-wrap:wrap; justify-content:flex-end;}
+.fr-btns .end-turn{padding:.35rem .65rem; font-size:.76rem;}
+.fr-del.armed{background:#8b2a22; color:#fff;}
+.fr-dot{width:.6rem; height:.6rem; border-radius:50%; flex:0 0 auto; background:#555;}
+.fr-dot.idle,.fr-dot.queue,.fr-dot.spectate{background:#3ecf6a; box-shadow:0 0 6px #3ecf6a;}
+.fr-dot.match{background:#e0a526; box-shadow:0 0 6px #e0a526;}
+.fr-empty{font-size:.8rem; color:var(--parch-d); margin:.2rem 0;}
+#frToasts{position:fixed; top:10px; right:10px; z-index:99990; display:flex; flex-direction:column; gap:.45rem; width:min(21rem, calc(100vw - 20px)); pointer-events:none;}
+.fr-toast{pointer-events:auto; padding:.6rem .75rem; border-radius:10px; border:1px solid var(--gold-d); background:linear-gradient(180deg,#2a2444,#1a1630); color:var(--parch); font-size:.84rem; box-shadow:0 4px 16px #000a; animation:frIn .25s ease-out;}
+.fr-toast.invite{border-color:var(--gold); box-shadow:0 0 18px rgba(201,162,39,.45), 0 4px 16px #000a;}
+.fr-toast .ft-sub{font-size:.74rem; color:var(--parch-d); margin-top:.2rem;}
+.fr-toast .ft-btns{display:flex; gap:.4rem; margin-top:.45rem; justify-content:flex-end;}
+.fr-toast .end-turn{padding:.35rem .8rem; font-size:.78rem;}
+@keyframes frIn{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:none;}}
+/* 관전: 내 쪽 조작 버튼은 숨기고, 친구 손패는 뒷면 */
+body.pvp-spectate #endTurnBtn, body.pvp-spectate #surrenderBtn, body.pvp-spectate #deckBtn, body.pvp-spectate #myDeckPile{display:none !important;}
+body.pvp-spectate #specLeaveBtn{display:inline-block;}
+.hand .card-back.spec-back{width:64px; height:90px; margin-left:-18px;}
+.hand .card-back.spec-back:first-child{margin-left:0;}

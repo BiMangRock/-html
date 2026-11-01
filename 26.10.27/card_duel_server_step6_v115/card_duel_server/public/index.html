@@ -53,7 +53,7 @@
     <div style="min-width:140px;"></div>
   </div>
 </div>
-<div class="controls"><div id="pvpTimer" class="pvp-timer" style="display:none"></div><div id="pvpRope" class="pvp-rope" style="display:none"><img class="rope-head" src="/images/pvp/rope.webp" alt=""><div class="rope-body" id="pvpRopeBody"></div></div><button class="end-turn sub" id="deckBtn" onclick="openDeck()">덱 보기</button><button class="end-turn sub" id="surrenderBtn">항복</button><button class="end-turn" id="endTurnBtn">턴 종료</button></div>
+<div class="controls"><div id="pvpTimer" class="pvp-timer" style="display:none"></div><div id="pvpRope" class="pvp-rope" style="display:none"><img class="rope-head" src="/images/pvp/rope.webp" alt=""><div class="rope-body" id="pvpRopeBody"></div></div><button class="end-turn sub" id="specLeaveBtn" style="display:none">관전 나가기</button><button class="end-turn sub" id="deckBtn" onclick="openDeck()">덱 보기</button><button class="end-turn sub" id="surrenderBtn">항복</button><button class="end-turn" id="endTurnBtn">턴 종료</button></div>
 <div class="deck-pile" id="myDeckPile" onclick="openDeck()"><img src="/images/deck_pile.webp" alt="내 덱" draggable="false"><span class="deck-cnt" id="myDeckPileCnt"></span></div>
 <div class="hand" id="hand"></div>
 </div>
@@ -82,6 +82,16 @@
       <div class="ed-tabs ed-costs" id="edCosts"></div>
     </div>
     <div class="deck-grid" id="edGrid"></div>
+  </div>
+</div>
+
+<div id="deckListModal">
+  <div class="deck-panel">
+    <div class="deck-head"><h3 id="deckListTitle">📚 내 덱</h3>
+      <div class="ed-btns"><button class="end-turn sub" id="dlNew" type="button" onclick="newDeck()">＋ 새 덱</button><button class="end-turn sub" id="dlImport" type="button" onclick="importDeckCode()">📥 코드로 가져오기</button><button class="end-turn" type="button" onclick="closeDeckList()">닫기</button></div>
+    </div>
+    <p class="note" id="deckListNote">덱을 여러 개 저장해 두고 골라 쓸 수 있어요. [사용하기]를 누른 덱이 AI 대전·유저 대전에 쓰입니다. [📋 코드]로 덱을 친구에게 보낼 수 있어요.</p>
+    <div class="dslots" id="deckSlots"></div>
   </div>
 </div>
 
@@ -114,7 +124,8 @@
     <button class="menu-btn" onclick="location.href='/tutorial/advanced.html'">🎓 고급 튜토리얼<span class="desc">기본을 익혔다면 · 더 깊은 전술과 심화 규칙을 직접 해 보며 배웁니다</span></button>
     <button class="menu-btn" onclick="openShop()">🛒 상점<span class="desc" id="shopMenuDesc">카드 팩을 열어 새 카드를 모읍니다 · 중복 카드는 골드로 환급</span></button>
     <button class="menu-btn" onclick="openGuide()">📖 가이드<span class="desc">초보자용 · 효과 설명(애니메이션) · 카드 읽는 법 · 게임 규칙</span></button>
-    <button class="menu-btn" onclick="openDeckEditor()">덱 편집<span class="desc" id="deckMenuDesc"></span></button>
+    <button class="menu-btn" onclick="openDeckList()">📚 내 덱<span class="desc" id="deckMenuDesc"></span></button>
+    <button class="menu-btn" onclick="Friends.open()">👥 친구<b class="fr-badge" id="friendBadge" hidden></b><span class="desc" id="friendMenuDesc">친구 추가 · 친구와 대전 · 친구 판 관전 · 닉네임</span></button>
     <button class="menu-btn" onclick="showScreen('power')">🔮 영웅 능력<span class="desc" id="powerMenuDesc"></span></button>
     <button class="menu-btn" onclick="openQuests()">📜 일일 퀘스트<span class="desc" id="questMenuDesc">매일 새 퀘스트 · 끝내면 골드</span></button>
     <button class="menu-btn" onclick="openCraft()">🔨 카드 제작<span class="desc" id="craftMenuDesc">카드를 분해해 가루를 모으고, 원하는 카드를 만듭니다</span></button>
@@ -267,6 +278,30 @@
     <p class="notice" id="pvpRules"></p>
     <button class="menu-btn back" id="pvpBackBtn">뒤로</button>
   </div>
+  <div class="screen" id="screen-friends">
+    <h3>👥 친구</h3>
+    <div class="fr-box">
+      <div class="fr-me"><span>내 아이디 <b id="frMyId">-</b></span><span>보이는 이름 <b id="frMyName">-</b></span></div>
+      <form class="fr-row" id="frNickForm" autocomplete="off">
+        <input id="frNick" maxlength="12" placeholder="닉네임 (2~12자 · 한글·영문·숫자·_)">
+        <button type="submit" class="end-turn">닉네임 저장</button>
+        <button type="button" class="end-turn sub" id="frNickClear" title="닉네임을 지우면 아이디로 보여요">지우기</button>
+      </form>
+      <p class="fr-note">닉네임은 대전 상대·친구·순위표에 보이는 이름이에요. 같은 닉네임은 한 명만 쓸 수 있어요.</p>
+    </div>
+    <div class="fr-box">
+      <form class="fr-row" id="frAddForm" autocomplete="off">
+        <input id="frAdd" maxlength="16" placeholder="친구의 아이디 또는 닉네임">
+        <button type="submit" class="end-turn">친구 요청 보내기</button>
+      </form>
+    </div>
+    <p class="notice warn" id="frMsg" style="display:none"></p>
+    <div class="fr-section" id="frIncomingSec" hidden><h4>📩 받은 친구 요청</h4><div class="fr-list" id="frIncoming"></div></div>
+    <div class="fr-section"><h4>친구 <small id="frCount"></small></h4><div class="fr-list" id="frList"><p class="fr-empty">불러오는 중…</p></div></div>
+    <div class="fr-section" id="frOutgoingSec" hidden><h4>📤 보낸 요청 (기다리는 중)</h4><div class="fr-list" id="frOutgoing"></div></div>
+    <p class="notice">⚔ 친구 대전은 연습용이라 골드·랭크·전적·일일 퀘스트에 반영되지 않아요. 👁 관전할 때는 양쪽 손패가 보이지 않아요.</p>
+    <button class="menu-btn back" onclick="Friends.close()">뒤로</button>
+  </div>
   <div class="screen" id="screen-difficulty">
     <h3>난이도 선택</h3>
     <div id="difficultyList" style="display:flex; flex-direction:column; gap:.9rem; width:100%;"></div>
@@ -324,11 +359,13 @@
 <script src="/js/shop.js"></script>
 <script src="/js/pvp.js"></script>
 <script src="/js/progress.js"></script>
+<script src="/js/deckcode.js"></script>
 <script src="/js/rank.js"></script>
 <script src="/js/serverstore.js"></script>
 <script src="/js/cardtext.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/pvpclient.js"></script>
+<script src="/js/friends.js"></script>
 <script src="/js/mobile.js"></script>
 </body>
 </html>

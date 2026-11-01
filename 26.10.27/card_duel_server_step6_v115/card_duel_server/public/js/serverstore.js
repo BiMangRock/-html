@@ -224,6 +224,22 @@
     return { ok: true, completed: d.completed || [], gold: d.gold || 0, capped: !!d.capped };
   };
 
+  // ---------- v135 덱 슬롯 ----------
+  S.decks = null;                                    // {max, active, slots:[{slot,name,deck,heroPower,updatedAt}]}
+  const takeDecks = d => { if (d && Array.isArray(d.slots)) { S.decks = { max: d.max, active: d.active, slots: d.slots }; if (typeof updateDeckMenuDesc === 'function') try { updateDeckMenuDesc(); } catch (_) {} } };
+  S.loadDecks = async () => { await S.waitSaved(); try { const r = await call('GET', '/api/decks'); if (r.ok) takeDecks(r.data); return r.ok; } catch (e) { return false; } };
+  const deckCall = async (method, url, body) => {
+    await S.waitSaved();                             // 밀린 덱 저장이 먼저 끝나야 순서가 꼬이지 않는다
+    let r; try { r = await call(method, url, body || {}); } catch (e) { return { ok: false, error: '서버에 연결할 수 없어요.' }; }
+    if (r.ok) takeDecks(r.data);
+    return r.ok ? { ok: true, ...r.data } : { ok: false, error: (r.data && r.data.error) || '처리하지 못했어요.' };
+  };
+  const syncDeck = () => { const a = S.decks && S.decks.slots.find(x => x.slot === S.decks.active); if (a && a.deck.length) S.deck = a.deck.slice(); };   // 사용 중 덱 = 대전 덱 (서버가 이미 저장함)
+  S.createDeck = body => deckCall('POST', '/api/decks', body);
+  S.updateDeck = async (slot, body) => { const r = await deckCall('PUT', '/api/decks/' + slot, body); if (r.ok && body.deck && S.decks.active === slot) syncDeck(); return r; };
+  S.deleteDeck = slot => deckCall('DELETE', '/api/decks/' + slot);
+  S.activateDeck = async slot => { const r = await deckCall('POST', '/api/decks/' + slot + '/activate'); if (r.ok) syncDeck(); return r; };
+
   // ---------- 시작: 서버에서 불러오기 ----------
   S.ready = (async () => {
     overlay('불러오는 중…');
@@ -244,6 +260,7 @@
         Economy.useStore(walletStore);
         overlayOff();
         S.loadProgress();                            // v132 가루·퀘스트 (실패해도 게임은 그대로)
+        S.loadDecks();                               // v135 덱 슬롯
         return;
       } catch (e) {
         overlay('서버에 연결할 수 없어요. 다시 시도하는 중…');

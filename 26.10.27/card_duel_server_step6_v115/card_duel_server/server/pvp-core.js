@@ -11,6 +11,12 @@
 //    {t:'match', matchId, seat, phase:'mulligan'|'play'|'over', seq, opp:{name,online}, mulligan:{...}, view, events, remainMs, turnMs, result?}
 //    {t:'presence', matchId, oppOnline, oppOfflineMs}     상대 연결 상태가 바뀜
 //    {t:'error', error}
+//   v136 친구 대전 · 관전
+//    {t:'invite', id, from:{id,name}, remainMs}           친구가 대전을 신청함 (받은 사람)
+//    {t:'inviteSent', id, to:{id,name}, remainMs}         내가 보낸 신청 (기다리는 중)
+//    {t:'inviteGone', id, why, name}                      신청이 사라짐: declined | cancelled | expired | busy | offline | accepted
+//    {t:'match', spectate:true, …}                        관전 화면 (양쪽 손패는 장수만, 선택지·덱 구성은 안 보냄)
+//    {t:'friends', why, name}                             친구 목록이 바뀜 (요청·수락 등) → 화면이 목록을 다시 불러온다
 const path = require('path');
 const crypto = require('crypto');
 const JS = path.join(__dirname, '..', 'public', 'js');
@@ -59,6 +65,8 @@ function createPvp(opts = {}) {
     graceMs: 4000,                      // 이벤트가 많은 턴(연출이 긴 턴)에 붙여 주는 여유 시간 상한
     queueGraceMs: 10000,                // 대기 중 연결이 끊겨도 이만큼은 자리를 지켜 준다 (새로고침·재접속 대비)
     queueMaxMs: 10 * 60 * 1000,         // 이 시간 동안 상대가 안 나타나면 대기 취소
+    inviteMs: PVP.INVITE_MS || 30000,   // v136 친구 대전 신청이 유효한 시간
+    maxSpectators: PVP.MAX_SPECTATORS || 10,   // v136 한 판을 동시에 관전할 수 있는 사람 수
     tickMs: 250,
     ...(opts.cfg || {}),
   };
@@ -71,15 +79,16 @@ function createPvp(opts = {}) {
   const users = new Map();     // uid → {uid, username, conns:Set, matchId, queued, queuedAt, goneAt, unseen}
   const matches = new Map();   // matchId → 진행 중인 판
   let queue = [];              // 대기 중인 uid (먼저 온 순서)
+  const invites = new Map();   // v136 inviteId → {id, from, to, at, until, power}
 
   // ---------- 사용자 ----------
   function getUser(uid, username) {
     let u = users.get(uid);
-    if (!u) { u = { uid, username: username || ('user' + uid), conns: new Set(), matchId: null, queued: false, qmode: 'normal', queuedAt: 0, goneAt: null, unseen: null }; users.set(uid, u); }
+    if (!u) { u = { uid, username: username || ('user' + uid), conns: new Set(), matchId: null, queued: false, qmode: 'normal', queuedAt: 0, goneAt: null, unseen: null, spectating: null }; users.set(uid, u); }
     else if (username) u.username = username;
     return u;
   }
-  function gc(u) { if (u && !u.conns.size && !u.matchId && !u.queued && !u.unseen) users.delete(u.uid); }
+  function gc(u) { if (u && !u.conns.size && !u.matchId && !u.queued && !u.unseen && !u.spectating && !invitesOf(u.uid).length) users.delete(u.uid); }
   const stateOf = uid => { const u = users.get(uid); return u && u.matchId ? 'match' : u && u.queued ? 'queue' : 'idle'; };
   function sendTo(u, msg) {
     for (const c of [...u.conns]) { try { c.send(msg); } catch (_) { dropConn(u, c); } }
@@ -87,7 +96,7 @@ function createPvp(opts = {}) {
   function statusMsg(u) {
     let st = {}; try { st = statsOf(u.uid) || {}; } catch (e) { log('statsOf 실패', e && e.message); }
     const waitingOf = md => queue.filter(id => { const x = users.get(id); return x && x.qmode === md; }).length;
-    return { t: 'status', state: stateOf(u.uid), mode: u.qmode, waiting: waitingOf('normal'), waitingRank: waitingOf('rank'), ...st,
+    return { t: 'status', state: stateOf(u.uid), mode: u.qmode, waiting: waitingOf('normal'), waitingRank: waitingOf('rank'), spectating: u.spectating || null, ...st,
       cfg: { turnMs: cfg.turnMs, mulliganMs: cfg.mulliganMs, reconnectMs: cfg.reconnectMs, maxTimeouts: cfg.maxTimeouts } };
   }
   const pushStatus = u => sendTo(u, statusMsg(u));
@@ -105,7 +114,11 @@ function createPvp(opts = {}) {
     } else if (u.unseen) {                      // 연결이 없는 사이에 판이 끝났다면 결과를 한 번 보여 준다
       const msg = u.unseen; u.unseen = null;
       try { conn.send(msg); } catch (_) {}
+    } else if (u.spectating) {                  // v136 관전 중이었으면 이어서 본다
+      const sm = matches.get(u.spectating);
+      if (sm && !sm.over && sm.spectators.has(uid)) { try { conn.send(specMsg(sm, uid)); } catch (_) {} } else u.spectating = null;
     }
+    for (const iv of invitesOf(uid)) { try { conn.send(inviteMsgFor(iv, uid)); } catch (_) {} }   // v136 기다리는 친구 대전 신청
   }
   function dropConn(u, conn) {
     if (!u.conns.delete(conn)) return;
@@ -132,6 +145,8 @@ function createPvp(opts = {}) {
     if (!u || !u.conns.size) return { ok: false, error: '서버와 연결되어 있지 않아요. 화면을 새로고침해 주세요.' };
     if (u.matchId) return { ok: false, error: '이미 대전 중이에요.' };
     if (u.queued && u.qmode === md) return { ok: true, already: true };
+    stopSpectating(u);                                                // v136 관전 중이면 그만 본다
+    for (const iv of invitesOf(uid)) if (iv.from === uid) dropInvite(iv, 'cancelled');   // v136 내가 보낸 친구 대전 신청은 취소
     if (u.queued) leaveQueue(u);                                   // 다른 대기열에 있었으면 옮긴다 (랭크전 → 일반전 전환)
     u.queued = true; u.qmode = md; u.queuedAt = Date.now(); queue.push(uid);
     pump();
@@ -171,18 +186,19 @@ function createPvp(opts = {}) {
       for (const uid of order) { const u = users.get(uid); if (u) { sendTo(u, { t: 'error', error: '덱을 불러오지 못했어요. 잠시 뒤 다시 해 주세요.' }); pushStatus(u); } }
       return;
     }
+    for (const uid of order) { const u = users.get(uid); if (u) { if (u.queued) leaveQueue(u); stopSpectating(u); } for (const iv of invitesOf(uid)) dropInvite(iv, 'busy'); }   // v136 대기열·관전·다른 신청 정리
     const heroPowers = order.map(uid => { const u = users.get(uid); return (u && u.qpower) || E.randomHeroPower(rng); });   // v131
     const state = E.newGame(rng, { decks, heroPowers });
     const now = Date.now();
     const m = {
-      id: crypto.randomBytes(8).toString('hex'), ranked: mode === 'rank', uids: order, names: order.map(uid => users.get(uid).username),
+      id: crypto.randomBytes(8).toString('hex'), ranked: mode === 'rank', friendly: mode === 'friend', spectators: new Map(), uids: order, names: order.map(uid => users.get(uid).username),
       state, decks, seq: 0, phase: 'mulligan', over: false, startedAt: now,
       mull: [0, 1].map(s => ({ done: !(state.seats[s].startIds || []).length })), mullUntil: now + cfg.mulliganMs,
       deadline: null, timeouts: [0, 0], offline: [null, null], result: null,
     };
     matches.set(m.id, m);
     for (const uid of order) { const u = users.get(uid); u.matchId = m.id; u.queued = false; }
-    log('판 시작', m.id, m.ranked ? '[랭크]' : '[일반]', m.names.join(' vs '));
+    log('판 시작', m.id, m.friendly ? '[친구]' : m.ranked ? '[랭크]' : '[일반]', m.names.join(' vs '));
     if (m.mull[0].done && m.mull[1].done) beginPlay(m); else broadcast(m);
   }
   function beginPlay(m) {
@@ -194,7 +210,7 @@ function createPvp(opts = {}) {
   function matchMsg(m, seat, extra) {
     const opp = 1 - seat, st = m.state, now = Date.now();
     return {
-      t: 'match', matchId: m.id, seat, ranked: !!m.ranked, phase: m.over ? 'over' : m.phase, seq: m.seq,
+      t: 'match', matchId: m.id, seat, ranked: !!m.ranked, friendly: !!m.friendly, spectators: m.spectators.size, phase: m.over ? 'over' : m.phase, seq: m.seq,
       opp: { name: m.names[opp], online: m.offline[opp] == null }, oppOfflineMs: m.offline[opp] == null ? 0 : now - m.offline[opp],
       mulligan: { done: m.mull[seat].done, oppDone: m.mull[opp].done, startIds: m.mull[seat].done ? [] : (st.seats[seat].startIds || []), remainMs: m.phase === 'mulligan' ? Math.max(0, m.mullUntil - now) : 0 },
       turnMs: cfg.turnMs, remainMs: (m.phase === 'play' && !m.over) ? Math.max(0, m.deadline - now) : 0, turnSeat: st.turn,
@@ -208,7 +224,125 @@ function createPvp(opts = {}) {
       const u = users.get(m.uids[seat]); if (!u) continue;
       sendTo(u, matchMsg(m, seat, { events: events ? scrubEvents(events, seat) : [], ...(extra || {}) }));
     }
+    if (m.spectators.size) {                                       // v136 관전자: 양쪽 비공개 정보를 모두 가린 이벤트
+      const sev = events ? scrubEvents(events, -1) : [];
+      for (const sid of m.spectators.keys()) { const u = users.get(sid); if (u) sendTo(u, specMsg(m, sid, { events: sev, ...(extra || {}) })); }
+    }
   }
+  // ---------- v136 관전 ----------
+  // 관전자 화면: 친구 쪽 좌석의 시점이지만 손패는 장수만, 덱 구성·선택지·할 수 있는 행동은 빼고 보낸다 (훈수로 상대 손패가 새지 않게 양쪽 모두 가림)
+  function specView(st, seat) {
+    const v = E.viewFor(st, seat);
+    v.me.handCount = v.me.hand.length; v.me.hand = []; delete v.me.deckCards;
+    v.legal = [];
+    if (v.pending) v.pending = { kind: v.pending.kind, seat: v.pending.seat };
+    v.spectate = true;
+    return v;
+  }
+  function specMsg(m, uid, extra) {
+    const seat = m.spectators.get(uid) ?? 0, st = m.state, now = Date.now();
+    return {
+      t: 'match', spectate: true, matchId: m.id, seat, ranked: !!m.ranked, friendly: !!m.friendly, spectators: m.spectators.size,
+      phase: m.over ? 'over' : m.phase, seq: m.seq, names: m.names.slice(),
+      opp: { name: m.names[1 - seat], online: m.offline[1 - seat] == null }, me: { name: m.names[seat], online: m.offline[seat] == null }, oppOfflineMs: 0,
+      mulligan: { done: true, oppDone: m.mull[1 - seat].done, startIds: [], remainMs: m.phase === 'mulligan' ? Math.max(0, m.mullUntil - now) : 0 },
+      turnMs: cfg.turnMs, remainMs: (m.phase === 'play' && !m.over) ? Math.max(0, m.deadline - now) : 0, turnSeat: st.turn,
+      timeouts: 0, maxTimeouts: cfg.maxTimeouts,
+      view: specView(st, seat), events: [], ...extra,
+    };
+  }
+  function stopSpectating(u) {
+    if (!u || !u.spectating) return;
+    const m = matches.get(u.spectating); u.spectating = null;
+    if (m && m.spectators.delete(u.uid)) pushSpecCount(m);
+  }
+  function pushSpecCount(m) { for (const uid of m.uids) { const u = users.get(uid); if (u) sendTo(u, { t: 'spectators', matchId: m.id, count: m.spectators.size }); } }
+  // targetUid 가 하고 있는 판을 본다 (친구인지는 부르는 쪽이 확인한다)
+  function spectate(uid, targetUid) {
+    const u = users.get(uid);
+    if (!u || !u.conns.size) return { ok: false, error: '서버와 연결되어 있지 않아요. 화면을 새로고침해 주세요.' };
+    if (u.matchId) return { ok: false, error: '대전 중에는 관전할 수 없어요.' };
+    const t = users.get(targetUid), m = t && t.matchId && matches.get(t.matchId);
+    if (!m || m.over) return { ok: false, error: '친구가 지금 대전 중이 아니에요.' };
+    if (m.uids.includes(uid)) return { ok: false, error: '내가 하는 판이에요.' };
+    if (!m.spectators.has(uid) && m.spectators.size >= cfg.maxSpectators) return { ok: false, error: `이 판은 관전 인원이 가득 찼어요 (최대 ${cfg.maxSpectators}명).` };
+    if (u.queued) { leaveQueue(u); pushStatus(u); pushAllQueued(); }
+    if (u.spectating && u.spectating !== m.id) stopSpectating(u);
+    u.spectating = m.id; m.spectators.set(uid, m.uids.indexOf(targetUid));
+    sendTo(u, specMsg(m, uid)); pushSpecCount(m);
+    return { ok: true, matchId: m.id };
+  }
+  function spectateLeave(uid) {
+    const u = users.get(uid); if (!u || !u.spectating) return { ok: true };
+    stopSpectating(u); pushStatus(u); gc(u);
+    return { ok: true };
+  }
+
+  // ---------- v136 친구 대전 신청 ----------
+  const invitesOf = uid => [...invites.values()].filter(iv => iv.from === uid || iv.to === uid);
+  const nameOf = uid => { const u = users.get(uid); return u ? u.username : ''; };
+  function inviteMsgFor(iv, uid) {
+    const remainMs = Math.max(0, iv.until - Date.now());
+    return iv.to === uid ? { t: 'invite', id: iv.id, from: { id: iv.from, name: nameOf(iv.from) }, remainMs }
+                         : { t: 'inviteSent', id: iv.id, to: { id: iv.to, name: nameOf(iv.to) }, remainMs };
+  }
+  function dropInvite(iv, why) {
+    if (!invites.delete(iv.id)) return;
+    for (const uid of [iv.from, iv.to]) {
+      const u = users.get(uid); if (!u) continue;
+      sendTo(u, { t: 'inviteGone', id: iv.id, why, name: nameOf(uid === iv.from ? iv.to : iv.from), mine: uid === iv.from });
+    }
+    for (const uid of [iv.from, iv.to]) gc(users.get(uid));
+  }
+  // 친구에게 대전 신청 (친구인지는 부르는 쪽이 확인한다). 상대가 이미 나에게 신청했으면 바로 시작
+  function invite(from, to, heroPower) {
+    const u = users.get(from), t = users.get(to);
+    if (!u || !u.conns.size) return { ok: false, error: '서버와 연결되어 있지 않아요. 화면을 새로고침해 주세요.' };
+    if (from === to) return { ok: false, error: '나 자신과는 대전할 수 없어요.' };
+    if (u.matchId) return { ok: false, error: '이미 대전 중이에요.' };
+    if (!t || !t.conns.size) return { ok: false, error: '친구가 지금 접속해 있지 않아요.' };
+    if (t.matchId) return { ok: false, error: '친구가 지금 대전 중이에요. 관전은 할 수 있어요.' };
+    u.qpower = E.HERO_POWERS[heroPower] ? heroPower : null;
+    const back = [...invites.values()].find(iv => iv.from === to && iv.to === from);
+    if (back) return respond(from, back.id, true, heroPower);
+    for (const iv of invitesOf(from)) if (iv.from === from) dropInvite(iv, 'cancelled');   // 신청은 한 번에 한 명에게만
+    if (u.queued) { leaveQueue(u); pushStatus(u); pushAllQueued(); }
+    const now = Date.now(), iv = { id: crypto.randomBytes(6).toString('hex'), from, to, at: now, until: now + cfg.inviteMs, power: u.qpower };
+    invites.set(iv.id, iv);
+    sendTo(t, inviteMsgFor(iv, to)); sendTo(u, inviteMsgFor(iv, from));
+    return { ok: true, id: iv.id, remainMs: cfg.inviteMs };
+  }
+  function respond(uid, id, accept, heroPower) {
+    const iv = invites.get(String(id || ''));
+    if (!iv || iv.to !== uid) return { ok: false, error: '이미 끝났거나 없는 신청이에요.' };
+    if (!accept) { dropInvite(iv, 'declined'); return { ok: true }; }
+    const a = users.get(iv.from), b = users.get(iv.to);
+    if (!b || !b.conns.size) return { ok: false, error: '서버와 연결되어 있지 않아요. 화면을 새로고침해 주세요.' };
+    if (b.matchId) return { ok: false, error: '이미 대전 중이에요.' };
+    if (!a || !a.conns.size || a.matchId) { dropInvite(iv, a && a.matchId ? 'busy' : 'offline'); return { ok: false, error: '친구가 지금 대전을 시작할 수 없어요.' }; }
+    b.qpower = E.HERO_POWERS[heroPower] ? heroPower : null; a.qpower = iv.power;
+    dropInvite(iv, 'accepted');
+    startMatch(iv.from, iv.to, 'friend');
+    pushAllQueued();
+    return { ok: true };
+  }
+  function inviteCancel(uid) {
+    let n = 0; for (const iv of invitesOf(uid)) if (iv.from === uid) { dropInvite(iv, 'cancelled'); n++; }
+    return n ? { ok: true } : { ok: false, error: '보낸 신청이 없어요.' };
+  }
+  // 친구 목록에 보일 접속 상태
+  function presenceOf(uid) {
+    const u = users.get(uid);
+    if (!u || !u.conns.size) {
+      const m = u && u.matchId && matches.get(u.matchId);      // 판 도중 잠깐 끊긴 사람은 "대전 중"으로
+      return m && !m.over ? { online: false, state: 'match', mode: m.friendly ? 'friend' : m.ranked ? 'rank' : 'normal' } : { online: false, state: 'offline' };
+    }
+    const m = u.matchId && matches.get(u.matchId);
+    if (m && !m.over) return { online: true, state: 'match', mode: m.friendly ? 'friend' : m.ranked ? 'rank' : 'normal', spectators: m.spectators.size };
+    return { online: true, state: u.queued ? 'queue' : u.spectating ? 'spectate' : 'idle' };
+  }
+  function notify(uid, msg) { const u = users.get(uid); if (u) sendTo(u, msg); }
+  function rename(uid, name) { const u = users.get(uid); if (u && name) u.username = name; }
 
   // ---------- 멀리건 ----------
   function matchOf(uid, matchId) {
@@ -231,6 +365,7 @@ function createPvp(opts = {}) {
     if (now - m.emoteAt[seat] < PROGRESS.EMOTE_GAP_MS) return { ok: false, error: '조금 뒤에 다시 보내 주세요.' };
     m.emoteAt[seat] = now;
     const o = users.get(m.uids[1 - seat]); if (o) sendTo(o, { t: 'emote', matchId: m.id, seat, id });
+    for (const sid of m.spectators.keys()) { const x = users.get(sid); if (x) sendTo(x, { t: 'emote', matchId: m.id, seat, id }); }   // v136 관전자에게도
     return { ok: true };
   }
   function mulligan(uid, matchId, ids) {
@@ -295,7 +430,7 @@ function createPvp(opts = {}) {
   function finish(m, winnerSeat, reason, events) {
     if (m.over) return;
     m.over = true; m.phase = 'over';
-    const settleArg = { matchId: m.id, ranked: !!m.ranked, uids: m.uids.slice(), winnerSeat, reason, turns: m.state.turnNo, startedAt: m.startedAt };
+    const settleArg = { matchId: m.id, ranked: !!m.ranked, friendly: !!m.friendly, uids: m.uids.slice(), winnerSeat, reason, turns: m.state.turnNo, startedAt: m.startedAt };
     let res = null;
     for (let i = 0; i < 2 && !res; i++) { try { res = settle(settleArg); } catch (e) { log('정산 실패', i, e && e.message); } }
     if (!res) res = [{ reward: 0, why: 'error' }, { reward: 0, why: 'error' }];      // 정산이 두 번 다 실패: 보상 없이 결과만 보여 준다 (기록·골드는 그대로 취소된 상태)
@@ -306,13 +441,23 @@ function createPvp(opts = {}) {
       const u = users.get(m.uids[seat]); if (!u) continue;
       const rs = res[seat] || {};
       const result = {
-        youWon: winnerSeat === seat, draw: winnerSeat === null && reason !== 'void', void: reason === 'void', ranked: !!m.ranked,
+        youWon: winnerSeat === seat, draw: winnerSeat === null && reason !== 'void', void: reason === 'void', ranked: !!m.ranked, friendly: !!m.friendly,
         reason, turns: m.state.turnNo, oppName: m.names[1 - seat], ...rs,
       };
       const msg = matchMsg(m, seat, { events: scrubEvents(events || [], seat), result });
       u.matchId = null;
       if (u.conns.size) { sendTo(u, msg); pushStatus(u); } else u.unseen = msg;
     }
+    for (const [sid, seat] of [...m.spectators]) {                  // v136 관전자: 결과만 (보상 없음)
+      const u = users.get(sid); if (!u) continue;
+      const result = { spectate: true, winnerName: winnerSeat === null ? null : m.names[winnerSeat], youWon: winnerSeat === seat, draw: winnerSeat === null && reason !== 'void', void: reason === 'void',
+        ranked: !!m.ranked, friendly: !!m.friendly, reason, turns: m.state.turnNo, names: m.names.slice(), reward: 0 };
+      const msg = specMsg(m, sid, { events: scrubEvents(events || [], -1), result });
+      u.spectating = null;
+      if (u.conns.size) { sendTo(u, msg); pushStatus(u); }
+      gc(u);
+    }
+    m.spectators.clear();
     for (const uid of m.uids) gc(users.get(uid));
   }
 
@@ -351,6 +496,11 @@ function createPvp(opts = {}) {
       if (gone || tooLong) { leaveQueue(u); changed = true; if (u.conns.size) { sendTo(u, { t: 'error', error: '대기 시간이 길어져 대기를 취소했어요. 다시 눌러 주세요.' }); pushStatus(u); } gc(u); }
     }
     if (changed) pushAllQueued();
+    for (const iv of [...invites.values()]) {                          // v136 친구 대전 신청: 시간이 지났거나 한쪽이 나갔으면 지운다
+      if (now >= iv.until) { dropInvite(iv, 'expired'); continue; }
+      const gone = [iv.from, iv.to].some(id => { const x = users.get(id); return !x || (!x.conns.size && x.goneAt && now - x.goneAt > cfg.queueGraceMs); });
+      if (gone) dropInvite(iv, 'offline');
+    }
     pump();
   }
   const timer = setInterval(() => { try { tick(); } catch (e) { log('tick 예외', e && e.stack || e); } }, cfg.tickMs);
@@ -359,7 +509,8 @@ function createPvp(opts = {}) {
 
   return {
     connect, disconnect, queueJoin, queueCancel, mulligan, emote, action, stateOf, shutdown,
-    _users: users, _matches: matches, _queue: () => queue, _tick: tick, cfg,
+    invite, respond, inviteCancel, spectate, spectateLeave, presenceOf, notify, rename,   // v136
+    _users: users, _matches: matches, _queue: () => queue, _invites: invites, _tick: tick, cfg,
   };
 }
 

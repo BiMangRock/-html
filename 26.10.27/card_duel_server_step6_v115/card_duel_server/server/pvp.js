@@ -6,6 +6,7 @@ const express = require('express');
 const { requireAuth } = require('./auth');
 const { createPvp } = require('./pvp-core');
 const pvpdb = require('./pvp-db');
+const { areFriends } = require('./friends-db');   // v136 친구 대전 · 관전은 친구끼리만
 
 const MAX_STREAMS_PER_USER = 4;       // 한 계정이 동시에 열 수 있는 탭 수
 const HEARTBEAT_MS = 15000;           // 프록시(터널)가 놀고 있는 연결을 끊지 않게 주기적으로 신호
@@ -40,7 +41,7 @@ function makeHandlers(pvp) {
       if (hb.unref) hb.unref();
       const cleanup = () => { if (closed) return; closed = true; clearInterval(hb); pvp.disconnect(uid, conn); };
       req.on('close', cleanup); res.on('error', cleanup);
-      pvp.connect(uid, req.user.username, conn);
+      pvp.connect(uid, req.user.name || req.user.username, conn);   // v136 닉네임이 있으면 닉네임으로 보인다
     },
     // GET /pvp/status — 페이지를 새로 열었을 때 진행 중인 판이 있는지 (있으면 화면이 스트림을 열어 이어서 한다)
     status(req, res) { res.set('Cache-Control', 'no-store'); res.json({ state: pvp.stateOf(req.user.id) }); },
@@ -59,6 +60,27 @@ function makeHandlers(pvp) {
       const b = req.body || {}; const r = pvp.emote(req.user.id, String(b.matchId || ''), String(b.id || ''));
       res.status(r.ok ? 200 : 400).json(r);
     },
+    // v136 POST /pvp/invite {to, heroPower} · /pvp/invite/respond {id, accept, heroPower} · /pvp/invite/cancel
+    invite(req, res) {
+      if (!queueOk(req.user.id)) return tooMany(res);
+      const b = req.body || {}, to = Number(b.to);
+      if (!Number.isInteger(to) || !areFriends(req.user.id, to)) return res.status(400).json({ ok: false, error: '친구에게만 대전을 신청할 수 있어요.' });
+      const r = pvp.invite(req.user.id, to, b.heroPower); res.status(r.ok ? 200 : 400).json(r);
+    },
+    inviteRespond(req, res) {
+      if (!queueOk(req.user.id)) return tooMany(res);
+      const b = req.body || {}; const r = pvp.respond(req.user.id, String(b.id || ''), !!b.accept, b.heroPower);
+      res.status(r.ok ? 200 : 400).json(r);
+    },
+    inviteCancel(req, res) { const r = pvp.inviteCancel(req.user.id); res.status(r.ok ? 200 : 400).json(r); },
+    // v136 POST /pvp/spectate {friendId} · /pvp/spectate/leave
+    spectate(req, res) {
+      if (!queueOk(req.user.id)) return tooMany(res);
+      const fid = Number((req.body || {}).friendId);
+      if (!Number.isInteger(fid) || !areFriends(req.user.id, fid)) return res.status(400).json({ ok: false, error: '친구의 판만 관전할 수 있어요.' });
+      const r = pvp.spectate(req.user.id, fid); res.status(r.ok ? 200 : 400).json(r);
+    },
+    spectateLeave(req, res) { res.json(pvp.spectateLeave(req.user.id)); },
     // POST /pvp/action {matchId, seq, action}   (결과 화면은 스트림으로 온다. 여기서는 접수 여부만)
     action(req, res) {
       if (!actionOk(req.user.id)) return tooMany(res);
@@ -79,6 +101,11 @@ router.post('/pvp/queue', h.queue);
 router.post('/pvp/cancel', h.cancel);
 router.post('/pvp/mulligan', h.mulligan);
 router.post('/pvp/action', h.action);
+router.post('/pvp/invite', h.invite);
+router.post('/pvp/invite/respond', h.inviteRespond);
+router.post('/pvp/invite/cancel', h.inviteCancel);
+router.post('/pvp/spectate', h.spectate);
+router.post('/pvp/spectate/leave', h.spectateLeave);
 router.get('/pvp/ranking', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ ...pvpdb.ranking(100), board: pvpdb.publicBoard({ limit: 100 }), me: pvpdb.rankOut(req.user.id), myRow: pvpdb.myBoardRow(req.user.id) }); });   // v127 순위표 (v128 전체 순위 + 내 순위)
 // v128 공개 순위 (로그인 없이): GET /api/public/ranking?offset=0&limit=50&q=이름
 const publicRouter = express.Router();

@@ -159,4 +159,29 @@ CREATE INDEX IF NOT EXISTS idx_rank_legend ON rank_state(tier, legend_wins DESC,
 if (!db.prepare('PRAGMA table_info(pvp_matches)').all().some(c => c.name === 'ranked'))
   db.exec('ALTER TABLE pvp_matches ADD COLUMN ranked INTEGER NOT NULL DEFAULT 0');
 
+// v136 친구 · 닉네임 · 친구 대전
+//  - 닉네임: 아이디와 따로 짓는 이름 (없으면 아이디를 보여 준다). 대소문자 구분 없이 한 명만 쓸 수 있다
+//  - 친구는 양쪽 방향으로 두 줄 저장 (A→B, B→A) → "내 친구" 조회가 단순하다
+//  - 친구 대전 판은 pvp_matches.friendly=1 (보상·랭크·전적에 안 들어감)
+if (!db.prepare('PRAGMA table_info(users)').all().some(c => c.name === 'nickname'))
+  db.exec('ALTER TABLE users ADD COLUMN nickname TEXT');
+if (!db.prepare('PRAGMA table_info(pvp_matches)').all().some(c => c.name === 'friendly'))
+  db.exec('ALTER TABLE pvp_matches ADD COLUMN friendly INTEGER NOT NULL DEFAULT 0');
+db.exec(`
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_nickname ON users(nickname COLLATE NOCASE) WHERE nickname IS NOT NULL;
+CREATE TABLE IF NOT EXISTS friends (
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  friend_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  since       INTEGER NOT NULL,
+  PRIMARY KEY (user_id, friend_id)
+);
+CREATE TABLE IF NOT EXISTS friend_requests (            -- 보낸 친구 요청 (수락·거절·취소하면 지운다)
+  from_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (from_id, to_id)
+);
+CREATE INDEX IF NOT EXISTS idx_friend_req_to ON friend_requests(to_id);
+`);
+
 module.exports = db;

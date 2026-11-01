@@ -35,8 +35,10 @@ app.use('/api', auth.router);
 app.use('/api', saves.router);
 app.use('/api', require('./bosses').router);           // v116: 보스 목록 (읽기: 로그인 / 쓰기: 개발자)
 app.use('/api', shop.router);
-app.use('/api', require('./progress').router);        // v132 카드 제작·분해 · 일일 퀘스트
+app.use('/api', require('./progress').router);
+app.use('/api', require('./decks').router);           // v135 덱 슬롯 여러 개        // v132 카드 제작·분해 · 일일 퀘스트
 app.use('/api', pvp.router);                             // 유저 대전: /api/pvp/stream(SSE) · queue · cancel · mulligan · action · status
+app.use('/api', require('./social').createSocialRouter({ core: pvp.core, onRename: () => require('./pvp-db').invalidateBoard() }));   // v136 닉네임 · 친구
 app.use('/api', (req, res) => res.status(404).json({ error: '없는 API예요.' }));
 
 // 게임 화면은 로그인한 사람만. 아니면 로그인 화면으로.

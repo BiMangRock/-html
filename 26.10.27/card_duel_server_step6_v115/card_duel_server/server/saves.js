@@ -44,6 +44,7 @@ function saveDeck(table, mode) {
     db.prepare(`INSERT INTO ${table}(user_id,deck_json,updated_at) VALUES (?,?,?)
                 ON CONFLICT(user_id) DO UPDATE SET deck_json=excluded.deck_json, updated_at=excluded.updated_at`)
       .run(req.user.id, JSON.stringify(list), Date.now());
+    if (table === 'decks') { try { require('./decks').syncActive(req.user.id, list); } catch (e) { console.error('덱 슬롯 동기화 실패:', e); } }   // v135 사용 중 슬롯에도
     res.json({ ok: true });
   };
 }

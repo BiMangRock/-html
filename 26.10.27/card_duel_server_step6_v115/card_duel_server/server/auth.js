@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const db = require('./db');
+const { nicknameTaken } = require('./friends-db');   // v136 남의 닉네임과 같은 아이디로는 가입 못 함 (사칭 방지)
 
 const COOKIE_NAME = 'cd_session';
 const SESSION_MS = 30 * 24 * 3600 * 1000;           // 30일
@@ -63,10 +64,10 @@ function parseCookies(req) {
 function getSessionUser(req) {
   const token = parseCookies(req)[COOKIE_NAME];
   if (!token) return null;
-  const row = db.prepare(`SELECT u.id, u.username, u.is_admin, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id
+  const row = db.prepare(`SELECT u.id, u.username, u.nickname, u.is_admin, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id
                           WHERE s.token_hash=?`).get(sha256(token));
   if (!row || row.expires_at < Date.now()) return null;
-  return { id: row.id, username: row.username, isAdmin: !!row.is_admin };
+  return { id: row.id, username: row.username, nickname: row.nickname || null, name: row.nickname || row.username, isAdmin: !!row.is_admin };   // v136 name = 화면에 보일 이름 (닉네임, 없으면 아이디)
 }
 function setCookie(req, res, token) {
   const secure = process.env.COOKIE_SECURE === '1' || req.secure;      // https(터널/프록시) 뒤에서는 Secure
@@ -113,7 +114,7 @@ router.post('/signup', async (req, res, next) => {
     if (bad) return res.status(400).json({ error: bad });
     if (signupByIp.blocked(req.ip)) return res.status(429).json({ error: '가입 시도가 너무 많아요. 잠시 후 다시 해 주세요.' });
     signupByIp.add(req.ip);
-    if (db.prepare('SELECT 1 FROM users WHERE username=?').get(username))
+    if (db.prepare('SELECT 1 FROM users WHERE username=?').get(username) || nicknameTaken(username))
       return res.status(409).json({ error: '이미 사용 중인 아이디예요.' });
     const pw_hash = await hashPassword(password);
     let id;

@@ -90,7 +90,8 @@ const heroLabel = seat => seat===MY ? '내 영웅' : '상대 영웅';
 const tLabel = (t,name) => t.kind==='hero' ? heroLabel(t.seat) : name;
 function eventText(ev){
   switch(ev.type){
-    case 'turn_start': return ev.seat===MY ? '당신의 턴입니다.' : '상대의 턴입니다.';
+    case 'turn_start': if(game && game.spectate) return `${document.querySelector(ev.seat===MY?'#playerHero .name':'#aiHero .name').textContent}의 턴입니다.`;   // v136 관전: 이름으로
+      return ev.seat===MY ? '당신의 턴입니다.' : '상대의 턴입니다.';
     case 'spell': return `${ev.tag?`(${ev.tag}) `:ev.chaos?'(혼돈) ':''}${ev.seat===MY?'당신이':'상대가'} 주문 「${ev.name}」 사용` + (ev.card.effect.type==='mana' ? `: 이번 턴 마나 +${ev.gain}` : '');
     case 'draw':
       if(ev.src) return `${who(ev.src.seat)} ${ev.src.name}: 카드 ${ev.count+ev.burned}장 뽑기`;
@@ -455,7 +456,7 @@ async function playEvents0(evs){
       if(!dv){ dv=structuredClone(view); dv.pending=null; dv.legal=[]; view=dv; }
       for(const [sd,side] of [[MY,dv.me],[OPP,dv.opp]]){ const sn=ev.seats[sd]; side.board=structuredClone(sn.board); side.hp=sn.hp; side.armor=sn.armor; side.heroAtk=sn.heroAtk||0;
         side.mana=sn.mana; side.maxMana=sn.maxMana; side.deckCount=sn.deckCount;      // v55: 혼돈의 주문서 중간에도 손패·마나·덱 장수가 바로 갱신된다
-        if(sd===MY) side.hand=structuredClone(sn.hand); else side.handCount=sn.hand.length; }
+        if(sd===MY && !(game&&game.spectate)) side.hand=structuredClone(sn.hand); else side.handCount=sn.hand.length; }   // v136 관전: 손패는 장수만
       render();
     }
     if(ev.type==='summon' && spellSeen){
@@ -522,7 +523,7 @@ async function perform(seat, action){
   return r;
 }
 async function playerAction(action){
-  if(ui.busy) return;
+  if(ui.busy || (game && game.spectate)) return;   // v136 관전자는 행동하지 않는다
   QStats.action(action);   // v132
   ui.busy=true; ui.selected=null; ui.pending=null; ui.place=null; stopArrow();
   if(game && game.mode==='pvp'){ await PvpClient.act(action); render(); return; }   // 유저 대전: 판은 서버가 진행한다 → 행동만 보내고, 결과·연출은 서버 메시지로 받는다
@@ -753,6 +754,7 @@ function showBubble(seat, text){
 }
 function toggleEmoteMenu(e){
   if(e){ e.stopPropagation(); e.preventDefault && e.preventDefault(); }
+  if(game && game.spectate) return;   // v136 관전자는 감정 표현을 보내지 않는다
   const hero=$('playerHero'); let m=hero.querySelector('.emote-menu');
   if(m){ m.remove(); return; }
   if(!game || (view && view.over)) return;
@@ -1423,7 +1425,8 @@ function render(){
   const place=ui.place;
   if(ui.handSeenGame!==game || !ui.handSeen){ ui.handSeenGame=game; ui.handSeen=new Set(me.hand.map(c=>c.id)); }   // v129 새 판: 처음 손패는 연출 없이
   const hand=$('hand'); hand.innerHTML='';
-  me.hand.forEach(c=>{
+  if(game && game.spectate) for(let k=0;k<(me.handCount||0);k++){ const b=document.createElement('div'); b.className='card-back spec-back'; hand.appendChild(b); }   // v136 관전: 친구 손패는 뒷면만
+  (game && game.spectate ? [] : me.hand).forEach(c=>{
     const isPending = (!!pending && pending.cardId===c.id) || (!!place && place.cardId===c.id);
     const playable = legal.some(a=>a.type==='PLAY_CARD' && a.cardId===c.id) && ((!pending && !place) || isPending || (!!place && !pending));
     const ht={kind:'hand', seat:MY, id:c.id}, isTarget=isPendingTarget(ht);      // 복제 같은 주문은 손패 카드가 대상이 된다
@@ -1513,7 +1516,7 @@ function renderDeckModal(){
     grid.appendChild(el);
   });
 }
-function openDeck(){ if(!view) return; renderDeckModal(); $('deckModal').classList.add('show'); }
+function openDeck(){ if(!view || (game && game.spectate)) return; renderDeckModal(); $('deckModal').classList.add('show'); }
 function closeDeck(){ $('deckModal').classList.remove('show'); }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDeck(); closeDeckEditor(); } });
 
@@ -1584,7 +1587,12 @@ function renderDeckEditor(){
   $('edCurve').querySelectorAll('.cv-col').forEach(el=>el.onclick=()=>{ const k=+el.dataset.cost; ed.cost=(ed.cost===k?null:k); edScrollTop(); renderDeckEditor(); });
   if(ed.adv){ $('edTitle').textContent=`🎒 모험 덱 편집 — ${total} / ${size}장 (주문 ${spellCnt}장)`; if(saveOk) $('edNote').textContent='영남대 입학 때 들고 가는 30장이에요. 처음엔 일반 카드만 넣을 수 있고, 모험 전용 카드는 입학한 뒤 보상으로 잠긴 덱에 더해져요.'; }
   if(ed.boss){ $('edTitle').textContent=`보스 덱 — ${ed.bossName||''} ${total} / ${size}장 (주문 ${spellCnt}장)`; $('edNote').textContent = saveOk ? '저장할 수 있습니다. 이 덱이 보스가 쓰는 덱입니다.' : `정확히 ${size}장을 채워야 저장할 수 있습니다 (같은 카드는 최대 ${CONFIG.COPIES}장).`; }
-  $('edSave').disabled=!saveOk;
+  let slotOk=false;
+  if(ed.slot){ const act=DeckSlots.isActive(ed.slot.slot); slotOk = total<=size && (!act || total===size);   // v135 덱 슬롯: 미완성도 저장 가능 (사용 중 덱만 30장)
+    $('edTitle').textContent=`📚 ${ed.slot.name} — ${total} / ${size}장 (주문 ${spellCnt}장)`;
+    $('edNote').textContent = act ? (total===size ? '사용 중인 덱입니다. 저장하면 바로 대전에 쓰입니다.' : `사용 중인 덱은 정확히 ${size}장이어야 저장할 수 있습니다.`)
+      : (total===size ? '저장할 수 있습니다. 덱 목록에서 [사용하기]를 누르면 대전에 쓰입니다.' : `미완성이어도 저장할 수 있어요 (${total}/${size}장). 대전에 쓰려면 ${size}장을 채워야 합니다.`); }
+  $('edSave').disabled=!(ed.slot ? slotOk : saveOk);
   const grid=$('edGrid'), st=grid.scrollTop; grid.innerHTML='';
   // 카드 종류(주문/하수인)로 먼저 나누고, 각 종류 안에서 속성별로 묶은 뒤 코스트 오름차순 정렬
   const typeOrder=['spell','minion'];
@@ -1647,13 +1655,108 @@ function renderDeckEditor(){
   grid.scrollTop=st;      // 다시 그려도 스크롤 위치 유지
   edUpdateFilterBtn();
 }
-function updateDeckMenuDesc(){ $('deckMenuDesc').textContent=`내 덱을 직접 구성합니다 (${CONFIG.DECK_SIZE}장, 같은 카드 최대 ${CONFIG.COPIES}장)`; }
-function openDeckEditor(){ ed.test=false; ed.boss=false; ed.adv=false; $('edClear').style.display=''; ed.counts=countsOf(DeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }
-function openAdvDeckEditor(){ if(Object.keys(ServerStore.runs).length){ alert('재학 중에는 덱을 바꿀 수 없어요. (졸업·자퇴하거나 보스에게 지면 풀려요)'); return; } ed.test=false; ed.boss=false; ed.adv=true; $('edClear').style.display=''; ed.counts=countsOf(AdvDeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }   // v117
+function updateDeckMenuDesc(){ const a=typeof DeckSlots!=='undefined' && ServerStore.decks && DeckSlots.active(); $('deckMenuDesc').textContent = a ? `사용 중: ${a.name} · 저장한 덱 ${ServerStore.decks.slots.length}/${ServerStore.decks.max}개 · 덱 코드로 공유` : `덱 여러 개 저장 · 골라 쓰기 · 덱 코드로 친구와 공유 (${CONFIG.DECK_SIZE}장, 같은 카드 최대 ${CONFIG.COPIES}장)`; }   // v135
+function openDeckEditor(){ ed.test=false; ed.boss=false; ed.adv=false; ed.slot=null; $('edClear').style.display=''; ed.counts=countsOf(DeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }
+function openAdvDeckEditor(){ if(Object.keys(ServerStore.runs).length){ alert('재학 중에는 덱을 바꿀 수 없어요. (졸업·자퇴하거나 보스에게 지면 풀려요)'); return; } ed.test=false; ed.boss=false; ed.adv=true; ed.slot=null; $('edClear').style.display=''; ed.counts=countsOf(AdvDeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }   // v117
+// ---------- v135 덱 슬롯 (여러 덱 저장) · 덱 코드 ----------
+const DeckSlots={
+  isActive(slot){ const d=ServerStore.decks; return !!d && d.active===slot; },
+  active(){ const d=ServerStore.decks; return d && d.slots.find(x=>x.slot===d.active); },
+};
+function deckStatus(list){                           // 덱 상태: 장수 · 없는 카드
+  const need=countsOf(list), missing=Object.entries(need).reduce((t,[n,k])=>t+Math.max(0,k-(isDev()?k:ServerStore.owned(n))),0);
+  return {total:list.length, missing, ok:list.length===CONFIG.DECK_SIZE && !missing};
+}
+async function openDeckList(){ $('deckListModal').classList.add('show'); renderDeckList(); await ServerStore.loadDecks(); renderDeckList(); }
+function closeDeckList(){ $('deckListModal').classList.remove('show'); }
+function renderDeckList(msg){
+  const box=$('deckSlots'), d=ServerStore.decks; if(!box) return;
+  if(msg!==undefined) $('deckListNote').textContent=msg;
+  if(!d){ box.innerHTML='<p class="note">불러오는 중…</p>'; return; }
+  $('deckListTitle').textContent=`📚 내 덱 (${d.slots.length}/${d.max})`;
+  $('dlNew').disabled=d.slots.length>=d.max; $('dlImport').disabled=d.slots.length>=d.max;
+  box.innerHTML='';
+  for(const sl of d.slots){
+    const st=deckStatus(sl.deck), act=d.active===sl.slot, hp=HERO_POWERS[sl.heroPower];
+    const row=document.createElement('div'); row.className='dslot'+(act?' active':'')+(st.ok?'':' incomplete');
+    const art=hp && HERO_PORTRAIT[sl.heroPower] && cardArt(cardByName(HERO_PORTRAIT[sl.heroPower]));
+    row.innerHTML=`<div class="ds-pic"${art?` style="background-image:url('${art}')"`:''}>${art?'':(hp?hp.icon:'🃏')}</div>
+      <div class="ds-main"><b></b><small></small><div class="ds-hp"></div></div><div class="ds-btns"></div>`;
+    row.querySelector('b').textContent=sl.name+(act?'  ✔ 사용 중':'');
+    row.querySelector('small').textContent= st.ok ? `${st.total}장 · 완성` : st.total<CONFIG.DECK_SIZE ? `미완성 ${st.total}/${CONFIG.DECK_SIZE}장${st.missing?` · 없는 카드 ${st.missing}장`:''}` : `없는 카드 ${st.missing}장 — 🔨 카드 제작에서 만들 수 있어요`;
+    const sel=document.createElement('select'); sel.title='이 덱의 영웅 능력';
+    sel.innerHTML='<option value="">🔮 영웅 능력: 따로 안 정함</option>'+HERO_POWER_IDS.map(id=>`<option value="${id}">${HERO_POWERS[id].icon} ${escHtml(HERO_POWERS[id].name)}</option>`).join('');
+    sel.value=sl.heroPower||''; sel.onchange=async()=>{ const r=await ServerStore.updateDeck(sl.slot,{heroPower:sel.value}); if(r.ok && act && sel.value){ HeroPowerPref.set(sel.value); updatePowerMenuDesc(); } renderDeckList(r.ok?`✔ 「${sl.name}」 영웅 능력을 바꿨습니다`:'⚠ '+r.error); };
+    row.querySelector('.ds-hp').appendChild(sel);
+    const btns=row.querySelector('.ds-btns');
+    const btn=(label, cls, fn, dis, tip)=>{ const b=document.createElement('button'); b.type='button'; b.className='end-turn sub '+(cls||''); b.textContent=label; b.disabled=!!dis; if(tip) b.title=tip; b.onclick=fn; btns.appendChild(b); return b; };
+    btn(act?'사용 중':'사용하기', 'ds-use', async()=>{ const r=await ServerStore.activateDeck(sl.slot); if(r.ok){ if(sl.heroPower){ HeroPowerPref.set(sl.heroPower); updatePowerMenuDesc(); } updateDeckMenuDesc(); } renderDeckList(r.ok?`✔ 「${sl.name}」을(를) 이제 대전에 씁니다`+(sl.heroPower?` (영웅 능력 ${HERO_POWERS[sl.heroPower].name})`:''):'⚠ '+r.error); }, act || !st.ok, st.ok?'':'완성된 덱(30장 · 가진 카드)만 쓸 수 있어요');
+    btn('편집', '', ()=>openSlotEditor(sl));
+    btn('이름', '', async()=>{ const nm=await promptBox('덱 이름 바꾸기', '새 이름 (24자까지)', sl.name); if(nm==null) return; const r=await ServerStore.updateDeck(sl.slot,{name:nm}); renderDeckList(r.ok?'✔ 이름을 바꿨습니다':'⚠ '+r.error); });
+    btn('복사', '', async()=>{ const r=await ServerStore.createDeck({name:(sl.name+' 사본').slice(0,24), deck:sl.deck, heroPower:sl.heroPower}); renderDeckList(r.ok?`✔ 「${sl.name}」을(를) 복사했습니다`:'⚠ '+r.error); }, d.slots.length>=d.max);
+    btn('📋 코드', 'ds-code', ()=>copyDeckCode(sl));
+    btn('삭제', 'ds-del', async()=>{ if(!await confirmBox('덱 삭제', `「${sl.name}」을(를) 지울까요? (카드는 그대로 남습니다)`, '삭제', true)) return; const r=await ServerStore.deleteDeck(sl.slot); renderDeckList(r.ok?'✔ 덱을 지웠습니다':'⚠ '+r.error); }, act, act?'사용 중인 덱은 지울 수 없어요':'');
+    box.appendChild(row);
+  }
+}
+async function newDeck(){
+  const nm=await promptBox('새 덱', '덱 이름 (24자까지)', `새 덱 ${(ServerStore.decks?ServerStore.decks.slots.length:0)+1}`); if(nm==null) return;
+  const r=await ServerStore.createDeck({name:nm, deck:[], heroPower:HeroPowerPref.get()==='random'?'':HeroPowerPref.get()});
+  if(!r.ok){ renderDeckList('⚠ '+r.error); return; }
+  renderDeckList(); const sl=ServerStore.decks.slots.find(x=>x.slot===r.slot); if(sl) openSlotEditor(sl);
+}
+function openSlotEditor(sl){
+  ed.test=false; ed.boss=false; ed.adv=false; ed.slot={slot:sl.slot, name:sl.name};
+  $('edClear').style.display=''; ed.counts=countsOf(sl.deck); renderDeckEditor(); $('deckEditor').classList.add('show');
+}
+async function saveSlotFromEditor(){
+  const list=listOf(ed.counts), sl=ed.slot;
+  const r=await ServerStore.updateDeck(sl.slot, {deck:list});
+  if(!r.ok){ $('edNote').textContent='⚠ '+r.error; return; }
+  closeDeckEditor(); updateDeckMenuDesc();
+  renderDeckList(`✔ 「${sl.name}」 저장 (${list.length}/${CONFIG.DECK_SIZE}장)`);
+}
+async function copyDeckCode(sl){
+  const code=await DeckCode.encode(sl.deck, sl.name, sl.heroPower);
+  const lines=[`### ${sl.name}`]; const hp=HERO_POWERS[sl.heroPower]; if(hp) lines.push(`# 영웅 능력: ${hp.icon} ${hp.name}`);
+  const cnt=countsOf(sl.deck); Object.keys(cnt).map(n=>cardByName(n)).filter(Boolean).sort((a,b)=>a.cost-b.cost||(a.name<b.name?-1:1)).forEach(c=>lines.push(`# ${cnt[c.name]}x (${c.cost}) ${c.name}`));
+  lines.push('#', code, '#', '# 카드 결투 → 📚 내 덱 → [코드로 가져오기]에 이 글을 통째로 붙여 넣으세요.');
+  const text=lines.join('\n');
+  let copied=false; try{ await navigator.clipboard.writeText(text); copied=true; }catch(_){}
+  await promptBox(copied?'📋 덱 코드를 복사했어요':'📋 덱 코드', copied?'친구에게 붙여 넣어 보내세요. (아래 글을 직접 복사해도 됩니다)':'아래 글을 모두 복사해서 친구에게 보내세요.', text, true, true);
+}
+async function importDeckCode(){
+  const text=await promptBox('📥 코드로 가져오기', '친구가 보낸 덱 코드(또는 글 전체)를 붙여 넣으세요.', '', true); if(text==null) return;
+  const r=await DeckCode.decode(text, CARD_POOL);
+  if(r.error){ renderDeckList('⚠ '+r.error); return; }
+  const ok=r.deck.filter(n=>{ const c=cardByName(n); return c && (isDev() || cardScope(c)==='normal'); }), skip=r.deck.length-ok.length;
+  const st=deckStatus(ok), hp=HERO_POWERS[r.heroPower];
+  const info=[`「${r.name}」 ${ok.length}장`+(hp?` · 영웅 능력 ${hp.icon} ${hp.name}`:''), st.missing?`아직 없는 카드 ${st.missing}장 — 🔨 카드 제작에서 만들면 쓸 수 있어요`:'가진 카드로 바로 쓸 수 있어요',
+    ...(r.unknown.length?[`이 게임에 없는 카드 ${r.unknown.length}종은 빠집니다: ${r.unknown.slice(0,4).join(', ')}${r.unknown.length>4?' …':''}`]:[]), ...(skip?[`일반 덱에 넣을 수 없는 카드 ${skip}장은 빠집니다`]:[])].join('\n');
+  if(!await confirmBox('이 덱을 가져올까요?', info, '가져오기')) return;
+  const res=await ServerStore.createDeck({name:r.name, deck:ok, heroPower:hp?r.heroPower:''});
+  renderDeckList(res.ok?`✔ 「${r.name}」을(를) 가져왔습니다`:'⚠ '+res.error);
+}
+function promptBox(title, label, value='', multiline=false, readOnly=false){   // 입력 창 (브라우저 prompt 대신). 취소하면 null
+  return new Promise(res=>{
+    let ov=$('confirmBox'); if(ov) ov.remove();
+    ov=document.createElement('div'); ov.id='confirmBox';
+    ov.innerHTML=`<div class="cb-panel"><h3></h3><p></p>${multiline?'<textarea rows="8"></textarea>':'<input type="text" maxlength="24">'}<div class="cb-btns">${readOnly?'':'<button type="button" class="end-turn sub cb-no">취소</button>'}<button type="button" class="end-turn cb-ok">${readOnly?'닫기':'확인'}</button></div></div>`;
+    ov.querySelector('h3').textContent=title; ov.querySelector('p').textContent=label;
+    const inp=ov.querySelector(multiline?'textarea':'input'); inp.value=value; if(readOnly) inp.readOnly=true;
+    const done=v=>{ ov.remove(); document.removeEventListener('keydown', key, true); res(v); };
+    const key=e=>{ if(e.key==='Escape'){ e.stopPropagation(); done(null); } else if(e.key==='Enter' && !multiline){ e.preventDefault(); done(inp.value.trim()); } };
+    const no=ov.querySelector('.cb-no'); if(no) no.onclick=()=>done(null);
+    ov.querySelector('.cb-ok').onclick=()=>done(readOnly?null:inp.value.trim());
+    document.addEventListener('keydown', key, true);
+    document.body.appendChild(ov); inp.focus(); if(readOnly || !multiline) inp.select(); inp.scrollTop=0;
+  });
+}
 function closeDeckEditor(){ $('deckEditor').classList.remove('show'); }
 $('edSave').onclick=()=>{
   if(ed.boss){ if(edTotal()!==CONFIG.DECK_SIZE) return; bossDeckSaved(listOf(ed.counts)); return; }   // v114 보스 덱
   if(ed.test){ if(edTotal()<1) return; testCfg.deck=listOf(ed.counts); TestBook.set(testCfg); refreshTestUI(); closeDeckEditor(); return; }
+  if(ed.slot){ saveSlotFromEditor(); return; }   // v135 덱 슬롯
   if(edTotal()!==CONFIG.DECK_SIZE) return;
   if(ed.adv){ if(!AdvDeckBook.set(listOf(ed.counts))) return alert('모험 덱에는 일반 카드만 넣을 수 있어요.'); closeDeckEditor(); if($('screen-adventure').classList.contains('show')) openAdventure(); return; }
   DeckBook.set(listOf(ed.counts)); closeDeckEditor(); };
@@ -1686,7 +1789,7 @@ function readTestCfg(){
   TestBook.set(testCfg); return testCfg;
 }
 function openTestScreen(){ if(!isDev()) return; testCfg=TestBook.get(); $('tHp').value=testCfg.hp; $('tMana').value=testCfg.mana; refreshTestUI(); showScreen('test'); }
-function openTestDeckEditor(){ if(!isDev()) return; readTestCfg(); refreshTestUI(); ed.test=true; ed.boss=false; ed.adv=false; $('edClear').style.display=''; ed.counts=countsOf(testCfg.deck); renderDeckEditor(); $('deckEditor').classList.add('show'); }
+function openTestDeckEditor(){ if(!isDev()) return; readTestCfg(); refreshTestUI(); ed.test=true; ed.boss=false; ed.adv=false; ed.slot=null; $('edClear').style.display=''; ed.counts=countsOf(testCfg.deck); renderDeckEditor(); $('deckEditor').classList.add('show'); }
 $('tHp').addEventListener('change', ()=>{ readTestCfg(); refreshTestUI(); });
 $('tMana').addEventListener('change', ()=>{ readTestCfg(); refreshTestUI(); });
 function startTest(){
@@ -1840,7 +1943,7 @@ function renderPowerScreen(){                     // v131 메뉴 → 영웅 능�
   const box=$('powerGrid'); if(!box) return; const cur=HeroPowerPref.get(); box.innerHTML='';
   const item=(id, icon, name, text)=>{ const d=document.createElement('button'); d.type='button'; d.className='power-pick'+(cur===id?' on':'');
     d.innerHTML=`<span class="pp-icon">${icon}</span><b>${escHtml(name)}</b><small>${escHtml(text)}</small>`;
-    d.onclick=()=>{ HeroPowerPref.set(id); renderPowerScreen(); updatePowerMenuDesc(); }; box.appendChild(d); };
+    d.onclick=()=>{ HeroPowerPref.set(id); renderPowerScreen(); updatePowerMenuDesc(); const a=DeckSlots.active(); if(a && id!=='random') ServerStore.updateDeck(a.slot,{heroPower:id}); }; box.appendChild(d); };   // v135 사용 중 덱의 영웅 능력도
   for(const id of HERO_POWER_IDS){ const h=HERO_POWERS[id]; item(id, h.icon, h.name, h.text); }
   item('random', '🎲', '무작위', '판마다 무작위로 정해집니다');
 }
@@ -2548,7 +2651,7 @@ function bossFormSave(quiet){
 function bossFormBack(){ openBossEdit(); }
 function bossFormDeck(){
   readBossForm();
-  ed.test=false; ed.boss=true; ed.adv=false; ed.bossName=bossDraft.name; $('edClear').style.display=''; ed.counts=countsOf(bossDraft.deck);
+  ed.test=false; ed.boss=true; ed.adv=false; ed.slot=null; ed.bossName=bossDraft.name; $('edClear').style.display=''; ed.counts=countsOf(bossDraft.deck);
   renderDeckEditor(); $('deckEditor').classList.add('show');
 }
 function bossDeckSaved(list){ bossDraft.deck=list; closeDeckEditor(); bossFormSave(true); refreshBossForm(); }

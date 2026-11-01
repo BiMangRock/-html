@@ -34,11 +34,11 @@ let boardCache = null;
 function fullBoard() {
   const users = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;              // 새로 가입하면 바로 반영
   if (boardCache && boardCache.users === users && Date.now() - boardCache.at < 5000) return boardCache.list;   // 5초 캐시 (공개 페이지 새로고침 대비)
-  const rows = db.prepare(`SELECT u.id, u.username, r.tier, r.div, r.stars, r.legend_wins, r.legend_at, r.updated_at,
+  const rows = db.prepare(`SELECT u.id, u.username, u.nickname, r.tier, r.div, r.stars, r.legend_wins, r.legend_at, r.updated_at,
       (SELECT COUNT(*) FROM pvp_matches m WHERE m.ranked=1 AND m.winner=u.id) AS wins,
       (SELECT COUNT(*) FROM pvp_matches m WHERE m.ranked=1 AND m.winner IS NOT NULL AND m.winner!=u.id AND (m.p0=u.id OR m.p1=u.id)) AS losses
     FROM users u LEFT JOIN rank_state r ON r.user_id=u.id`).all();
-  const list = rows.map(r => ({ id: r.id, name: r.username, tier: r.tier ?? 0, div: r.div ?? RANK.DIVS, stars: r.stars ?? 0, legendWins: r.legend_wins ?? 0,
+  const list = rows.map(r => ({ id: r.id, name: r.nickname || r.username, username: r.username, tier: r.tier ?? 0, div: r.div ?? RANK.DIVS, stars: r.stars ?? 0, legendWins: r.legend_wins ?? 0,
     legendAt: r.legend_at, at: r.updated_at ?? Infinity, wins: r.wins, losses: r.losses }));
   list.sort((a, b) => b.tier - a.tier
     || (a.tier >= RANK.LEGEND ? (b.legendWins - a.legendWins) || ((a.legendAt ?? 0) - (b.legendAt ?? 0)) : (a.div - b.div) || (b.stars - a.stars))
@@ -51,7 +51,7 @@ const boardOut = x => ({ place: x.place, name: x.name, tier: x.tier, div: x.div,
 // 공개 순위 (로그인 없이): offset/limit 페이지 · q 이름 검색
 function publicBoard({ offset = 0, limit = 50, q = '' } = {}) {
   const all = fullBoard(), qq = String(q || '').trim().toLowerCase().slice(0, 16);
-  const pool = qq ? all.filter(x => x.name.toLowerCase().includes(qq)) : all;
+  const pool = qq ? all.filter(x => x.name.toLowerCase().includes(qq) || x.username.toLowerCase().includes(qq)) : all;   // v136 닉네임·아이디 둘 다 검색
   const off = Math.max(0, Math.floor(Number(offset) || 0)), lim = Math.max(1, Math.min(100, Math.floor(Number(limit) || 50)));
   const counts = RANK.TIERS.map(() => 0); for (const x of all) counts[x.tier]++;
   return { total: all.length, matched: pool.length, offset: off, rows: pool.slice(off, off + lim).map(boardOut), counts };
@@ -60,9 +60,9 @@ const myBoardRow = uid => { const x = fullBoard().find(y => y.id === uid); retur
 const invalidateBoard = () => { boardCache = null; };
 // 순위표: 전설 목록(최대 limit명) + 등급별 인원
 function ranking(limit = 100) {
-  const legends = db.prepare(`SELECT r.user_id, u.username, r.legend_wins, r.legend_at FROM rank_state r JOIN users u ON u.id=r.user_id
+  const legends = db.prepare(`SELECT r.user_id, u.username, u.nickname, r.legend_wins, r.legend_at FROM rank_state r JOIN users u ON u.id=r.user_id
                               WHERE r.tier=? ORDER BY r.legend_wins DESC, r.legend_at ASC LIMIT ?`).all(RANK.LEGEND, limit)
-    .map((r, i) => ({ place: i + 1, name: r.username, wins: r.legend_wins }));
+    .map((r, i) => ({ place: i + 1, name: r.nickname || r.username, wins: r.legend_wins }));
   const counts = RANK.TIERS.map(() => 0);
   for (const r of db.prepare('SELECT tier, COUNT(*) AS n FROM rank_state GROUP BY tier').all()) if (counts[r.tier] != null) counts[r.tier] = r.n;
   return { legends, counts };
@@ -93,13 +93,14 @@ function settle(g) {
   const isVoid = g.reason === 'void';
   const winnerSeat = !isVoid && (g.winnerSeat === 0 || g.winnerSeat === 1) ? g.winnerSeat : null;
   const winner = winnerSeat === null ? null : g.uids[winnerSeat];
+  const friendly = !!g.friendly, ranked = !!g.ranked && !friendly;                    // v136 친구 대전: 보상·랭크·전적 없음 (기록만 남긴다)
   db.exec('BEGIN');
   try {
-    const reward = winner !== null ? PVP.WIN_GOLD : 0;
-    db.prepare('INSERT INTO pvp_matches(match_id,p0,p1,winner,reason,turns,reward,day,started_at,ended_at,ranked) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-      .run(String(g.matchId), p0, p1, winner, String(g.reason), g.turns | 0, reward, day, g.startedAt || now, now, g.ranked ? 1 : 0);
+    const reward = winner !== null && !friendly ? PVP.WIN_GOLD : 0;
+    db.prepare('INSERT INTO pvp_matches(match_id,p0,p1,winner,reason,turns,reward,day,started_at,ended_at,ranked,friendly) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(String(g.matchId), p0, p1, winner, String(g.reason), g.turns | 0, reward, day, g.startedAt || now, now, ranked ? 1 : 0, friendly ? 1 : 0);
     const ranks = g.uids.map(uid => {                                                  // v127 랭크전: 승패가 난 판만 별이 오르내린다 (무승부·무효는 그대로)
-      if (!g.ranked) return null;
+      if (!ranked) return null;
       const before = rankOf(uid);
       if (winner === null) return { before, after: before, gained: 0 };
       const r = ladderApply(before, uid === winner, now); saveRank(uid, r.state, now);
@@ -128,9 +129,9 @@ function statsOf(uid) {
   const day = today();
   const q = sql => db.prepare(sql).get(uid, uid).n;
   const mine = '(p0=? OR p1=?)';
-  const wins = db.prepare("SELECT COUNT(*) AS n FROM pvp_matches WHERE winner=? AND reason!='void'").get(uid).n;
-  const losses = db.prepare(`SELECT COUNT(*) AS n FROM pvp_matches WHERE ${mine} AND winner IS NOT NULL AND winner!=? AND reason!='void'`).get(uid, uid, uid).n;
-  const draws = q(`SELECT COUNT(*) AS n FROM pvp_matches WHERE ${mine} AND winner IS NULL AND reason!='void'`);
+  const wins = db.prepare("SELECT COUNT(*) AS n FROM pvp_matches WHERE winner=? AND reason!='void' AND friendly=0").get(uid).n;   // v136 친구 대전은 전적에서 뺀다
+  const losses = db.prepare(`SELECT COUNT(*) AS n FROM pvp_matches WHERE ${mine} AND winner IS NOT NULL AND winner!=? AND reason!='void' AND friendly=0`).get(uid, uid, uid).n;
+  const draws = q(`SELECT COUNT(*) AS n FROM pvp_matches WHERE ${mine} AND winner IS NULL AND reason!='void' AND friendly=0`);
   return { record: { wins, losses, draws }, winGold: PVP.WIN_GOLD, rewardsToday: rewardsToday(uid, day), rank: rankOut(uid) };
 }
 
