@@ -783,3 +783,21 @@ body.boss-portrait #aiAvatar>span{background-size:cover; background-position:cen
 #cardPreview .kw-notes{position:absolute; top:0; width:13.5rem; display:flex; flex-direction:column; gap:.35rem;}
 #cardPreview .kw-notes div{background:rgba(18,15,38,.96); border:1px solid var(--gold-d); border-radius:8px; padding:.4rem .55rem; font-size:.74rem; line-height:1.4; color:var(--parch-d); box-shadow:0 4px 14px rgba(0,0,0,.5);}
 #cardPreview .kw-notes b{display:block; color:var(--gold); font-size:.8rem; margin-bottom:.1rem;}
+
+/* v118: 카드 상세 창 (자세한 설명이 있는 카드를 누르면) */
+.card.has-detail .card-art{position:relative;}
+.card .info-dot{position:absolute; top:2px; right:2px; width:13px; height:13px; border-radius:50%; background:var(--gold-d); color:#fff8e0; font:700 .55rem/13px Georgia,serif; text-align:center; box-shadow:0 0 0 1px rgba(0,0,0,.35); pointer-events:none;}
+.card.spell .info-dot{background:#6f5a9b;}
+.card .info-dot.noart{top:auto; bottom:24px; right:4px;}
+#cardDetail{position:fixed; z-index:8100; display:none; width:18rem; max-width:calc(100vw - 12px); max-height:calc(100vh - 12px); overflow:auto; padding:.75rem .85rem .8rem;
+  background:linear-gradient(180deg,#241f38,#181428); border:1px solid var(--gold-d); border-radius:10px; color:var(--parch); box-shadow:0 10px 30px rgba(0,0,0,.6); font-size:.82rem; line-height:1.5;}
+#cardDetail .cd-x{position:absolute; top:.35rem; right:.4rem; background:none; border:0; color:var(--parch-d); font-size:.9rem; cursor:pointer; padding:.2rem .35rem;}
+#cardDetail .cd-head{display:flex; gap:.55rem; align-items:center; margin:0 1.2rem .55rem 0;}
+#cardDetail .cd-head b{display:block; color:var(--gold); font-size:.95rem; line-height:1.25;}
+#cardDetail .cd-head small{color:var(--parch-d); font-size:.72rem;}
+#cardDetail .cd-cost{flex:0 0 1.9rem; height:1.9rem; border-radius:50%; background:radial-gradient(circle at 35% 30%,#7fb2ff,#1f4fa8); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px rgba(0,0,0,.35);}
+#cardDetail .cd-desc{white-space:pre-line;}
+#cardDetail .cd-quote{margin-top:.5rem; padding:.35rem .5rem; border-left:3px solid var(--gold-d); background:rgba(201,162,39,.08); color:#f3e6bf;}
+#cardDetail .cd-flavor{margin-top:.5rem; color:var(--parch-d); font-style:italic; font-size:.76rem;}
+#cardDetail .cd-kw{margin-top:.55rem; padding-top:.45rem; border-top:1px solid rgba(138,111,28,.45); display:flex; flex-direction:column; gap:.25rem; font-size:.74rem; color:var(--parch-d);}
+#cardDetail .cd-kw b{color:var(--gold);}

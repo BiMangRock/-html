@@ -100,7 +100,10 @@ const ADV_LEGACY_IDS = ['ynu_1a', 'ynu_1b', 'ynu_2a', 'ynu_2b', 'ynu_3a', 'ynu_3
 const SUNEUNG_REWARDS = ['멘붕의 카페 알바생', '야간 편의점 근무자', '일당 15만 원의 유혹', '불판 세척 특공대', '마의 T자 코스',
   '파격적인 탈색 3연타', '안경 탈출 수술', '헬스장 3개월 등록', '방구석 통기타', '청춘의 내일로 티켓',
   '당당한 주민등록증', '인생 첫 술', '롤 다이아 승급전: 캐리 머신', 'PC방 30시간 올나잇 파티', '봉인 해제: 무한 백수 라이프'];
-const ADV_TEMPLATE_REWARDS = { ynu_suneung: SUNEUNG_REWARDS };   // 틀의 보상 묶음 후보 (이미 추가된 보스도 비어 있으면 채운다)
+// v118 2학년 클리어 보상 「캠퍼스의 은인들」 9장 (cards.js 맨 아래, scope:'adventure') → 3종씩 3묶음
+const YNU2_REWARDS = ['출석 안 부르는 천사 교수님', 'PPT의 신 & 발표 장인', '캠퍼스 명예 총장 길고양이', '단골 술집 욕쟁이 이모님', '과방 붙박이 만물상',
+  '의욕 넘치는 전역 복학생', '과방 소파에서의 쪽잠', '연구실의 군주 지도교수', '수강신청 서버 대폭발'];
+const ADV_TEMPLATE_REWARDS = { ynu_suneung: SUNEUNG_REWARDS, ynu_2: YNU2_REWARDS };   // 틀의 보상 묶음 후보 (이미 추가된 보스도 비어 있으면 채운다)   // 틀의 보상 묶음 후보 (이미 추가된 보스도 비어 있으면 채운다)
 const ADV_TEMPLATES = {
   ynu: [   // [id, 이름, 아이콘, 소개, 덱(선택)]
     ['ynu_suneung', '수능', 'images/boss/ynu_suneung.jpg', '대학수학능력시험 — 시험장의 모든 악몽이 한꺼번에 덮쳐 온다', SUNEUNG_CARDS.flatMap(n => [n, n])],
@@ -124,4 +127,4 @@ const BOSS_DEFAULT = [
   deck:["불굴의 토레스", "채광 사상자", "시초자", "허기진 포식자", "바르덴 던그래스프", "채광 사상자", "벼락 마법사", "어둠가시 바느질꾼", "주문사수", "부화장 도우미", "거대한 토템 아이스오르", "검 제작의 대가", "공허의 영혼", "불꽃의 토템", "불꽃의 토템", "거머리 어미 발토라", "비겁한 밀고자", "견습 검사", "전장의 강령술사", "덱 탐색", "그훈의 피", "피의 소용돌이", "전력 질주", "스테레오 토템", "고대의 공허 사냥개", "비겁한 밀고자", "왕의 축복", "왕 크루쉬", "타르막", "거머리 어미 발토라"]},
 ];
 
-if (typeof module !== 'undefined') { module.exports = { ADV_OLD_TEMPLATE_DECKS, advRunNext, ADV_FILL_EPIC, ADV_FILL_LEGEND, ADV_LEGEND_SHARE, ADV_LEGACY_IDS, advFillDeck, YNU_COMMON, YNU_1_CARDS, YNU_2_CARDS, YNU_3_CARDS, YNU_4_CARDS, YNU_FINAL_CARDS, SUNEUNG_REWARDS, ADV_TEMPLATE_REWARDS, ADV_BUNDLES, advMakeBundles, SUNEUNG_CARDS, advIsImgIcon, advCleanIcon, ADV_CHAPTERS, ADV_MAX_STAGE, ADV_MAX_REWARD_CARDS, ADV_REWARD_COPIES, ADV_TEMPLATES, BOSS_DEFAULT, advCleanFields, advChapterInfo, advChapterBosses, advBlocker }; }
+if (typeof module !== 'undefined') { module.exports = { YNU2_REWARDS, ADV_OLD_TEMPLATE_DECKS, advRunNext, ADV_FILL_EPIC, ADV_FILL_LEGEND, ADV_LEGEND_SHARE, ADV_LEGACY_IDS, advFillDeck, YNU_COMMON, YNU_1_CARDS, YNU_2_CARDS, YNU_3_CARDS, YNU_4_CARDS, YNU_FINAL_CARDS, SUNEUNG_REWARDS, ADV_TEMPLATE_REWARDS, ADV_BUNDLES, advMakeBundles, SUNEUNG_CARDS, advIsImgIcon, advCleanIcon, ADV_CHAPTERS, ADV_MAX_STAGE, ADV_MAX_REWARD_CARDS, ADV_REWARD_COPIES, ADV_TEMPLATES, BOSS_DEFAULT, advCleanFields, advChapterInfo, advChapterBosses, advBlocker }; }

@@ -688,7 +688,7 @@ function drawArrow(x1,y1,x2,y2){
 // ---------- 렌더 (view 만 읽는다) ----------
 // 사용자가 제공한 스크린샷에서 추출한 하수인 이미지를 로컬 파일로 사용합니다. 인터넷 연결이 필요 없습니다.
 // v117: cards.js 의 카드에 art:'images/…' 를 적으면 아래 표에 없어도 그 그림을 쓴다
-const cardArt = c => CARD_ART[c.name] || c.art || (typeof cardByName==='function' && (cardByName(c.name)||{}).art) || '';
+const cardArt = c => CARD_ART[c.name] || c.art || (typeof cardByName==='function' && (cardByName(c.name)||{}).art) || (c.origName && (CARD_ART[c.origName] || (cardByName(c.origName)||{}).art)) || '';   // v118 석박통합 연구원: 원래 하수인 그림
 const CARD_ART = {
   "피의 기록관 말라코르": "images/art_malakor.jpg",
   "거머리 어미 발토라": "images/art_valtora.jpg",
@@ -1006,6 +1006,7 @@ function cardEl(c, opts={}){
   const el=document.createElement('div');
   el.className='card'+(opts.extra?(' '+opts.extra):'');
   el.dataset.id=c.id;
+  el._card=c;                                                                                       // v118 상세 창용 (발견 후보·생성된 카드처럼 카드풀에 없는 카드)
   if(c.lifeCost) el.classList.add('lifecost');
   if(c.stealth) el.classList.add('stealthed');
   let tags='';
@@ -1034,8 +1035,13 @@ function cardEl(c, opts={}){
   if(c.stealth) tags+='<span class="tag" style="background:#2c2c3c;color:#c8c8e8">은신</span>';
   if(c.frozen) tags+='<span class="tag frozen">빙결</span>';
   if(c.infect) tags+='<span class="tag" style="background:#5a1a3a;color:#ffb8d4">감염</span>';
+  if(c.resting) tags+='<span class="tag" style="background:#3a3a5a;color:#d8d8ff">💤 휴식</span>';                 // v118 과방 소파에서의 쪽잠
+  if(c.airpods) tags+='<span class="tag" style="background:#1f4a5a;color:#c8f4ff">🎧 노캔</span>';                // v118 에어팟 노이즈 캔슬링
+  if(c.timidTemp||c.timidPerm) tags+='<span class="tag" style="background:#5a4a2a;color:#ffe8b0">소심함</span>';   // v118 공격력 1
   const eff=effectText(c), art=cardArt(c);
-  if(c.flavor || (cardByName(c.name)||{}).flavor) el.title=c.flavor || cardByName(c.name).flavor;   // v117 카드 설명(분위기 글): 마우스를 올리면 보인다
+  const det=cardDetailOf(c);                                                                       // v118 자세한 설명이 있는 카드: 누르면 상세 창 (앞면은 짧게)
+  if(det) el.classList.add('has-detail');
+  else if(c.flavor || (cardByName(c.name)||{}).flavor) el.title=c.flavor || cardByName(c.name).flavor;   // v117 카드 설명(분위기 글): 마우스를 올리면 보인다
   if(c.type==='spell'){
     el.classList.add('spell');
     if(c.fatigue) el.classList.add('fatigue');
@@ -1043,6 +1049,7 @@ function cardEl(c, opts={}){
   } else {
     el.innerHTML=`<div class="cost">${c.cost}</div><div class="cname">${c.name}</div>${art?`<div class="card-art"><img src="${art}" alt="${c.name}" loading="lazy"></div>`:''}<div class="effect">${tags}${tags&&eff?'<br>':''}${eff}</div><div class="stats"><span class="atk">${c.atk}</span>${(c.tribe||runeOf(c).length)?`<span class="race">${c.tribe?c.tribe.replace(/ \/ /g,'·'):''}${runeOf(c).length?`<small class="rn">${runeOf(c).join('·')} 룬</small>`:''}</span>`:''}<span class="life">${c.hp}</span></div>`;
   }
+  if(det){ const d=document.createElement('div'); d.className='info-dot'; d.textContent='i'; d.title='눌러서 자세히 보기'; const ar=el.querySelector('.card-art'); if(!ar) d.classList.add('noart'); (ar||el).appendChild(d); }   // 그림 오른쪽 위 (이름을 가리지 않게)
   if(opts.onClick) el.onclick=opts.onClick;
   return el;
 }
@@ -2402,6 +2409,14 @@ const KEYWORD_HELP = [
   ['지문','도발 · 공격 불가 토큰.'],
   ['블러드 엘프','3/3 토큰 (상대 전장).'],
   ['오크','3/3 토큰.'],
+  ['상태이상','빙결·기절·혼란·침묵·소심함·겁먹음·공격 불가처럼 하수인을 묶는 효과.'],
+  ['휴식','이번 턴에는 공격할 수 없습니다. 내 턴이 끝나면 풀립니다.'],
+  ['석박통합 연구원','내 턴이 끝날 때마다 내 영웅 생명력 3 회복 + 무작위 주문 1장. 원래 능력은 사라지고 능력치는 그대로.'],
+  ['서비스 계란말이','0코스트 주문: 하수인 하나에게 생명력 +3.'],
+  ['올클리어','0코스트 주문: 카드 2장 뽑기, 마나 수정 2개 즉시 회복.'],
+  ['응원 주문','과방 만물상이 주는 1코스트 주문 9종 (타이레놀·에어팟·비타민C·메가커피·포스트잇·보조배터리·A4 요약본·1+1 쿠폰·선배 찬스).'],
+  ['대기열','빙결 + 행동 불가: 다음 내 턴까지 적 하수인과 적 영웅이 공격할 수 없습니다.'],
+  ['방어도','영웅이 받는 피해를 생명력보다 먼저 흡수합니다.'],
   ['도발','적은 도발 하수인을 먼저 공격해야 합니다.'],
   ['돌진','낸 턴에 바로 공격할 수 있습니다.'],
   ['속공','낸 턴에 하수인만 공격할 수 있습니다.'],
@@ -2463,4 +2478,54 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
   });
   ['mousedown','wheel','dragstart'].forEach(t=>document.addEventListener(t, ()=>{ if(cur) hide(); }, true));
   setInterval(()=>{ if(cur && !document.body.contains(cur)) hide(); }, 250);     // 화면이 다시 그려져 카드가 사라지면 미리보기도 치운다
+})();
+
+
+// ---------- v118: 카드 상세 창 — 자세한 설명(desc)이 있는 카드는 앞면에 짧게 적고, 카드를 누르면 전체 설명·등장 대사·키워드가 뜬다 ----------
+//  (카드를 고르거나 내는 동작은 그대로 되고, 창은 옆에 떠 있다가 다른 곳을 누르면 닫힌다)
+function cardDetailOf(c){
+  if(!c || !c.name) return null;
+  const b=(typeof cardByName==='function' && cardByName(c.name)) || {};
+  const desc=c.desc || b.desc; if(!desc) return null;
+  return {desc, quote:c.quote || b.quote || '', flavor:c.flavor || b.flavor || ''};
+}
+const cardDetail=(function(){
+  const box=document.createElement('div'); box.id='cardDetail'; document.body.appendChild(box);
+  function hide(){ box.style.display='none'; box.innerHTML=''; }
+  function show(anchor, c){
+    const d=cardDetailOf(c); if(!d) return;
+    const typeLine = c.type==='spell' ? `주문${c.school&&c.school.length?' · '+c.school.join('·'):''}` : `하수인 · ${c.atk}/${c.hp}${c.tribe?' · '+c.tribe:''}`;
+    const rar = c.rarity || ((cardByName(c.name)||{}).rarity) || '';
+    const sc = typeof cardScope==='function' && cardByName(c.name) ? cardScope(cardByName(c.name)) : '';
+    const notes=keywordNotes(d.desc+' '+(effectText(c)||''));
+    box.innerHTML=`<button class="cd-x" aria-label="닫기">✕</button>
+      <div class="cd-head"><span class="cd-cost">${c.cost ?? ''}</span><div><b>${escHtml(c.name)}</b><small>${escHtml(typeLine)}${rar?' · '+escHtml(rar):''}${sc==='adventure'?' · 🎒 모험 전용':''}</small></div></div>
+      <div class="cd-desc">${escHtml(d.desc)}</div>
+      ${d.quote?`<div class="cd-quote">🗨 ${escHtml(d.quote)}</div>`:''}
+      ${d.flavor?`<div class="cd-flavor">${escHtml(d.flavor)}</div>`:''}
+      ${notes.length?`<div class="cd-kw">${notes.map(([k,v])=>`<div><b>${escHtml(k)}</b> ${escHtml(v)}</div>`).join('')}</div>`:''}`;
+    box.style.display='block';
+    const r=anchor.getBoundingClientRect(), w=box.offsetWidth, h=box.offsetHeight;
+    let x=r.right+12; if(x+w>innerWidth-6) x=r.left-w-12; if(x<6) x=Math.max(6, Math.min(innerWidth-w-6, r.left+r.width/2-w/2));
+    let y=Math.max(6, Math.min(innerHeight-h-6, r.top+r.height/2-h/2));
+    if(x<r.right && x+w>r.left && y<r.bottom && y+h>r.top){ y = r.top-h-10>=6 ? r.top-h-10 : Math.min(innerHeight-h-6, r.bottom+10); }   // 좁은 화면: 카드 위나 아래로
+    box.style.left=x+'px'; box.style.top=y+'px';
+    box.querySelector('.cd-x').onclick=e=>{ e.stopPropagation(); hide(); };
+  }
+  // 어떤 카드인지: 화면의 카드 요소 → 같은 id 의 상태 객체(전장·손패) → 없으면 이름으로 카드풀에서
+  function cardOfEl(el){
+    const id=Number(el.dataset.id), name=(el.querySelector('.cname')||{}).textContent;
+    if(view && Number.isFinite(id)){ for(const P of [view.me, view.opp]){ if(!P) continue;
+      const hit=(P.board||[]).find(x=>x.id===id) || (Array.isArray(P.hand)?P.hand:[]).find(x=>x && x.id===id); if(hit && hit.name===name) return hit; } }
+    if(el._card) return el._card;
+    return cardByName(name) || null;
+  }
+  document.addEventListener('click', e=>{
+    if(e.target.closest && e.target.closest('#cardDetail')) return;
+    const el=e.target.closest && e.target.closest('.card.has-detail'); if(!el) return;
+    const c=cardOfEl(el); if(c) show(el, c);
+  });
+  ['mousedown','touchstart'].forEach(t=>document.addEventListener(t, e=>{ if(box.style.display==='block' && !(e.target.closest && e.target.closest('#cardDetail'))) hide(); }, {capture:true, passive:true}));
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') hide(); });
+  return {show, hide};
 })();

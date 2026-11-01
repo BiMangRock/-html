@@ -386,6 +386,35 @@ const CARD_POOL = [
   {type:'spell', name:"어색해진 3대3 미팅", cost:3, school:['2학년'], rarity:'희귀', effect:{type:'blindDate'}, scope:'boss', art:'images/ynu/ynu_2_meeting.jpg', flavor:'"저… 군대는 다녀오셨어요?"'},
   // ---- 3학년 보스 카드 (그림 없음) ----
   {type:'minion', name:"영혼 탈곡된 동아리 회장", cost:6, rarity:'전설', atk:6, hp:6, tribe:'3학년', overload:3, freshBuffEnd:1, endSelfHpLoss:1, scope:'boss', flavor:'"믿음직해서 맡긴다"는 선배들의 유언을 믿지 말았어야 했다. (코볼트 회장 & 노움 신입생들)'},
+  // ======== v118 영남대 모험 · 2학년 클리어 보상 카드 「캠퍼스의 은인들」 (scope:'adventure' → 모험 덱에만) ========
+  //  카드 앞면 문구는 짧게(engine 의 효과 문구), 자세한 설명은 desc · 등장 대사는 quote → 카드를 누르면 상세 창에 나온다
+  {type:'minion', name:"출석 안 부르는 천사 교수님", cost:5, rarity:'특급', atk:3, hp:6, statusAura:true, scope:'adventure', art:'images/ynu/ynu_r2_angel.jpg',
+    flavor:'"출석은 여러분의 양심에 맡기겠습니다." 강의실에 울려 퍼지는 구원의 한마디.',
+    desc:'지속 효과: 이 하수인이 전장에 있는 동안, 내 전장의 모든 아군 하수인이 적이 거는 상태이상(빙결·기절·혼란·침묵·소심함·겁먹음·공격 불가 등)에 면역이 됩니다. 교수님 자신도 보호받으며, 교수님이 죽으면 효과가 사라집니다.'},
+  {type:'minion', name:"PPT의 신 & 발표 장인", cost:3, rarity:'희귀', atk:2, hp:5, effect:{type:'pptCry', value:2}, scope:'adventure', art:'images/ynu/ynu_r2_ppt.jpg',
+    quote:'"템플릿은 제가 만들어왔으니, 질문은 발표자인 저에게 해주세요."', flavor:'조별 과제 A+의 8할은 이 사람의 슬라이드 전환 효과였다.',
+    desc:'전투의 함성: 양옆에 있는 아군 하수인에게 공격력 +2와 도발을 부여합니다. 적 하수인이 있으면 하나를 골라, 화려한 언변으로 이번 턴 동안 소심함(공격력 1) 상태로 만듭니다. 내 턴이 끝나면 그 하수인의 공격력은 원래대로 돌아옵니다.'},
+  {type:'minion', name:"캠퍼스 명예 총장 길고양이", cost:1, rarity:'희귀', atk:1, hp:3, endRandHp:2, scope:'adventure', art:'images/ynu/ynu_r2_cat.jpg',
+    flavor:'인문관 앞 왕좌의 주인. 마나 통조림 배급은 총장님의 고유 권한이다.',
+    desc:'내 턴이 끝날 때마다, 무작위 아군 하수인(자신 포함) 하나의 생명력을 2 증가시킵니다. (최대 생명력도 함께 늘어납니다)'},
+  {type:'minion', name:"단골 술집 욕쟁이 이모님", cost:3, rarity:'희귀', atk:4, hp:4, effect:{type:'eggrollCry', value:2}, scope:'adventure', art:'images/ynu/ynu_r2_auntie.jpg',
+    flavor:'욕은 한 바가지, 계란말이는 두 접시. 학생증만 보여주면 서비스가 나온다.',
+    desc:'전투의 함성: 내 손으로 0코스트 주문 「서비스 계란말이」(하수인 하나에게 생명력 +3 부여) 2장을 가져옵니다.'},
+  {type:'minion', name:"과방 붙박이 만물상", cost:2, rarity:'희귀', atk:2, hp:4, effect:{type:'gadgetCry'}, deathGadget:true, scope:'adventure', art:'images/ynu/ynu_r2_gadget.jpg',
+    quote:'"어? 너 배터리 없냐? 내 보조배터리 써라."', flavor:'과방 소파와 한 몸이 된 지 3년째. 가방에서 없는 게 없다.',
+    desc:'전투의 함성 & 죽음의 메아리: 무작위 응원 주문(1코스트) 1장을 내 손으로 가져옵니다.\n응원 주문 9종: 타이레놀 한 알 · 에어팟 노이즈 캔슬링 · 비타민C 한 포 · 메가커피 1L 아메리카노 · 포스트잇 응원 쪽지 · 보조배터리 대여 · A4 한 장 요약본 · 편의점 1+1 쿠폰 · 선배 찬스'},
+  {type:'minion', name:"의욕 넘치는 전역 복학생", cost:7, rarity:'특급', atk:7, hp:9, rush:true, vetArmor:true, scope:'adventure', art:'images/ynu/ynu_r2_veteran.jpg',
+    quote:'"사회 나오니까 공기부터 다르지 말입니다! 제가 다 치우겠습니다!"', flavor:'전역 3일 차. 아직 경례가 먼저 나간다.',
+    desc:'속공. 이 하수인이 적 하수인을 공격해 처치하면, 남은 공격력(이 하수인의 공격력 − 적의 남은 생명력)만큼 내 영웅이 방어도를 얻습니다. 예) 공격력 7로 생명력 3인 적을 처치하면 방어도 +4.'},
+  {type:'spell', name:"과방 소파에서의 쪽잠", cost:0, rarity:'일반', effect:{type:'sofaNap', armor:3}, scope:'adventure', art:'images/ynu/ynu_r2_nap.jpg',
+    flavor:'공강 2시간, 과방 소파는 세상에서 가장 푹신한 침대가 된다.',
+    desc:'아군 하수인 하나를 이번 턴 동안 휴식(공격 불가) 상태로 만드는 대신, 그 하수인의 생명력을 완전히 회복합니다. 그리고 내 영웅이 방어도 +3을 얻습니다.'},
+  {type:'minion', name:"연구실의 군주 지도교수", cost:8, rarity:'전설', atk:7, hp:7, effect:{type:'advisorCry'}, scope:'adventure', art:'images/ynu/ynu_r2_advisor.jpg',
+    quote:'"자네, 대학원 생각 없나? 인건비는… 열정으로 대신하지."', flavor:'서명 한 번이면 학부생이 석박통합 과정생이 된다. 졸업은 교수님 마음.',
+    desc:'전투의 함성: 적 하수인 하나를 내 편으로 데려와 「석박통합 연구원」으로 만듭니다. 데려온 하수인은 공격력·생명력은 그대로, 원래 능력은 모두 사라지며, 내 턴이 끝날 때마다 내 영웅의 생명력을 3 회복하고 무작위 주문 카드 1장을 내 손으로 가져옵니다. (내 전장에 자리가 있어야 데려올 수 있습니다)'},
+  {type:'spell', name:"수강신청 서버 대폭발", cost:9, rarity:'전설', effect:{type:'serverCrash'}, scope:'adventure', art:'images/ynu/ynu_r2_server.jpg',
+    flavor:'오전 10시 정각. 새로고침 한 번에 온 캠퍼스가 멈춰 섰다.',
+    desc:'다음 내 턴까지 모든 적 하수인과 적 영웅을 「대기열 48,290번」(빙결·행동 불가) 상태로 만듭니다. 그리고 내 손으로 비용 0인 「올클리어」(카드를 2장 뽑고 마나 수정 2개를 즉시 회복) 주문 1장을 가져옵니다.'},
 ];
 
 if (typeof module !== 'undefined') { module.exports = { CARD_POOL }; }
