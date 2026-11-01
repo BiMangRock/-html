@@ -528,13 +528,13 @@ function finishGame(){
     if(winner===MY){
       if(game.devTest){ logLine('시험 대전 종료: 승리 (기록·보상 없음)'); }
       else {
-        const first=!AdventureBook.has(game.boss.id), full=bossReward(game.boss), amount=first?full:Math.max(1,Math.round(full*BOSS_REPEAT_RATIO));
+        const first=!AdventureBook.has(game.boss.id), full=bossReward(game.boss), amount=first?full:bossRepeatGold(game.boss);   // v123 마지막 단계 재클리어는 100골드
         const sv=Economy.get(); Economy.set({...sv, gold:sv.gold+amount}); updateWallet();
         AdventureBook.clear(game.boss.id);
         const gotCards=first && game.boss.rewardCards && game.boss.rewardCards.length ? rewardCardsText(game.boss.rewardCards) : '';   // v117: 첫 클리어 보상 카드 (서버가 지급)
         const next=game.boss.chapter ? advChapterBosses(BossBook.get(), game.boss.chapter).find(b=>b.stage>game.boss.stage) : null;
         const grad=!!(game.boss.chapter && !next);                                                    // v117 마지막 단계 → 졸업
-        game.advReward=`<span class="plus">+${fmt(amount)}골드</span><span class="sub2">${first?'첫 클리어 보상':'재도전 보상 (첫 클리어 보상의 '+Math.round(BOSS_REPEAT_RATIO*100)+'%)'}</span>`+
+        game.advReward=`<span class="plus">+${fmt(amount)}골드</span><span class="sub2">${first?'첫 클리어 보상':isFinalStage(game.boss)?`재졸업 보상 (${FINAL_REPEAT_GOLD}골드 고정)`:'재도전 보상 (첫 클리어 보상의 '+Math.round(BOSS_REPEAT_RATIO*100)+'%)'}</span>`+
           (gotCards?`<span class="sub2 cards">🎁 획득 카드: ${escHtml(gotCards)}</span>`:'')+
           ((game.boss.chapter || first) && game.boss.rewardChoice && game.boss.rewardChoice.length?`<span class="sub2 cards">🎁 보상 카드 묶음을 고를 수 있어요! (고른 카드는 잠긴 덱에 바로 더해져요)</span>`:'')+
           (next?`<span class="sub2">🔓 다음 상대: ${escHtml(next.name)}</span>`:'')+(grad?`<span class="sub2 cards">🎓 졸업을 축하합니다! 덱 잠금이 풀렸어요.</span>`:'')+
@@ -1028,7 +1028,7 @@ function cardEl(c, opts={}){
   if(c.freezeNext) tags+='<span class="tag frozen">겁먹음</span>';
   if(c.deathPoisonShot||c.deathLunch||c.deathKill||c.deathFace||c.deathCaffeine||c.deathKillAlly||c.deathHandMinion) tags+='<span class="tag revive">죽음의 메아리</span>';
   if(c.deathSummonCost) tags+='<span class="tag revive">죽음의 메아리</span>'; 
-  if(c.deathCopy||c.deathGain) tags+='<span class="tag revive">죽음의 메아리</span>';
+  if(c.deathCopy||c.deathGain||c.deathHeroHeal) tags+='<span class="tag revive">죽음의 메아리</span>';   // v123 벚꽃길이 준 죽메 포함
   if(c.deathDraw||c.deathSummon||c.deathStego||c.deathArmor||c.deathBuffAll||c.deathGrave||c.eggChicken||c.deathProto||c.deathAdjBuff||c.deathAoe||c.deathPtero||c.deathBeast||c.deathGhoul) tags+='<span class="tag revive">죽음의 메아리</span>';
   if(c.mini) tags+='<span class="tag" style="background:#2a4a5c;color:#c8ecff">미니미</span>';
   if(c.isMini) tags+='<span class="tag" style="background:#2a4a5c;color:#c8ecff">미니</span>';
@@ -1654,7 +1654,10 @@ const isDev = () => !!ServerStore.isAdmin;
 // 보상(골드)은 아래 표에서만 고친다. 보스 설정에서 보스마다 직접 정할 수도 있다 (0 = 이 표 값).
 const BOSS_RANKS=[['mid','중급','#9aa3b8',50],['high','상급','#c9c1ee',100],['bronze','브론즈','#c98a56',150],['silver','실버','#c4ccd6',250],['gold','골드','#e6bd3c',400],
   ['plat','플래티넘','#4fd1c0',600],['emerald','에메랄드','#3ecf74',900],['diamond','다이아몬드','#6fb0ff',1300],['master','마스터','#c071ff',1800],['gm','그랜드마스터','#ff6e6e',2500],['challenger','챌린저','#ffd44d',4000]];
-const BOSS_REPEAT_RATIO=0.1;      // 이미 깬 보스를 다시 이기면 보상의 이 비율만 (반복 노가다 방지)
+const BOSS_REPEAT_RATIO=0.1, FINAL_REPEAT_GOLD=100;   // v123 챕터의 마지막 단계(영남대 4학년)는 재클리어 때 100골드 고정
+const isFinalStage=b=>!!(b && b.chapter && !advChapterBosses(BossBook.get(), b.chapter).some(x=>x.stage>b.stage));
+const bossRepeatGold=b=> isFinalStage(b) ? FINAL_REPEAT_GOLD : Math.max(1,Math.round(bossReward(b)*BOSS_REPEAT_RATIO));
+//      // 이미 깬 보스를 다시 이기면 보상의 이 비율만 (반복 노가다 방지)
 const bossRank=b=>{ const n=(b.cheats||[]).length; return n<=0 ? (b.tier==='high'?'high':'mid') : BOSS_RANKS[Math.min(n,9)+1][0]; };
 const rankInfo=k=>BOSS_RANKS.find(r=>r[0]===k)||BOSS_RANKS[0];
 const rankLabel=k=>rankInfo(k)[1];
@@ -1960,7 +1963,7 @@ const rewardCardsText=list=>{ const c={}; list.forEach(n=>c[n]=(c[n]||0)+1); ret
 function bossButton(b, i, all, opts={}){
   const bad=BossBook.deckError(b), lock=opts.chapter ? bossLocked(b, all) : null, done=AdventureBook.has(b.id);
   const chips=bossCheatList(b).map(c=>`<span class="chip" tabindex="0" data-tip="${escHtml(c.desc(cheatValue(c,0)))}">${c.icon||''} ${escHtml(c.name)}</span>`).join(' ');
-  const gold=done?'재도전 +'+Math.max(1,Math.round(bossReward(b)*BOSS_REPEAT_RATIO)):'첫 클리어 +'+bossReward(b);
+  const gold=done?'재도전 +'+bossRepeatGold(b):'첫 클리어 +'+bossReward(b);
   const cards=b.rewardCards&&b.rewardCards.length ? ` · 🎁 ${done?'<s>':''}${escHtml(rewardCardsText(b.rewardCards))}${done?'</s>':''}` : '';
   const stage=opts.chapter && b.stage>0 ? `<span class="stage">${b.stage}단계</span>` : '';
   const btn=document.createElement('button'); btn.className='menu-btn boss-btn'+(lock&&!lock.passed?' locked':'')+(lock&&lock.passed?' passed':''); btn.disabled=!!bad || !!lock;
@@ -2112,10 +2115,10 @@ function bossAddTemplate(chapter){
     if(ch.length) fill.push({b, ch}); }
   if(!add.length && !fill.length && !legacy.length){ alert('이미 최신 틀이에요.'); return; }
   const lines=[];
-  if(legacy.length) lines.push(`예전 학년별 2단계 보스 ${legacy.length}개(${legacy.map(b=>b.name).join(', ')})를 지웁니다`);
+  if(legacy.length) lines.push(`지금 구조에 없는 예전 단계 보스 ${legacy.length}개(${legacy.map(b=>b.name).join(', ')})를 지웁니다`);
   if(add.length) lines.push(`새 단계 ${add.length}개(${add.map(t=>t[1]).join(', ')})를 추가합니다`);
   if(fill.length) lines.push(`이미 있는 ${fill.map(f=>f.b.name).join(', ')}의 단계 번호·임시 덱·보상 후보를 새 틀로 맞춥니다 (직접 고친 덱은 그대로)`);
-  if(!confirm(`${advChapterInfo(chapter).name} 틀을 새 구조(수능 → 1·2·3·4학년 → 졸업)로 맞출까요?\n\n· `+lines.join('\n· '))) return;
+  if(!confirm(`${advChapterInfo(chapter).name} 틀을 새 구조(수능 → 1·2·3·4학년, 4학년을 이기면 졸업)로 맞출까요?\n\n· `+lines.join('\n· '))) return;
   list=list.filter(b=>!ADV_LEGACY_IDS.includes(b.id));
   fill.forEach(f=>f.ch.forEach(fn=>fn()));
   add.forEach(([id,name,icon,desc,deck])=>{ const st=tpl.findIndex(t=>t[0]===id)+1; list.push({id, name, icon, desc, cheats:[], reward:0, tier:'mid', bot:'rule2', model:'', deck:(deck && !validateDeckList(deck))?deck.slice():defaultDeckList(), chapter, stage:st, rewardCards:[], rewardChoice:(ADV_TEMPLATE_REWARDS[id]||[]).slice()}); });
@@ -2437,6 +2440,7 @@ const KEYWORD_HELP = [
   ['응원 주문','과방 만물상이 주는 1코스트 주문 9종 (타이레놀·에어팟·비타민C·메가커피·포스트잇·보조배터리·A4 요약본·1+1 쿠폰·선배 찬스).'],
   ['대기열','빙결 + 행동 불가: 다음 내 턴까지 적 하수인과 적 영웅이 공격할 수 없습니다.'],
   ['방어도','영웅이 받는 피해를 생명력보다 먼저 흡수합니다.'],
+  ['축하 음료','밤샘 종강 총회가 주는 0코스트 주문 (축하 맥주·숙취해소제·샴페인 한 잔).'],
   ['절대평가','꿀교양 줍줍이 주는 주문 5종 (단순 출석 체크·오픈북 테스트·교수님의 너그러운 자비·P/F·전원 A+ 확정).'],
   ['면역','피해를 받지 않습니다.'],
   ['내구도','쓸 때마다 1씩 줄고, 0이 되면 사라집니다.'],

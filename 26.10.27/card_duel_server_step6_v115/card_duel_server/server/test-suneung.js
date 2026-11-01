@@ -10,7 +10,7 @@ const BOSS_DECK = Adv.SUNEUNG_CARDS.flatMap(n => [n, n]);
 assert.strictEqual(E.validateDeckList(BOSS_DECK), null, '수능 보스 덱 30장 규칙');
 assert(Col.validateDeckScope(BOSS_DECK, E.CARD_POOL, 'adventure'), '유저 덱에는 못 넣음');
 for (const n of Adv.SUNEUNG_CARDS) assert.strictEqual(E.CARD_POOL.find(c => c.name === n).scope, 'boss', n + ' 보스 전용');
-const tpl = Adv.ADV_TEMPLATES.ynu; assert.deepStrictEqual(tpl.map(t => t[1]), ['수능', '1학년', '2학년', '3학년', '4학년', '졸업'], '영남대 6단계');
+const tpl = Adv.ADV_TEMPLATES.ynu; assert.deepStrictEqual(tpl.map(t => t[1]), ['수능', '1학년', '2학년', '3학년', '4학년'], '영남대 5단계 (v123: 4학년이 마지막)');
 for (const t of tpl) assert.strictEqual(E.validateDeckList(t[4]), null, t[1] + ' 덱');
 { const legends = sh => new Set(Adv.advFillDeck(Adv.YNU_COMMON, sh).filter(n => E.CARD_POOL.find(c => c.name === n).rarity === '전설')).size;   // 채움 규칙: 학년이 오를수록 전설 증가
   const L = [1, 2, 3, 4, 'final'].map(k => legends(Adv.ADV_LEGEND_SHARE[k])); assert.strictEqual(L[0], 0, '1학년 채움엔 전설 없음');

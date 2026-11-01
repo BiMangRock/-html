@@ -95,11 +95,15 @@ const YNU_3_CARDS_V117 = ['영혼 탈곡된 동아리 회장', ...YNU_COMMON];
 const YNU_3_CARDS = ['영혼 탈곡된 동아리 회장', '코딩테스트', '지옥의 중간고사', '조별과제 내부분열', 'SNS 속 동기들의 합격 수기', '쇼츠 알고리즘', '심각한 진로 방황', '기사 자격증 시험',
   ...YNU_COMMON];   // v119 3학년 보스: 전용 8종 + 공통 4종 = 12종 → 모자란 3종은 특급·전설로 채움 (전설 비율 50%) · 종류마다 2장 = 30장
 const YNU_3_DERIVED = ['스트레스성 폭식', '번아웃', '카페인 과다복용', '마감 효과', '계절학기 재수강', '학사경고장', '두꺼운 수험서', '3초만 더 보기'];   // 덱에는 안 넣는 파생 카드
-const YNU_4_CARDS = [...YNU_COMMON], YNU_FINAL_CARDS = [...YNU_COMMON];   // 아직 전용 카드 없음
+// v123 4학년(마지막 단계) 보스: 전용 15종 + 공통 4종 = 19종 → 앞쪽 11종 2장 · 나머지 8종 1장 = 30장 (15종이 넘어서 채움 카드 없음)
+const YNU_4_CARDS = ['졸업 유예자 멍서스', '캡스톤 걸작 메카', '무한동력 논문 발표!', '최종 면접 올패스', '학사모 던지기', '어엿한 사회 초년생', '노련한 4학년 조장',
+  '당당한 혼밥러, 키키', '잔디밭 낮잠터', '마지막 벚꽃길', '황금 시간표', '캠퍼스의 신선, 판다렌 선배', '교수님의 관용', '서류 전형 합격!', '밤샘 종강 총회', ...YNU_COMMON];
+const YNU_4_DERIVED = ['특허 출원된 조수 메카', '소형 기계', '아직 작동중!', '4학년'];   // 덱에는 안 넣는 파생 카드
+const YNU_FINAL_CARDS = [...YNU_COMMON];   // v123: 졸업 단계는 없어짐 (4학년이 마지막). 예전 코드 호환용
 // 예전 틀이 넣어 둔 임시 덱 (공통 하수인 + 채움). 보스에 이 덱이 그대로 있으면 틀 버튼이 새 덱으로 바꿔 준다 (직접 고친 덱은 그대로)
 const ADV_OLD_TEMPLATE_DECKS = { ynu_2: [advFillDeck(YNU_COMMON, ADV_LEGEND_SHARE[2])], ynu_3: [advFillDeck(YNU_COMMON, ADV_LEGEND_SHARE[3]), advFillDeck(YNU_3_CARDS_V117, ADV_LEGEND_SHARE[3])],
   ynu_4: [advFillDeck(YNU_COMMON, ADV_LEGEND_SHARE[4])], ynu_final: [advFillDeck(YNU_COMMON, ADV_LEGEND_SHARE.final)] };
-const ADV_LEGACY_IDS = ['ynu_1a', 'ynu_1b', 'ynu_2a', 'ynu_2b', 'ynu_3a', 'ynu_3b', 'ynu_4a', 'ynu_4b'];   // 예전 틀(학년별 2단계). 틀 추가 버튼이 정리해 준다
+const ADV_LEGACY_IDS = ['ynu_1a', 'ynu_1b', 'ynu_2a', 'ynu_2b', 'ynu_3a', 'ynu_3b', 'ynu_4a', 'ynu_4b', 'ynu_final'];   // v123: 졸업 단계도 정리 (4학년이 마지막)   // 예전 틀(학년별 2단계). 틀 추가 버튼이 정리해 준다
 const SUNEUNG_REWARDS = ['멘붕의 카페 알바생', '야간 편의점 근무자', '일당 15만 원의 유혹', '불판 세척 특공대', '마의 T자 코스',
   '파격적인 탈색 3연타', '안경 탈출 수술', '헬스장 3개월 등록', '방구석 통기타', '청춘의 내일로 티켓',
   '당당한 주민등록증', '인생 첫 술', '롤 다이아 승급전: 캐리 머신', 'PC방 30시간 올나잇 파티', '봉인 해제: 무한 백수 라이프'];
@@ -116,8 +120,7 @@ const ADV_TEMPLATES = {
     ['ynu_1', '1학년', 'images/boss/ynu_1a_statue.jpg', '새내기의 악몽 — 수강신청 대참사부터 본가로 날아온 학사경고 통지서까지', advFillDeck(YNU_1_CARDS, ADV_LEGEND_SHARE[1])],
     ['ynu_2', '2학년', '😵', '현실 자각 — 잠수 타는 팀플 조원, 전공 F 폭격, 곰팡이 핀 자취방', advFillDeck(YNU_2_CARDS, ADV_LEGEND_SHARE[2])],
     ['ynu_3', '3학년', 'images/ynu/ynu_3_midterm.jpg', '사망년 — 코딩테스트, 지옥의 중간고사, 조별과제 내부분열, 끝나지 않는 밤샘', advFillDeck(YNU_3_CARDS, ADV_LEGEND_SHARE[3])],
-    ['ynu_4', '4학년', '👔', '취준생 — 서류 50곳 탈락, 압박 면접, 눈물의 졸업 유예', advFillDeck(YNU_4_CARDS, ADV_LEGEND_SHARE[4])],
-    ['ynu_final', '졸업', '🎓', '최종 보스 — 졸업 학점, 졸업 논문, 그리고 최종 합격 발표', advFillDeck(YNU_FINAL_CARDS, ADV_LEGEND_SHARE.final)],
+    ['ynu_4', '4학년', 'images/ynu/ynu_4_senior.jpg', '마지막 학기 — 졸업 유예자, 캡스톤 디자인, 최종 면접. 이기면 졸업!', advFillDeck(YNU_4_CARDS, ADV_LEGEND_SHARE[4])],
   ],
 };
 
@@ -133,4 +136,4 @@ const BOSS_DEFAULT = [
   deck:["불굴의 토레스", "채광 사상자", "시초자", "허기진 포식자", "바르덴 던그래스프", "채광 사상자", "벼락 마법사", "어둠가시 바느질꾼", "주문사수", "부화장 도우미", "거대한 토템 아이스오르", "검 제작의 대가", "공허의 영혼", "불꽃의 토템", "불꽃의 토템", "거머리 어미 발토라", "비겁한 밀고자", "견습 검사", "전장의 강령술사", "덱 탐색", "그훈의 피", "피의 소용돌이", "전력 질주", "스테레오 토템", "고대의 공허 사냥개", "비겁한 밀고자", "왕의 축복", "왕 크루쉬", "타르막", "거머리 어미 발토라"]},
 ];
 
-if (typeof module !== 'undefined') { module.exports = { YNU3_REWARDS, YNU_3_DERIVED, YNU2_REWARDS, ADV_OLD_TEMPLATE_DECKS, advRunNext, ADV_FILL_EPIC, ADV_FILL_LEGEND, ADV_LEGEND_SHARE, ADV_LEGACY_IDS, advFillDeck, YNU_COMMON, YNU_1_CARDS, YNU_2_CARDS, YNU_3_CARDS, YNU_4_CARDS, YNU_FINAL_CARDS, SUNEUNG_REWARDS, ADV_TEMPLATE_REWARDS, ADV_BUNDLES, advMakeBundles, SUNEUNG_CARDS, advIsImgIcon, advCleanIcon, ADV_CHAPTERS, ADV_MAX_STAGE, ADV_MAX_REWARD_CARDS, ADV_REWARD_COPIES, ADV_TEMPLATES, BOSS_DEFAULT, advCleanFields, advChapterInfo, advChapterBosses, advBlocker }; }
+if (typeof module !== 'undefined') { module.exports = { YNU_4_DERIVED, YNU3_REWARDS, YNU_3_DERIVED, YNU2_REWARDS, ADV_OLD_TEMPLATE_DECKS, advRunNext, ADV_FILL_EPIC, ADV_FILL_LEGEND, ADV_LEGEND_SHARE, ADV_LEGACY_IDS, advFillDeck, YNU_COMMON, YNU_1_CARDS, YNU_2_CARDS, YNU_3_CARDS, YNU_4_CARDS, YNU_FINAL_CARDS, SUNEUNG_REWARDS, ADV_TEMPLATE_REWARDS, ADV_BUNDLES, advMakeBundles, SUNEUNG_CARDS, advIsImgIcon, advCleanIcon, ADV_CHAPTERS, ADV_MAX_STAGE, ADV_MAX_REWARD_CARDS, ADV_REWARD_COPIES, ADV_TEMPLATES, BOSS_DEFAULT, advCleanFields, advChapterInfo, advChapterBosses, advBlocker }; }
