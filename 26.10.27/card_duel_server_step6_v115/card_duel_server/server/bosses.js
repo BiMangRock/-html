@@ -7,6 +7,7 @@ const db = require('./db');
 const { requireAuth, requireAdmin } = require('./auth');
 const JS = path.join(__dirname, '..', 'public', 'js');
 const { validateDeckList } = require(path.join(JS, 'engine.js'));
+const { BOSS_DEFAULT, advCleanFields, advCleanIcon } = require(path.join(JS, 'adventure.js'));
 
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_BOSSES = 60;
@@ -27,7 +28,7 @@ function cleanBoss(b, i) {
   return {
     id: b.id,
     name: String(b.name || '이름 없음').slice(0, 20),
-    icon: String(b.icon || '👹').slice(0, 4),
+    icon: advCleanIcon(b.icon),                // v117: 이모지 또는 images/… 그림 경로
     desc: String(b.desc || '').slice(0, 80),
     cheats: [...new Set((Array.isArray(b.cheats) ? b.cheats : []).map(x => String(x).slice(0, 40)))].slice(0, 30),
     reward: Math.max(0, Math.min(1000000, Math.floor(Number(b.reward) || 0))),
@@ -35,7 +36,14 @@ function cleanBoss(b, i) {
     bot: high ? 'model' : (b.bot === 'rule' ? 'rule' : 'rule2'),
     model: String(b.model || '').slice(0, 200),
     deck: b.deck.map(String),
+    ...advCleanFields(b),          // v117: chapter · stage · rewardCards
   };
+}
+// 지금 실제로 쓰이는 보스 목록 (서버에 저장된 것 → 없으면 코드 기본값). 클리어 보상·단계 잠금 검사에 쓴다.
+function currentBosses() {
+  const saved = readBosses();
+  if (saved) return saved.map((b, i) => { const c = cleanBoss(b, i); return typeof c === 'string' ? { ...b, ...advCleanFields(b) } : c; });
+  return BOSS_DEFAULT.map((b, i) => { const c = cleanBoss(b, i); return typeof c === 'string' ? { ...b, ...advCleanFields(b) } : c; });
 }
 
 const router = express.Router();
@@ -65,4 +73,4 @@ router.put('/bosses', requireAdmin, (req, res) => {
   res.json({ bosses: out });
 });
 
-module.exports = { router, readBosses, cleanBoss };
+module.exports = { router, readBosses, cleanBoss, currentBosses };

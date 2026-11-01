@@ -4,6 +4,9 @@
 // [분리 작업] CARD_POOL 은 cards.js 로 옮겼다. 브라우저에서는 cards.js 를 먼저 불러오면 전역 const 로 보이고,
 // Node 에서는 아래에서 require 해 전역에 올려 둔다. (엔진 코드는 CARD_POOL 을 전역 이름으로 참조한다)
 if (typeof module !== 'undefined' && typeof require === 'function') { globalThis.CARD_POOL = require('./cards.js').CARD_POOL; }
+// v117: 무작위 생성·발견·변신·추천 덱용 카드풀 = 일반 카드만. 모험 전용·보스 전용(cards.js 의 scope)은 여기서 빠진다.
+//   이름으로 카드를 찾을 때(CARD_POOL.find)는 그대로 전체 CARD_POOL 을 쓴다 (보스 덱 카드도 찾아야 하므로).
+const GEN_POOL = CARD_POOL.filter(c=>!c.scope || c.scope==='normal');
 // [분리 작업] 룬 헬퍼는 원래 화면 코드(ui)에 있었지만 엔진이 쓰므로 여기로 옮겼다.
 const RUNE_NAME={unholy:'부정', frost:'냉기', blood:'혈기'};
 const RUNE_ORDER=['부정','냉기','혈기'];
@@ -60,6 +63,8 @@ const EFFECT_TEXT = {
   parrot: (v,e)=>`전투의 함성: 내가 마지막으로 시전한 비용이 (${e.min}) 이상인 주문을 반복합니다`,
   mana: v=>`주문: 이번 턴 마나 ${v} 얻기`,
   gainMana: v=>`전투의 함성: 이번 턴 마나 +${v}`,
+  bcCrystal: v=>`전투의 함성: 빈 마나 수정을 ${v}개 얻습니다`,                                   // v117 수능: N수생
+  lotto: ()=>`전투의 함성: 1~5 중 숫자 하나를 굴려 그만큼 적 영웅에게 피해를 줍니다. 5가 나오면 10 피해!`,   // v117 수능: 아랍어 로또 괴물
   sweep: v=>`전투의 함성: 적 하수인 전체에 ${v} 피해`,
   scatter: v=>`전투의 함성: 모든 적에게 ${v}의 피해를 무작위로 나누어 입힙니다`,
   draw: v=>`전투의 함성: 카드 ${v}장 뽑기`,
@@ -99,7 +104,7 @@ function nextRand(s){ let t=(s.seed=(s.seed+0x6D2B79F5)|0); t=Math.imul(t^(t>>>1
 // ---- v27 주문 속성: 카드의 school 배열 (비어 있거나 없으면 무속성). 한 카드가 속성을 둘 이상 가질 수도 있다 ----
 const SCHOOLS = ['비전','지옥','화염','냉기','신성','암흑','자연','혈기','부정'];   // Arcane · Fel · Fire · Frost · Holy · Shadow · Nature
 function spellPool(o={}){                                      // 주문 후보를 한 곳에서 고른다. o: {school, min, max, skip(제외할 효과 종류 배열)}
-  return CARD_POOL.filter(x=>x.type==='spell' && x.effect && !(o.skip||[]).includes(x.effect.type)
+  return GEN_POOL.filter(x=>x.type==='spell' && x.effect && !(o.skip||[]).includes(x.effect.type)
     && (!o.school || (x.school||[]).includes(o.school)) && x.cost>=(o.min||0) && x.cost<=(o.max ?? 99));
 }
 const DISCOVER_FX = ['discover','damageDiscover','deckDiscover','handDiscover','tauntDiscover','omegaFacility','rewind','loopDiscover','learned'];            // 발견 카드끼리는 서로의 후보가 되지 않는다
@@ -147,17 +152,17 @@ function startHandDiscover(s, seat, e, ev, src, auto){          // v62 데자뷔
   finishDiscover(s, seat, opts, e, ev, src, auto);
 }
 function startBloodDiscover(s, seat, e, ev, src, auto){         // v78 혈기술사: 혈기 룬(속성) 카드(하수인·주문) 최대 3장 중 1장 발견
-  const bag=CARD_POOL.filter(c=>(c.school||[]).includes('혈기') && !c.generatedOnly), opts=[];
+  const bag=GEN_POOL.filter(c=>(c.school||[]).includes('혈기') && !c.generatedOnly), opts=[];
   while(opts.length<3 && bag.length){ const o=structuredClone(bag.splice(Math.floor(nextRand(s)*bag.length),1)[0]); delete o.lifeCost; opts.push(o); }
   finishDiscover(s, seat, opts, {value:0}, ev, src, auto);
 }
 function startTauntDiscover(s, seat, e, ev, src, auto){         // v63: 도발 하수인 최대 3장(서로 다른 카드) 중 1장 발견. 후보 카드에 +atk/+hp 가 이미 반영돼 보인다
-  const bag=CARD_POOL.filter(c=>c.type==='minion' && c.taunt && !c.generatedOnly), opts=[];
+  const bag=GEN_POOL.filter(c=>c.type==='minion' && c.taunt && !c.generatedOnly), opts=[];
   while(opts.length<3 && bag.length){ const o=structuredClone(bag.splice(Math.floor(nextRand(s)*bag.length),1)[0]); delete o.lifeCost; o.atk+=e.atk; o.hp+=e.hp; opts.push(o); }
   finishDiscover(s, seat, opts, {value:0}, ev, src, auto);
 }
 function startCostDiscover(s, seat, e, ev, src, auto){          // v112 보석 박힌 딱정벌레: 비용이 e.cost 인 카드(하수인·주문 모두) 최대 3장 중 1장 발견
-  const bag=CARD_POOL.filter(c=>c.cost===e.cost && !c.generatedOnly), opts=[];
+  const bag=GEN_POOL.filter(c=>c.cost===e.cost && !c.generatedOnly), opts=[];
   while(opts.length<3 && bag.length){ const o=structuredClone(bag.splice(Math.floor(nextRand(s)*bag.length),1)[0]); delete o.lifeCost; opts.push(o); }
   finishDiscover(s, seat, opts, {value:0}, ev, src, auto);
 }
@@ -219,7 +224,7 @@ function summonTokens(s, seat, n, tok, ev){                    // tok: {name, at
   return ids;
 }
 // v94: 하수인이 가진 '추가 효과' 키 목록 (침묵이 제거하고, 영혼의 절규가 토큰을 카드로 만들 때 옮겨 담는다). 능력치·이름·종족은 해당하지 않는다.
-const ABILITY_KEYS=['taunt','shield','charge','rush','revive','elusive','stealth','stealthTemp','frozen','lifesteal','spellburst','effect','leechBoost','costOne','dynCost',
+const ABILITY_KEYS=['onAttackPing','endSniff','cardLimit','deathPoisonShot','deathLunch','cantAttack','taunt','shield','charge','rush','revive','elusive','stealth','stealthTemp','frozen','lifesteal','spellburst','effect','leechBoost','costOne','dynCost',
   'deathDraw','deathSummon','deathSummonCost','deathCopy','deathGain','deathStego','deathArmor','deathBuffAll','deathGrave',
   'onAttackCopy','endCastMin','spellDmgSchools','onSpellFireball','onSpellScatter','onAttackBeast','onSpellDraw','endCast','endRecast','endAttack','endDrain','endCorpses','startSpend','endScatter','endBait','endSteal','spellAura','endRaise','endCopy','poison','endLotus','endViper','startHeal','ignoreTaunt','needArmor','reviveFull','beastDouble','shieldAura','deathMachines','spellWeave','deathKill','endDeckCopy','sonya','gally','crowley','tortola','endArmorSummon','endBully','windfury','trogg','fireImmune','endDeckSummon','eggChicken','eggBonus','deathProto','endSword','deathAdjBuff','deathAoe','atkAura','lordGrow','deathPtero','pteroEgg','hatchLeft','copyLow','fishHeal','onSpellBeast','deathBeast','deathGhoul','endSpellGain','endTotemBuff','adjAtkAura','endAdjBuff','endHandBuff','endSelfHp'];
 const hasAbility=m=>ABILITY_KEYS.some(k=>m[k]);
@@ -240,7 +245,7 @@ function checkGlide(s, ev){                                    // 공중활강: 
 
 // ---- v26 철벽 소집 / 혼돈의 주문서 도우미 ----
 function musterPick(s, total, slots){                          // 비용 합이 정확히 total 이 되는 하수인 조합 (0코스트 제외, 최대 slots 기)
-  const pool=CARD_POOL.filter(c=>c.type==='minion' && c.cost>=1), out=[];
+  const pool=GEN_POOL.filter(c=>c.type==='minion' && c.cost>=1), out=[];
   let rem=total, k=slots;
   const ok=(r,n)=> r===0 || (n>0 && r<=7*n);                   // 남은 비용을 남은 자리로 채울 수 있는가 (1~7코가 모두 있으므로 7*n 이하면 항상 가능)
   while(rem>0 && k>0){
@@ -357,7 +362,7 @@ function effCost(P, c){                                      // v74 태양샘(�
 function summonSameCost(s, seat, k, ev, src){                // v74·v75: 비용이 k 인 무작위 하수인 소환 (없으면 k/k 「이름 없는 하수인」). 전투의 함성은 발동하지 않음
   const P=s.seats[seat];
   if(!(k>0) || P.board.length>=CONFIG.MAX_BOARD){ ev.push({type:'ignored', seat, src}); return; }
-  const pool=CARD_POOL.filter(x=>x.type==='minion' && x.cost===k), bf=(P.mods&&P.mods.buff)||0;
+  const pool=GEN_POOL.filter(x=>x.type==='minion' && x.cost===k), bf=(P.mods&&P.mods.buff)||0;
   const base=pool.length ? pool[Math.floor(nextRand(s)*pool.length)] : {type:'minion', name:'이름 없는 하수인', cost:k, atk:k, hp:k};
   const mm={...structuredClone(base), id:s.nextId++, maxHp:base.hp+bf, hp:base.hp+bf, attacked:false, summoned:true}; delete mm.effect;
   P.board.push(mm); ev.push({type:'summon', seat, id:mm.id, name:mm.name, src});
@@ -376,7 +381,7 @@ function spellburstFire(s, seat, c, ev){                         // v80 주문�
 }
 const isHunter = c => !!(c.hunter || (c.tribe||'').includes('야수'));   // v105 사냥꾼 카드: hunter 표시가 있거나 야수 하수인
 function hunterGain(s, seat, ev, src){                       // v106 실탄 장전: 무작위 야수 1장을 손패로, 그 비용 -2 (가득이면 소각)
-  const pool=CARD_POOL.filter(x=>x.type==='minion' && (x.tribe||'').includes('야수') && !x.generatedOnly); if(!pool.length) return;
+  const pool=GEN_POOL.filter(x=>x.type==='minion' && (x.tribe||'').includes('야수') && !x.generatedOnly); if(!pool.length) return;
   const P=s.seats[seat], card={...structuredClone(pool[Math.floor(nextRand(s)*pool.length)]), id:s.nextId++}, burned=P.hand.length>=handMax(P);
   card.cost=Math.max(0, card.cost-2); delete card.inDeck;
   if(!burned) P.hand.push(card);
@@ -396,14 +401,14 @@ function repeatLastTurn(s, seat, ev, src){                    // v105 사스퀙:
   }
 }
 function summonRandomBeast(s, seat, maxCost, ev, src){           // 브롤 베어맨틀: 비용 maxCost 이하 무작위 야수 소환 (전투의 함성은 발동 안 함)
-  const P=s.seats[seat], pool=CARD_POOL.filter(c=>c.type==='minion' && (c.tribe||'').includes('야수') && c.cost<=maxCost && !c.generatedOnly);
+  const P=s.seats[seat], pool=GEN_POOL.filter(c=>c.type==='minion' && (c.tribe||'').includes('야수') && c.cost<=maxCost && !c.generatedOnly);
   if(!pool.length || P.board.length>=CONFIG.MAX_BOARD){ ev.push({type:'ignored', seat, src}); return; }
   const c=pool[Math.floor(nextRand(s)*pool.length)], bf=(P.mods&&P.mods.buff)||0;
   const m={...structuredClone(c), id:s.nextId++, maxHp:c.hp+bf, hp:c.hp+bf, attacked:false, summoned:true}; delete m.effect; cheatMinion(P, m);
   P.board.push(m); ev.push({type:'summon', seat, id:m.id, name:m.name, src});
 }
 function giveRandomBeast(s, seat, ev, src){                     // 그물거미: 무작위 야수를 손으로
-  const P=s.seats[seat], pool=CARD_POOL.filter(c=>c.type==='minion' && (c.tribe||'').includes('야수') && !c.generatedOnly);
+  const P=s.seats[seat], pool=GEN_POOL.filter(c=>c.type==='minion' && (c.tribe||'').includes('야수') && !c.generatedOnly);
   if(!pool.length) return;
   const copy={...structuredClone(pool[Math.floor(nextRand(s)*pool.length)]), id:s.nextId++}, burned=P.hand.length>=handMax(P); if(!burned) P.hand.push(copy);
   ev.push({type:'generated', seat, name:copy.name, burned, src, ...(burned?{card:copy}:{})});
@@ -483,7 +488,7 @@ const SPELL_FX = {
             ruleUse:(view,acts)=> acts.length && view.me.hand.length<=6 ? acts[0] : null },
   arcaneTome:{text:()=>`무작위 비전 주문을 셋 얻습니다`, rank:0,
     spellWorth:(c,view)=>view.me.hand.length<=7?5:1,
-    cast:(s,seat,c,target,ev,src)=>{const P=s.seats[seat],pool=CARD_POOL.filter(x=>x.type==='spell'&&(x.school||[]).includes('비전')&&x.name!=='신비술사의 고서'&&!x.generatedOnly);for(let i=0;i<3&&pool.length;i++){const x=pool[Math.floor(nextRand(s)*pool.length)],copy={...x,id:s.nextId++};const burned=P.hand.length>=handMax(P);if(!burned)P.hand.push(copy);ev.push({type:'generated',seat,name:x.name,burned,src,...(burned?{card:copy}:{})});}}},
+    cast:(s,seat,c,target,ev,src)=>{const P=s.seats[seat],pool=GEN_POOL.filter(x=>x.type==='spell'&&(x.school||[]).includes('비전')&&x.name!=='신비술사의 고서'&&!x.generatedOnly);for(let i=0;i<3&&pool.length;i++){const x=pool[Math.floor(nextRand(s)*pool.length)],copy={...x,id:s.nextId++};const burned=P.hand.length>=handMax(P);if(!burned)P.hand.push(copy);ev.push({type:'generated',seat,name:x.name,burned,src,...(burned?{card:copy}:{})});}}},
   pocketDimension:{text:()=>`주문을 발견합니다. 그 주문의 비용이 4 감소합니다. 이미 발견한 주문이 다시 나올 때까지 반복합니다`, rank:0,
     spellWorth:(c,view)=>view.me.hand.length<=7?5:1,
     cast:(s,seat,c,target,ev,src)=>{
@@ -516,7 +521,7 @@ const SPELL_FX = {
   frostbite: {text:()=>`적 하수인을 빙결 상태로 만듭니다. 무작위 냉기 주문을 얻습니다`, needsTarget:true, rank:1,
     targets:(s,seat)=>s.seats[other(seat)].board.filter(m=>!m.frozen).map(m=>minionT(other(seat),m.id)),
     spellWorth:(c,view)=>view.opp.board.some(m=>!m.frozen)?4:0,
-    cast:(s,seat,c,target,ev,src)=>{const t=target&&target.kind==='minion'?findMinion(s,target.seat,target.id):null;if(t){t.frozen=true;ev.push({type:'freeze',target,name:t.name,src});}const P=s.seats[seat],pool=CARD_POOL.filter(x=>x.type==='spell'&&x.school&&x.school.includes('냉기')&&x.name!=='매서운 한파'&&!x.generatedOnly);if(pool.length){const x=pool[Math.floor(nextRand(s)*pool.length)],copy={...x,id:s.nextId++};const burned=P.hand.length>=handMax(P);if(!burned)P.hand.push(copy);ev.push({type:'generated',seat,name:x.name,burned,src,...(burned?{card:copy}:{})});}}},
+    cast:(s,seat,c,target,ev,src)=>{const t=target&&target.kind==='minion'?findMinion(s,target.seat,target.id):null;if(t){t.frozen=true;ev.push({type:'freeze',target,name:t.name,src});}const P=s.seats[seat],pool=GEN_POOL.filter(x=>x.type==='spell'&&x.school&&x.school.includes('냉기')&&x.name!=='매서운 한파'&&!x.generatedOnly);if(pool.length){const x=pool[Math.floor(nextRand(s)*pool.length)],copy={...x,id:s.nextId++};const burned=P.hand.length>=handMax(P);if(!burned)P.hand.push(copy);ev.push({type:'generated',seat,name:x.name,burned,src,...(burned?{card:copy}:{})});}}},
   blizzard: {text:v=>`모든 적 하수인에게 피해 ${v}를 주고 빙결 상태로 만듭니다`, rank:1,
     blocked:(s,seat)=>s.seats[other(seat)].board.length===0?'적 하수인이 없습니다.':null,
     spellWorth:(c,view)=>view.opp.board.reduce((n,m)=>n+(!m.shield&&m.hp<=c.effect.value?m.atk+m.hp+2:1.5),0),
@@ -656,7 +661,7 @@ const SPELL_FX = {
   transform:{ text:()=>`적 하수인 하나를 1/1 양으로 바꾼다`, needsTarget:true, rank:1,
             targets:(s,seat)=>minsOf(s,other(seat)),
             cast:onMinion((t,s,seat,c,target,ev,src)=>{ const from=t.name;
-              delete t.deathDraw; delete t.deathSummon; delete t.deathSummonCost; delete t.deathCopy; delete t.deathGain; delete t.deathStego; delete t.onAttackCopy; delete t.endCastMin; delete t.spellDmgSchools; delete t.spellDmg; delete t.mini; delete t.onSpellFireball; delete t.onSpellScatter; delete t.onAttackBeast; delete t.onSpellDraw; delete t.endRecast; delete t.stealth; delete t.stealthTemp; delete t.infect; delete t.ignoreTaunt; delete t.needArmor; delete t.beastDouble; delete t.poison; delete t.endLotus; delete t.endViper; delete t.startHeal; delete t.endCast; delete t.endAttack; delete t.endDrain; delete t.leechBoost; delete t.endCorpses; delete t.startSpend; delete t.endScatter; delete t.endBait; delete t.endSteal; delete t.spellAura; delete t.lifesteal; delete t.spellburst; delete t.deathArmor; delete t.deathBuffAll; delete t.deathGrave; delete t.costOne; delete t.sonya; delete t.gally; delete t.crowley; delete t.tortola; delete t.endArmorSummon; delete t.endBully; delete t.windfury; delete t.deathMachines; delete t.deathKill; delete t.endDeckCopy; delete t.spellWeave; delete t.shieldAura; delete t.shieldHits; delete t.trogg; delete t.fireImmune; delete t.endDeckSummon; delete t.eggChicken; delete t.eggBonus; delete t.deathProto; delete t.endSword; delete t.tribe; t.name='양'; t.atk=1; t.hp=1; t.maxHp=1; t.taunt=false; t.shield=false; t.charge=false; t.rush=false; t.revive=false; t.elusive=false; t.frozen=false; if(t.tempAtk) t.tempAtk=0; delete t.effect;   // v53: 모면·빙결·이번 턴 공격력 보정도 함께 제거
+              delete t.deathDraw; delete t.deathSummon; delete t.deathSummonCost; delete t.deathCopy; delete t.deathGain; delete t.deathStego; delete t.onAttackCopy; delete t.endCastMin; delete t.spellDmgSchools; delete t.spellDmg; delete t.mini; delete t.onSpellFireball; delete t.onSpellScatter; delete t.onAttackBeast; delete t.onSpellDraw; delete t.endRecast; delete t.stealth; delete t.stealthTemp; delete t.infect; delete t.ignoreTaunt; delete t.needArmor; delete t.beastDouble; delete t.poison; delete t.endLotus; delete t.endViper; delete t.startHeal; delete t.endCast; delete t.endAttack; delete t.endDrain; delete t.leechBoost; delete t.endCorpses; delete t.startSpend; delete t.endScatter; delete t.endBait; delete t.endSteal; delete t.spellAura; delete t.lifesteal; delete t.spellburst; delete t.deathArmor; delete t.deathBuffAll; delete t.deathGrave; delete t.costOne; delete t.sonya; delete t.gally; delete t.crowley; delete t.tortola; delete t.endArmorSummon; delete t.endBully; delete t.windfury; delete t.deathMachines; delete t.deathKill; delete t.endDeckCopy; delete t.spellWeave; delete t.shieldAura; delete t.shieldHits; delete t.trogg; delete t.fireImmune; delete t.endDeckSummon; delete t.eggChicken; delete t.eggBonus; delete t.deathProto; delete t.endSword; delete t.onAttackPing; delete t.endSniff; delete t.cardLimit; delete t.deathPoisonShot; delete t.deathLunch; delete t.cantAttack; delete t.tribe; t.name='양'; t.atk=1; t.hp=1; t.maxHp=1; t.taunt=false; t.shield=false; t.charge=false; t.rush=false; t.revive=false; t.elusive=false; t.frozen=false; if(t.tempAtk) t.tempAtk=0; delete t.effect;   // v53: 모면·빙결·이번 턴 공격력 보정도 함께 제거
               ev.push({type:'transform', target, name:from, to:'양', src}); }),
             worth:(view,card,t,ctx,h)=>{ if(h.mineSide||!h.m) return -1000; const m=h.m;                         // 비싼 하수인일수록 가치가 크다
               return Math.max(0, h.val(m)-5) + (m.taunt&&ctx.readyAtk>0 ? 1 : 0) + (ctx.danger ? m.atk*h.W.killThreat : 0); },
@@ -708,9 +713,9 @@ const SPELL_FX = {
             spellWorth:(c,view)=> CONFIG.MAX_BOARD-view.me.board.length>=1 && view.me.deckCount>=3 ? 5 : 0,
             ruleUse:(view,acts)=> acts.length && CONFIG.MAX_BOARD-view.me.board.length>=1 && view.me.deckCount>=3 ? acts[0] : null },
   upgradeMinion:{ text:()=>`아군 하수인을 비용이 (1) 높은 무작위 하수인으로 변신시킵니다`, needsTarget:true, rank:4,
-            targets:(s,seat)=>minsOf(s,seat).filter(t=>{ const m=findMinion(s,seat,t.id); return m && CARD_POOL.some(x=>x.type==='minion' && x.cost===(m.cost||0)+1 && !x.generatedOnly); }),
+            targets:(s,seat)=>minsOf(s,seat).filter(t=>{ const m=findMinion(s,seat,t.id); return m && GEN_POOL.some(x=>x.type==='minion' && x.cost===(m.cost||0)+1 && !x.generatedOnly); }),
             cast:onMinion((t,s,seat,c,target,ev,src)=>{ const P=s.seats[seat], bf=(P.mods&&P.mods.buff)||0,
-              pool=CARD_POOL.filter(x=>x.type==='minion' && x.cost===(t.cost||0)+1 && !x.generatedOnly);
+              pool=GEN_POOL.filter(x=>x.type==='minion' && x.cost===(t.cost||0)+1 && !x.generatedOnly);
               if(!pool.length){ ev.push({type:'ignored', seat, src}); return; }
               const base=pool[Math.floor(nextRand(s)*pool.length)], idx=P.board.indexOf(t);
               const nm={...structuredClone(base), id:t.id, maxHp:base.hp+bf, hp:base.hp+bf, attacked:t.attacked, summoned:t.summoned}; delete nm.effect; delete nm.inDeck; cheatMinion(P, nm);   // 새 하수인 (전투의 함성은 없음, 공격 여부는 유지)
@@ -725,7 +730,7 @@ const SPELL_FX = {
             spellWorth:(c,view)=>{ const b=view.opp.board.filter(m=>m.cost>=3); return b.length>=2 ? Math.min(10, b.length*2.5) : 0; },
             cast:(s,seat,c,target,ev,src)=>{ const sd=other(seat), P=s.seats[sd], bf=(P.mods&&P.mods.buff)||0;
               for(const m of [...P.board]){
-                let k=Math.max(0, (m.cost||0)-1), pool=[]; while(k>=0 && !(pool=CARD_POOL.filter(x=>x.type==='minion' && x.cost===k && !x.generatedOnly)).length) k--;
+                let k=Math.max(0, (m.cost||0)-1), pool=[]; while(k>=0 && !(pool=GEN_POOL.filter(x=>x.type==='minion' && x.cost===k && !x.generatedOnly)).length) k--;
                 if(!pool.length) continue;
                 const base=pool[Math.floor(nextRand(s)*pool.length)], idx=P.board.indexOf(m);
                 const nm={...structuredClone(base), id:m.id, maxHp:base.hp+bf, hp:base.hp+bf, attacked:false, summoned:m.summoned}; delete nm.effect;
@@ -740,7 +745,7 @@ const SPELL_FX = {
               sweepDead(s, ev); } },
   omegaFacility:{ text:()=>`기계를 발견합니다. 내 마나 수정이 10개면, 카드 3장을 모두 가집니다`, rank:0,
             spellWorth:(c,view)=> view.me.hand.length<=8 ? 3.5 : 0,
-            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], bag=CARD_POOL.filter(x=>x.type==='minion' && (x.tribe||'').includes('기계') && !x.generatedOnly), opts=[];
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], bag=GEN_POOL.filter(x=>x.type==='minion' && (x.tribe||'').includes('기계') && !x.generatedOnly), opts=[];
               while(opts.length<3 && bag.length){ const o=structuredClone(bag.splice(Math.floor(nextRand(s)*bag.length),1)[0]); delete o.lifeCost; opts.push(o); }
               if(!opts.length){ ev.push({type:'ignored', seat, src}); return; }
               if(P.maxMana>=10){                                    // 마나 수정 10개: 후보 3장을 모두 얻는다
@@ -750,7 +755,7 @@ const SPELL_FX = {
               finishDiscover(s, seat, opts, {value:0}, ev, src, !!c.auto || !!s.pending); } },
   dragonRoar:{ text:(v,e)=>`무작위 용족 ${['','하나를','둘을','셋을'][e.count]||e.count+'기를'} 내 손으로 가져옵니다`, rank:0,
             spellWorth:(c,view)=> CONFIG.MAX_HAND-(view.me.hand.length-1)>=2 ? 4 : 0,
-            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], pool=CARD_POOL.filter(x=>x.type==='minion' && (x.tribe||'').includes('용족') && !x.generatedOnly);
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], pool=GEN_POOL.filter(x=>x.type==='minion' && (x.tribe||'').includes('용족') && !x.generatedOnly);
               if(!pool.length){ ev.push({type:'ignored', seat, src}); return; }
               for(let i=0;i<c.effect.count;i++){ const card={...structuredClone(pool[Math.floor(nextRand(s)*pool.length)]), id:s.nextId++}; delete card.inDeck;
                 const burned=P.hand.length>=handMax(P); if(!burned) P.hand.push(card);
@@ -907,7 +912,7 @@ const SPELL_FX = {
             blocked:(s,seat)=> freeSlots(s,seat)<=0 ? '전장이 가득 찼습니다.' : null,
             cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], e=c.effect;
               P.armor=(P.armor||0)+e.armor; ev.push({type:'armor', seat, amount:e.armor, src});
-              const pool=CARD_POOL.filter(x=>x.type==='minion' && x.cost===e.cost);                    // 전투의 함성은 발동하지 않는다 (철벽 소집과 같음)
+              const pool=GEN_POOL.filter(x=>x.type==='minion' && x.cost===e.cost);                    // 전투의 함성은 발동하지 않는다 (철벽 소집과 같음)
               if(pool.length && freeSlots(s,seat)>0) summonMuster(s, seat, [pool[Math.floor(nextRand(s)*pool.length)]], ev); },
             spellWorth:(c,view)=> CONFIG.MAX_BOARD-view.me.board.length>=1 ? 5 : 0,
             ruleUse:(view,acts)=> acts.length && CONFIG.MAX_BOARD-view.me.board.length>=1 ? acts[0] : null },
@@ -1182,8 +1187,8 @@ const SPELL_FX = {
             spellWorth:(c,view)=> view.opp.board.length && view.me.hand.some(x=>x.id!==c.id && x.type==='spell' && x.effect && ['damage','rain','bolt','cleave','freeze','storm'].includes(x.effect.type)) ? 4 : 0,
             ruleUse:(view,acts)=> null },
   voidSoul:{ text:v=>`비용이 ${v}인 무작위 하수인을 소환합니다. 미래의 내 공허의 영혼을 개선합니다. 내 턴이 끝날 때, 이 카드를 내 손으로 가져옵니다`, rank:2.5, summons:true,
-            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], lvl=c.effect.value, maxC=Math.max(...CARD_POOL.filter(x=>x.type==='minion').map(x=>x.cost));
-              let cost=Math.min(lvl, maxC), pool=[]; while(cost>=0 && !(pool=CARD_POOL.filter(x=>x.type==='minion' && x.cost===cost)).length) cost--;   // 그 비용 하수인이 없으면 가장 가까운 낮은 비용
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], lvl=c.effect.value, maxC=Math.max(...GEN_POOL.filter(x=>x.type==='minion').map(x=>x.cost));
+              let cost=Math.min(lvl, maxC), pool=[]; while(cost>=0 && !(pool=GEN_POOL.filter(x=>x.type==='minion' && x.cost===cost)).length) cost--;   // 그 비용 하수인이 없으면 가장 가까운 낮은 비용
               if(pool.length && P.board.length<CONFIG.MAX_BOARD){ const b=pool[Math.floor(nextRand(s)*pool.length)], bf=(P.mods&&P.mods.buff)||0;
                 const m={...structuredClone(b), id:s.nextId++, maxHp:b.hp+bf, hp:b.hp+bf, attacked:false, summoned:true}; delete m.effect; cheatMinion(P, m); P.board.push(m); ev.push({type:'summon', seat, id:m.id, name:m.name, src}); }
               const nl=Math.min(lvl+1, maxC);                                                      // 개선: 손패·덱의 공허의 영혼과 이번 턴 끝에 돌아올 카드가 모두 +1 (최대 하수인 비용까지)
@@ -1278,6 +1283,59 @@ const SPELL_FX = {
             spellWorth:(c,view)=> view.me.hand.length<=8 && view.opp.handCount>=2 ? 3.5 : 0,
             ruleUse:(view,acts)=> acts.length && view.me.hand.length<=8 && view.opp.handCount>=2 ? acts[0] : null },
 };
+// ---- v117 영남대 모험: 수능 보스 전용 주문 (cards.js 에서 scope:'boss') ----------------------------
+const YNU_TEXTS=[{name:'철학 지문', atk:1, hp:1}, {name:'경제 지문', atk:3, hp:3}, {name:'양자역학 지문', atk:5, hp:5}];   // 비문학 3연타 토큰: 도발, 공격 불가
+const logNote=(ev, seat, src, text)=>ev.push({type:'note', seat, text, src});                       // 로그에 한 줄 (화면은 'note' 이벤트를 그대로 적는다)
+const playsThisTurn=P=>(P.turnPlays||[]).filter(x=>!(x.effect && x.effect.type==='mana')).length;   // 이번 턴 손에서 낸 카드 수 (동전 제외)
+const enemyPlayLimit=(s, seat)=>{ const lims=s.seats[other(seat)].board.filter(x=>x.cardLimit && x.hp>0).map(x=>x.cardLimit); return lims.length ? Math.min(...lims) : null; };
+Object.assign(SPELL_FX, {
+  omrSwap:{ text:()=>`모든 하수인의 주인이 바뀝니다. 넘어온 하수인은 이번 턴에 공격할 수 없습니다`, rank:1,
+            blocked:(s)=> s.seats[0].board.length+s.seats[1].board.length===0 ? '하수인이 없습니다.' : null,
+            cast:(s,seat,c,target,ev,src)=>{ const A=s.seats[0], B=s.seats[1], a=A.board, b=B.board; A.board=b; B.board=a;
+              for(const m of [...A.board, ...B.board]){ m.summoned=true; m.attacked=false; m.frozen=false; delete m.infect; }
+              logNote(ev, seat, src, `모든 하수인의 주인이 바뀌었습니다! (${a.length} ↔ ${b.length})`); },
+            spellWorth:(c,view,ctx,h)=>{ const v=b=>b.reduce((t,m)=>t+h.val(m),0); return Math.min(20, v(view.opp.board)-v(view.me.board)); } },
+  destroyMinion:{ text:()=>`적 하수인 하나를 제거합니다 (보호막 무시)`, needsTarget:true, rank:1,
+            targets:(s,seat)=>s.seats[other(seat)].board.map(m=>minionT(other(seat), m.id)),
+            cast:onMinion((t,s,seat,c,target,ev,src)=>{ const amt=t.hp; t.shield=false; t.hp=0;
+              ev.push({type:'damage', target, name:t.name, amount:amt, absorbed:false, cause:'battlecry', src}); }),
+            worth:(view,card,t,ctx,h)=> (h.mineSide||!h.m) ? -1000 : h.val(h.m)+h.W.tempo-1 },
+  noSpellNext:{ text:()=>`상대는 다음 턴 동안 주문을 사용할 수 없습니다`, rank:-0.5,
+            blocked:(s,seat)=> s.seats[other(seat)].noSpell ? '이미 주문 금지 상태입니다.' : null,
+            cast:(s,seat,c,target,ev,src)=>{ s.seats[other(seat)].noSpell=true; logNote(ev, seat, src, '상대는 다음 턴에 주문을 쓸 수 없습니다'); },
+            spellWorth:(c,view)=> view.opp.handCount>=3 ? 3.3 : 0 },
+  tapeHeal:{ text:v=>`대상의 생명력을 ${v} 회복시킵니다. 상대 손에 있는 무작위 카드 1장의 비용이 (1) 늘어납니다`, needsTarget:true, rank:3,
+            targets:(s,seat)=>[heroT(seat), ...minsOf(s, seat)],
+            cast:(s,seat,c,target,ev,src)=>{ battlecry(s, seat, {name:c.name, effect:{type:'heal', value:c.effect.value}, spell:true}, target, ev);
+              const H=s.seats[other(seat)].hand.filter(x=>!(x.effect&&x.effect.type==='mana'));
+              if(H.length){ const x=H[Math.floor(nextRand(s)*H.length)]; x.cost+=1; logNote(ev, seat, src, '상대 손패의 카드 1장 비용 +1'); } },
+            worth:(view,card,t,ctx,h)=>{ if(!h.mineSide) return -1000; const cur=t.kind==='hero' ? (view.me.maxHp||30)-view.me.hp : (h.m ? h.m.maxHp-h.m.hp : 0);
+              return 1.5+Math.min(card.effect.value, cur)*0.8; } },
+  mentalBreak:{ text:()=>`모든 적 하수인이 번아웃(1턴 공격 불가)과 소심함(공격력 1)에 걸립니다`, rank:1,
+            blocked:(s,seat)=> s.seats[other(seat)].board.length ? null : '적 하수인이 없습니다.',
+            cast:(s,seat,c,target,ev,src)=>{ for(const x of s.seats[other(seat)].board){ x.frozen=true; x.atk=1; x.tempAtk=0;
+                ev.push({type:'statSet', target:minionT(other(seat), x.id), name:x.name, atk:1, src}); }
+              logNote(ev, seat, src, '모든 적 하수인이 번아웃! (이번 턴 공격 불가 · 공격력 1)'); },
+            spellWorth:(c,view)=> Math.min(16, view.opp.board.reduce((t,m)=>t+Math.max(0,m.atk-1)+m.atk*0.4,0)) },
+  textTriple:{ text:()=>`도발 능력이 있는 1/1, 3/3, 5/5 지문을 소환합니다. 이 하수인들은 공격할 수 없습니다`, rank:2.5, summons:true,
+            blocked:(s,seat)=> freeSlots(s,seat)<=0 ? '전장이 가득 찼습니다.' : null,
+            cast:(s,seat,c,target,ev,src)=>{ for(const t of YNU_TEXTS) summonTokens(s, seat, 1, {...t, taunt:true, rush:false, extra:{cantAttack:true}}, ev); },
+            spellWorth:(c,view,ctx)=>{ const slots=CONFIG.MAX_BOARD-view.me.board.length; return slots<=0 ? 0 : Math.min(3,slots)*(ctx.danger?2.5:1.6); } },
+  drawDiscard:{ text:(v,e)=>`카드를 ${e.draw}장 뽑습니다. 그중 ${e.discard}장을 무작위로 버립니다`, rank:0,
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], before=new Set(P.hand.map(x=>x.id)); drawCards(s, seat, c.effect.draw, ev, src);
+              const got=P.hand.filter(x=>!before.has(x.id));
+              for(let i=0;i<c.effect.discard && got.length;i++){ const x=got.splice(Math.floor(nextRand(s)*got.length),1)[0]; P.hand=P.hand.filter(y=>y.id!==x.id); logNote(ev, seat, src, '긴장해서 뽑은 카드 1장을 버렸습니다'); } },
+            spellWorth:(c,view)=> view.me.hand.length-1+c.effect.draw-c.effect.discard<=CONFIG.MAX_HAND && view.me.deckCount>=c.effect.draw ? 5 : 0 },
+  cutCrash:{ text:(v,e)=>`모든 적 하수인에게 피해를 ${v} 줍니다. 살아남은 하수인 하나당 방어도를 ${e.armor} 얻습니다. 살아남은 적 하수인이 있으면 반복합니다`, rank:1,
+            blocked:(s,seat)=> s.seats[other(seat)].board.length ? null : '적 하수인이 없습니다.',
+            cast:(s,seat,c,target,ev,src)=>{ const fo=other(seat), P=s.seats[seat];
+              for(let i=0;i<20;i++){ const alive=s.seats[fo].board.filter(x=>x.hp>0); if(!alive.length) break;
+                for(const x of alive) hurtMinion(s, fo, x, c.effect.value, ev, 'spell', src);
+                sweepDead(s, ev);
+                const left=s.seats[fo].board.filter(x=>x.hp>0).length; if(!left) break;
+                P.armor=(P.armor||0)+left*c.effect.armor; ev.push({type:'armor', seat, amount:left*c.effect.armor, src}); } },
+            spellWorth:(c,view,ctx,h)=> view.opp.board.length ? Math.min(20, view.opp.board.reduce((t,m)=>t+h.val(m),0)) : 0 },
+});
 // 동전: 덱(CARD_POOL)에는 들어가지 않고, 후공이 시작할 때 손패로 받는다. (그 밖의 주문은 CARD_POOL 에 있어 덱에 넣을 수 있다)
 function makeCoin(){ return {type:'spell', name:'동전', cost:0, effect:{type:'mana', value:CONFIG.COIN_MANA}}; }
 // ---- v40 카드 문구: 길게 풀어 쓰지 않고 짧게. 상세 규칙은 설명 txt 에 있다. (이 표가 위 정의의 text 를 덮어쓴다) ----
@@ -1312,10 +1370,10 @@ const SPELL_TEXT = {
   haste:    ()=>`방금 소환한 하수인이 바로 공격 가능`,
 };
 for(const k in SPELL_TEXT) SPELL_FX[k].text = SPELL_TEXT[k];
-function effectText0(c){ const runeText=''; if(!c.effect){ if(c.eggChicken) return '죽음의 메아리: 3/3 언데드 닭을 소환합니다. 내 턴이 끝날 때마다 닭이 +1/+1'+(c.eggBonus?` (현재 +${c.eggBonus})`:''); if(c.deathProto) return '죽음의 메아리: 하수인을 뽑습니다. 내 손에 있는 모든 하수인에게 +1/+1을 부여합니다'; if(c.endSword) return '내 턴이 끝날 때, 다른 무작위 아군 하수인 둘에게 공격력을 +1 부여합니다'; if(c.endDeckSummon) return '내 턴이 끝날 때, 내 덱에서 하수인을 소환합니다'; if(c.trogg) return '상대편이 주문을 시전한 후에, 다른 깊은무쇠 트로그를 소환합니다'; if(c.crowley) return `이 하수인은 공격하여 다른 하수인을 처치한 후에 +${c.crowley}/+${c.crowley}를 얻습니다`; if(c.endArmorSummon) return '내 턴이 끝날 때, 내 방어도와 같은 비용의 무작위 하수인을 소환합니다. (최대 10)'; if(c.tortola) return '이 하수인이 피해를 받은 후 방어도를 1 얻고, 이 하수인에게 공격력을 +1 부여합니다'; if(c.endBully) return '내 턴이 끝날 때, 무작위 적을 공격하는 3/3 불량배를 둘 소환합니다'; if(c.gally) return '상대편이 주문을 시전할 때마다 동일한 주문을 내 손으로 가져오고 상대편에게 동전을 줍니다'; if(c.sonya) return '내가 비용이 (1)인 하수인이나 주문을 낸 후에, 그 카드를 비용이 (0)인 카드로 복사하여 얻습니다'; if(c.endSpellGain) return `내 턴이 끝날 때, 무작위 ${c.endSpellGain.school} 주문을 얻습니다.${c.endSpellGain.discount?` 그 주문의 비용이 (${c.endSpellGain.discount}) 감소합니다.`:''}`; if(c.endHandBuff) return `내 턴이 끝날 때, 내 손에 있는 무작위 하수인에게 +${c.endHandBuff}/+${c.endHandBuff}을 부여합니다`; if(c.endSelfHp) return `내 턴이 끝날 때, 생명력을 +${c.endSelfHp} 얻습니다`; if(c.overload) return `과부하: (${c.overload})`; if(c.endTotemBuff) return `내 턴이 끝날 때, 내 손, 덱, 전장에 있는 다른 모든 토템에게 +${c.endTotemBuff}/+${c.endTotemBuff}을 부여합니다`; if(c.adjAtkAura) return `양옆의 하수인들이 공격력을 +${c.adjAtkAura} 얻습니다`; if(c.endAdjBuff) return `내 턴이 끝날 때, 양옆의 하수인들에게 +${c.endAdjBuff}/+${c.endAdjBuff}을 부여합니다`; if(c.onSpellBeast) return `내가 주문을 시전한 후에, 비용이 (${c.onSpellBeast}) 이하인 야수를 소환합니다`; if(c.deathBeast) return '죽음의 메아리: 무작위 야수를 얻습니다'; if(c.pteroEgg) return `죽음의 메아리: 2/1 새끼 비명익룡을 ${['','하나','둘','셋','넷'][c.deathPtero]||c.deathPtero+'기'} 소환합니다. 내 턴이 끝날 때마다 알이 깨지는 시간이 줄어들고(${c.hatchLeft ?? c.pteroEgg}턴 남음), 깨지면 내 전장을 4/4 다 자란 비명익룡으로 가득 채웁니다`; if(c.copyLow) return `내가 비용이 (${c.copyLow}) 이하인 하수인을 낸 후에, 그 하수인을 복사하여 소환합니다`; if(c.lordGrow) return `내 하수인이 소환된 후에, 이 하수인이 생명력을 +${c.lordGrow} 얻습니다`; if(c.deathAoe) return `죽음의 메아리: 모든 캐릭터에게 피해를 ${c.deathAoe} 줍니다`; if(c.deathKill) return '죽음의 메아리: 무작위 적 하수인을 처치합니다'; if(c.endDeckCopy) return '내 턴이 끝날 때, 내 덱에서 하수인을 복사하여 5/5 하수인으로 소환합니다'; if(c.deathMachines) return `죽음의 메아리: 도발과 보호막 능력이 있는 1/2 기계를 ${['','하나','둘','셋'][c.deathMachines]||c.deathMachines} 소환합니다`; if(c.spellWeave) return '내가 하수인에게 주문을 시전한 후에, 하수인을 대상으로 지정할 수 있는 주문을 내 손으로 가져옵니다'; if(c.shieldAura) return `내 보호막들이 ${['','한','두','세'][c.shieldAura]||c.shieldAura} 번 피해를 받아야 부서집니다`; if(c.beastDouble) return '아군 야수들이 주는 피해가 2배 증가합니다'; if(c.reviveFull) return '이 하수인은 최대 체력으로 환생합니다'; if(c.ignoreTaunt) return '내 캐릭터들의 공격이 도발을 무시합니다'; if(c.needArmor) return `내 방어도가 ${c.needArmor} 이상일 때에만 공격할 수 있습니다`; if(c.endLotus) return '턴 종료 시 피어오르는 연꽃을 소환합니다'; if(c.endViper) return '내 턴이 끝날 때, 속공·은신·독성 능력이 있는 1/1 치명적인 독사를 1마리 소환합니다'; if(c.startHeal) return `내 턴이 시작될 때, 피해를 입은 아군 1명을 무작위로 ${c.startHeal} 회복합니다`; if(c.endRaise) return '내 턴이 끝날 때, 시체를 1개 소모해 도발 능력이 있는 1/3 되살아난 보병을 소환합니다'; if(c.endCopy) return `내 턴이 끝날 때, 시체를 ${c.endCopy.corpses}개 소모해 이 하수인을 복사하여 소환합니다`; if(c.endScatter==='atk') return '내 턴이 끝날 때, 적들에게 이 하수인의 공격력만큼의 피해를 무작위로 나누어 입힙니다'; if(c.deathBuffAll) return `죽음의 메아리: 내 손과 덱에 있는 모든 하수인에게 +${c.deathBuffAll}/+${c.deathBuffAll}을 부여합니다`; if(c.deathGrave) return '죽음의 메아리: 이번 게임에서 죽은 내 도발 하수인들을 소환합니다'; if(c.costOne) return '내 하수인들의 비용이 (1)이 됩니다'; if(c.spellburst) return `이번 턴에 내 영웅에게 공격력을 +${c.spellburst.heroAtk} 부여하고 방어도를 ${c.spellburst.armor} 얻습니다`; if(c.endScatter) return `내 턴이 끝날 때, 모든 적에게 ${c.endScatter}의 피해를 무작위로 나누어 입힙니다`; if(c.endBait) return '내 턴이 끝날 때, 모든 적 하수인이 이 하수인을 공격하게 만듭니다'; if(c.spellAura) return `상대편이 시전하는 주문의 비용이 (${c.spellAura}) 증가합니다`; if(c.endSteal) return '내 턴이 끝날 때, 모든 적 하수인으로부터 공격력과 생명력을 1씩 가져옵니다'; if(c.endCorpses) return `내 턴이 끝날 때, 시체를 ${c.endCorpses}개 얻습니다. 내 턴이 시작될 때, 시체를 ${c.startSpend.corpses}개 소모해 내 영웅에게 생명력을 +${c.startSpend.life} 부여합니다`; if(c.endAttack) return '내 턴이 끝날 때, 생명력이 가장 낮은 적을 공격합니다'; if(c.endDrain) return '내 턴이 끝날 때 생명력이 가장 낮은 적에게서 생명력을 1 가져옵니다'; if(c.deathCopy) return '죽음의 메아리: 손패에서 비용이 가장 높은 주문 1장을 복사합니다'; if(c.deathGain) return '죽음의 메아리: 무작위 암흑 주문 1장과 무작위 신성 주문 1장을 손패로 가져옵니다'; if(c.onAttackCopy) return '이 하수인이 공격할 때마다, 이 하수인의 복사본을 내 손으로 가져옵니다(강화효과 유지)'; if(c.endRecast) return '내 턴이 끝날 때, 이번 턴에 내가 시전한 주문 중 하나를 시전합니다. (대상은 무작위로 선택)'; if(c.onSpellScatter) return `내가 주문을 시전한 후에, 모든 적에게 ${c.onSpellScatter}의 피해를 무작위로 나누어 입힙니다`; if(c.onAttackBeast) return '이 하수인은 공격할 때마다 야수를 뽑고 그 능력치를 얻습니다'; if(c.onSpellDraw) return '내가 주문을 시전할 때마다 카드를 뽑습니다'; if(c.dynCost==='cast') return '이번 게임에서 내가 시전한 주문 1개당 이 카드의 비용이 1 감소합니다'; if(c.onSpellFireball) return '내가 주문을 시전할 때마다 「화염구」 주문을 내 손으로 가져옵니다'; if(c.endCastMin) return `내 턴이 끝날 때 비용이 (${c.endCastMin}) 이상인 무작위 주문을 시전합니다. (대상은 무작위로 선택)`; if(c.spellDmgSchools) return '주문 공격력 +1 (이번 게임에서 내가 시전한 주문의 속성 종류만큼 강화됩니다)'; if(c.endCast) return `내 턴이 끝날 때, 비용이 ${c.endCast} 이하인 무작위 주문을 시전합니다`; } return c.effect ? runeText + (c.fireImmune ? '화염 주문에 면역입니다. ' : '') + (c.echo && c.type==='spell' ? '잔상. ' : '') + (c.twin ? '이중 주문. ' : '') + (c.lifeCost ? `생명력 ${c.cost} 지불. ` : '') + (c.overload ? `과부하: (${c.overload}). ` : '') + (c.type==='spell' ? SPELL_FX[c.effect.type].text : EFFECT_TEXT[c.effect.type])(c.effect.value, c.effect) + (c.infuse && c.id!==undefined ? (c.infused ? ' [주입됨]' : ` [${c.infuseN||0}/${c.infuse}]`) : '') : ''; }
+function effectText0(c){ const runeText=''; if(!c.effect){ if(c.onAttackPing) return `이 하수인이 공격할 때마다 무작위 적에게 피해를 ${c.onAttackPing} 줍니다`; if(c.endSniff) return `내 턴이 끝날 때, 모든 적 하수인에게 피해를 ${c.endSniff} 줍니다 (화상)`; if(c.cardLimit) return `상대는 턴마다 카드를 ${c.cardLimit}장까지만 낼 수 있습니다`; if(c.deathPoisonShot) return `죽음의 메아리: 무작위 적 하수인에게 피해를 ${c.deathPoisonShot} 줍니다 (독성)`; if(c.deathLunch) return '죽음의 메아리: 상대는 다음 턴에 카드를 1장 덜 뽑고, 무작위 하수인 하나가 식곤증으로 기절합니다'; if(c.cantAttack) return '공격할 수 없습니다'; if(c.eggChicken) return '죽음의 메아리: 3/3 언데드 닭을 소환합니다. 내 턴이 끝날 때마다 닭이 +1/+1'+(c.eggBonus?` (현재 +${c.eggBonus})`:''); if(c.deathProto) return '죽음의 메아리: 하수인을 뽑습니다. 내 손에 있는 모든 하수인에게 +1/+1을 부여합니다'; if(c.endSword) return '내 턴이 끝날 때, 다른 무작위 아군 하수인 둘에게 공격력을 +1 부여합니다'; if(c.endDeckSummon) return '내 턴이 끝날 때, 내 덱에서 하수인을 소환합니다'; if(c.trogg) return '상대편이 주문을 시전한 후에, 다른 깊은무쇠 트로그를 소환합니다'; if(c.crowley) return `이 하수인은 공격하여 다른 하수인을 처치한 후에 +${c.crowley}/+${c.crowley}를 얻습니다`; if(c.endArmorSummon) return '내 턴이 끝날 때, 내 방어도와 같은 비용의 무작위 하수인을 소환합니다. (최대 10)'; if(c.tortola) return '이 하수인이 피해를 받은 후 방어도를 1 얻고, 이 하수인에게 공격력을 +1 부여합니다'; if(c.endBully) return '내 턴이 끝날 때, 무작위 적을 공격하는 3/3 불량배를 둘 소환합니다'; if(c.gally) return '상대편이 주문을 시전할 때마다 동일한 주문을 내 손으로 가져오고 상대편에게 동전을 줍니다'; if(c.sonya) return '내가 비용이 (1)인 하수인이나 주문을 낸 후에, 그 카드를 비용이 (0)인 카드로 복사하여 얻습니다'; if(c.endSpellGain) return `내 턴이 끝날 때, 무작위 ${c.endSpellGain.school} 주문을 얻습니다.${c.endSpellGain.discount?` 그 주문의 비용이 (${c.endSpellGain.discount}) 감소합니다.`:''}`; if(c.endHandBuff) return `내 턴이 끝날 때, 내 손에 있는 무작위 하수인에게 +${c.endHandBuff}/+${c.endHandBuff}을 부여합니다`; if(c.endSelfHp) return `내 턴이 끝날 때, 생명력을 +${c.endSelfHp} 얻습니다`; if(c.overload) return `과부하: (${c.overload})`; if(c.endTotemBuff) return `내 턴이 끝날 때, 내 손, 덱, 전장에 있는 다른 모든 토템에게 +${c.endTotemBuff}/+${c.endTotemBuff}을 부여합니다`; if(c.adjAtkAura) return `양옆의 하수인들이 공격력을 +${c.adjAtkAura} 얻습니다`; if(c.endAdjBuff) return `내 턴이 끝날 때, 양옆의 하수인들에게 +${c.endAdjBuff}/+${c.endAdjBuff}을 부여합니다`; if(c.onSpellBeast) return `내가 주문을 시전한 후에, 비용이 (${c.onSpellBeast}) 이하인 야수를 소환합니다`; if(c.deathBeast) return '죽음의 메아리: 무작위 야수를 얻습니다'; if(c.pteroEgg) return `죽음의 메아리: 2/1 새끼 비명익룡을 ${['','하나','둘','셋','넷'][c.deathPtero]||c.deathPtero+'기'} 소환합니다. 내 턴이 끝날 때마다 알이 깨지는 시간이 줄어들고(${c.hatchLeft ?? c.pteroEgg}턴 남음), 깨지면 내 전장을 4/4 다 자란 비명익룡으로 가득 채웁니다`; if(c.copyLow) return `내가 비용이 (${c.copyLow}) 이하인 하수인을 낸 후에, 그 하수인을 복사하여 소환합니다`; if(c.lordGrow) return `내 하수인이 소환된 후에, 이 하수인이 생명력을 +${c.lordGrow} 얻습니다`; if(c.deathAoe) return `죽음의 메아리: 모든 캐릭터에게 피해를 ${c.deathAoe} 줍니다`; if(c.deathKill) return '죽음의 메아리: 무작위 적 하수인을 처치합니다'; if(c.endDeckCopy) return '내 턴이 끝날 때, 내 덱에서 하수인을 복사하여 5/5 하수인으로 소환합니다'; if(c.deathMachines) return `죽음의 메아리: 도발과 보호막 능력이 있는 1/2 기계를 ${['','하나','둘','셋'][c.deathMachines]||c.deathMachines} 소환합니다`; if(c.spellWeave) return '내가 하수인에게 주문을 시전한 후에, 하수인을 대상으로 지정할 수 있는 주문을 내 손으로 가져옵니다'; if(c.shieldAura) return `내 보호막들이 ${['','한','두','세'][c.shieldAura]||c.shieldAura} 번 피해를 받아야 부서집니다`; if(c.beastDouble) return '아군 야수들이 주는 피해가 2배 증가합니다'; if(c.reviveFull) return '이 하수인은 최대 체력으로 환생합니다'; if(c.ignoreTaunt) return '내 캐릭터들의 공격이 도발을 무시합니다'; if(c.needArmor) return `내 방어도가 ${c.needArmor} 이상일 때에만 공격할 수 있습니다`; if(c.endLotus) return '턴 종료 시 피어오르는 연꽃을 소환합니다'; if(c.endViper) return '내 턴이 끝날 때, 속공·은신·독성 능력이 있는 1/1 치명적인 독사를 1마리 소환합니다'; if(c.startHeal) return `내 턴이 시작될 때, 피해를 입은 아군 1명을 무작위로 ${c.startHeal} 회복합니다`; if(c.endRaise) return '내 턴이 끝날 때, 시체를 1개 소모해 도발 능력이 있는 1/3 되살아난 보병을 소환합니다'; if(c.endCopy) return `내 턴이 끝날 때, 시체를 ${c.endCopy.corpses}개 소모해 이 하수인을 복사하여 소환합니다`; if(c.endScatter==='atk') return '내 턴이 끝날 때, 적들에게 이 하수인의 공격력만큼의 피해를 무작위로 나누어 입힙니다'; if(c.deathBuffAll) return `죽음의 메아리: 내 손과 덱에 있는 모든 하수인에게 +${c.deathBuffAll}/+${c.deathBuffAll}을 부여합니다`; if(c.deathGrave) return '죽음의 메아리: 이번 게임에서 죽은 내 도발 하수인들을 소환합니다'; if(c.costOne) return '내 하수인들의 비용이 (1)이 됩니다'; if(c.spellburst) return `이번 턴에 내 영웅에게 공격력을 +${c.spellburst.heroAtk} 부여하고 방어도를 ${c.spellburst.armor} 얻습니다`; if(c.endScatter) return `내 턴이 끝날 때, 모든 적에게 ${c.endScatter}의 피해를 무작위로 나누어 입힙니다`; if(c.endBait) return '내 턴이 끝날 때, 모든 적 하수인이 이 하수인을 공격하게 만듭니다'; if(c.spellAura) return `상대편이 시전하는 주문의 비용이 (${c.spellAura}) 증가합니다`; if(c.endSteal) return '내 턴이 끝날 때, 모든 적 하수인으로부터 공격력과 생명력을 1씩 가져옵니다'; if(c.endCorpses) return `내 턴이 끝날 때, 시체를 ${c.endCorpses}개 얻습니다. 내 턴이 시작될 때, 시체를 ${c.startSpend.corpses}개 소모해 내 영웅에게 생명력을 +${c.startSpend.life} 부여합니다`; if(c.endAttack) return '내 턴이 끝날 때, 생명력이 가장 낮은 적을 공격합니다'; if(c.endDrain) return '내 턴이 끝날 때 생명력이 가장 낮은 적에게서 생명력을 1 가져옵니다'; if(c.deathCopy) return '죽음의 메아리: 손패에서 비용이 가장 높은 주문 1장을 복사합니다'; if(c.deathGain) return '죽음의 메아리: 무작위 암흑 주문 1장과 무작위 신성 주문 1장을 손패로 가져옵니다'; if(c.onAttackCopy) return '이 하수인이 공격할 때마다, 이 하수인의 복사본을 내 손으로 가져옵니다(강화효과 유지)'; if(c.endRecast) return '내 턴이 끝날 때, 이번 턴에 내가 시전한 주문 중 하나를 시전합니다. (대상은 무작위로 선택)'; if(c.onSpellScatter) return `내가 주문을 시전한 후에, 모든 적에게 ${c.onSpellScatter}의 피해를 무작위로 나누어 입힙니다`; if(c.onAttackBeast) return '이 하수인은 공격할 때마다 야수를 뽑고 그 능력치를 얻습니다'; if(c.onSpellDraw) return '내가 주문을 시전할 때마다 카드를 뽑습니다'; if(c.dynCost==='cast') return '이번 게임에서 내가 시전한 주문 1개당 이 카드의 비용이 1 감소합니다'; if(c.onSpellFireball) return '내가 주문을 시전할 때마다 「화염구」 주문을 내 손으로 가져옵니다'; if(c.endCastMin) return `내 턴이 끝날 때 비용이 (${c.endCastMin}) 이상인 무작위 주문을 시전합니다. (대상은 무작위로 선택)`; if(c.spellDmgSchools) return '주문 공격력 +1 (이번 게임에서 내가 시전한 주문의 속성 종류만큼 강화됩니다)'; if(c.endCast) return `내 턴이 끝날 때, 비용이 ${c.endCast} 이하인 무작위 주문을 시전합니다`; } return c.effect ? runeText + (c.fireImmune ? '화염 주문에 면역입니다. ' : '') + (c.echo && c.type==='spell' ? '잔상. ' : '') + (c.twin ? '이중 주문. ' : '') + (c.lifeCost ? `생명력 ${c.cost} 지불. ` : '') + (c.overload ? `과부하: (${c.overload}). ` : '') + (c.type==='spell' ? SPELL_FX[c.effect.type].text : EFFECT_TEXT[c.effect.type])(c.effect.value, c.effect) + (c.infuse && c.id!==undefined ? (c.infused ? ' [주입됨]' : ` [${c.infuseN||0}/${c.infuse}]`) : '') : ''; }
 function effectText(c){ let t=effectText0(c); if(c.effect && c.crowley) t+=`. 이 하수인이 적 하수인을 처치하면 +${c.crowley}/+${c.crowley}를 얻습니다`; if(c.effect && c.fishHeal) t+='. 이 하수인이 공격한 뒤 하수인을 처치하면 생명력을 모두 회복합니다'; return t; }   // 효과가 있는 카드에도 크롤리 계열 문구를 덧붙임
 const needsTarget = c => c.type==='spell' && !!(SPELL_FX[c.effect.type] && SPELL_FX[c.effect.type].needsTarget);   // 대상이 하나도 없으면 낼 수 없는 주문
-const NO_TARGET_FX=['natureCast','crystalBuff','peaceDraw','armorCry','draw','sweep','scatter','gainMana','recastLog','yogg','seedDeck','recycle','manastorm','spellTax','revealSummon','leechSummon','bloodDiscover','bloodDrain','yodel','malakor','valtora','repeatLast','parrot','spellHunt','drawSpellArmor','frostWarden','doubleHand','alana','tarim','edric','mindCopy','benedictus','faceCollector','comboDraw','tauntDiscoverBc','copyDragons','repeatAll','avalancheFreeze','discoverCost','snitch','deathwing','pyroar','selfHurt','deckBuff','adjBuffCry','machinesCry','spiritsCry','hatchCry','wormCry','shieldCry','decalCry','bubbleCry','stoneCry','stormCry'];   // 대상을 고르지 않는 전투의 함성
+const NO_TARGET_FX=['bcCrystal','lotto','natureCast','crystalBuff','peaceDraw','armorCry','draw','sweep','scatter','gainMana','recastLog','yogg','seedDeck','recycle','manastorm','spellTax','revealSummon','leechSummon','bloodDiscover','bloodDrain','yodel','malakor','valtora','repeatLast','parrot','spellHunt','drawSpellArmor','frostWarden','doubleHand','alana','tarim','edric','mindCopy','benedictus','faceCollector','comboDraw','tauntDiscoverBc','copyDragons','repeatAll','avalancheFreeze','discoverCost','snitch','deathwing','pyroar','selfHurt','deckBuff','adjBuffCry','machinesCry','spiritsCry','hatchCry','wormCry','shieldCry','decalCry','bubbleCry','stoneCry','stormCry'];   // 대상을 고르지 않는 전투의 함성
 
 // ---- 덱 목록: 카드 이름의 배열 (같은 카드는 이름이 여러 번 나온다). 서버에서도 같은 검증을 쓴다 ----
 function validateDeckList(names){
@@ -1341,7 +1399,7 @@ const defaultDeckList = () => [...DEFAULT_DECK_PAIRS.flatMap(n=>[n,n]), ...DEFAU
 const AI_CURVE = {1:5, 2:7, 3:6, 4:5, 5:3, 6:2, 7:2};      // 합 30, 평균 코스트 약 3.3 (DECK_SIZE 를 바꾸면 같이 맞출 것)
 const AI_DECK_RULE = {minMinions:16, minCheap:18, cheapCost:4, tries:10};
 function buildRandomDeck(rng=Math.random){
-  const costs=[...new Set(CARD_POOL.map(c=>c.cost))].sort((a,b)=>a-b);
+  const costs=[...new Set(GEN_POOL.map(c=>c.cost))].sort((a,b)=>a-b);
   let best=null;
   for(let t=0;t<AI_DECK_RULE.tries;t++){
     const curve={...AI_CURVE};
@@ -1354,13 +1412,13 @@ function buildRandomDeck(rng=Math.random){
     const free=c=>(used[c.name]||0)<CONFIG.COPIES;
     for(const cost of costs){
       for(let need=curve[cost]||0; need>0; need--){
-        const pool=CARD_POOL.filter(c=>c.cost===cost && free(c));
+        const pool=GEN_POOL.filter(c=>c.cost===cost && free(c));
         if(!pool.length) break;                              // 이 코스트 카드가 모자라면 아래에서 보충
         take(pool[Math.floor(rng()*pool.length)]);
       }
     }
     while(deck.length<CONFIG.DECK_SIZE){                     // 부족분 보충: 남은 카드 중 무작위
-      const pool=CARD_POOL.filter(free);
+      const pool=GEN_POOL.filter(free);
       if(!pool.length) break;
       take(pool[Math.floor(rng()*pool.length)]);
     }
@@ -1403,7 +1461,7 @@ function newGame(rng=Math.random, opts={}){
     const wanted=(opts.decks && opts.decks[seat]) || null;
     const freeOk=!!(opts.freeDeck && opts.freeDeck[seat]) && Array.isArray(wanted) && wanted.length>0 && wanted.every(n=>CARD_POOL.some(c=>c.name===n));   // v54: 테스트 덱은 크기·같은 카드 장수 제한 없이 카드 이름만 확인
     const names=(wanted && (freeOk || !validateDeckList(wanted))) ? wanted : null;
-    const src=names ? names.map(n=>CARD_POOL.find(c=>c.name===n)) : CARD_POOL.flatMap(c=>Array(CONFIG.COPIES).fill(c));
+    const src=names ? names.map(n=>CARD_POOL.find(c=>c.name===n)) : GEN_POOL.flatMap(c=>Array(CONFIG.COPIES).fill(c));
     src.forEach(c=>deck.push({...c, inDeck:true, cost:c.type==='spell' ? c.cost : Math.max(0, c.cost-(mods.costDown||0)), id:s.nextId++}));   // inDeck: 게임 시작 때 덱에 있던 카드 (v56 롬메스는 이 표시가 없는 주문만 다시 시전)   // costDown 은 하수인만
     shuffle(deck, rng);
     const maxHp=CONFIG.HERO_HP+(mods.hp||0);
@@ -1478,7 +1536,13 @@ function startTurn(s, seat, ev){
   P.freeMinion=md.firstMinion||0;                      // v98 치트 무료 첫 하수인: 이 턴에 처음 내는 하수인만 (하수인을 내면 0)
   if(md.regen && P.hp>0 && P.hp<P.maxHp){ const b=P.hp; P.hp=Math.min(P.maxHp, P.hp+md.regen); ev.push({type:'heal', target:heroT(seat), name:null, amount:P.hp-b, src:{seat, name:'재생'}}); }   // v98 치트 재생
   if(md.burn && P.turns>1){ const fo=other(seat); hurtHero(s, fo, md.burn, ev, 'burn', {seat, name:'영웅 일격'}); }   // v98 치트 영웅 일격: 내 턴 시작에 상대 영웅 N 피해 (첫 턴 제외, 방어도로 막힘)
-  drawCards(s, seat, (md.extraDraw && (md.extraDraw===true || P.turns<=md.extraDraw)) ? 2 : 1, ev);
+  let drawN=(md.extraDraw && (md.extraDraw===true || P.turns<=md.extraDraw)) ? 2 : 1;
+  if(P.skipDraw || P.stunNext){ const src={seat:other(seat), name:'체증을 유발하는 보온도시락'};          // v117 보온도시락 죽음의 메아리 (지난 상대 턴에 걸어 둔 것)
+    if(P.skipDraw){ drawN=Math.max(0, drawN-P.skipDraw); logNote(ev, other(seat), src, `점심이 얹혔다… 카드를 ${P.skipDraw}장 덜 뽑습니다`); P.skipDraw=0; }
+    for(let i=0;i<(P.stunNext||0);i++){ const c=P.board.filter(x=>x.hp>0 && !x.frozen); if(!c.length) break; const x=c[Math.floor(nextRand(s)*c.length)]; x.frozen=true;
+      ev.push({type:'freeze', target:minionT(seat, x.id), name:x.name, src}); logNote(ev, other(seat), src, `${x.name}: 식곤증으로 기절! (이번 턴 공격 불가)`); }
+    P.stunNext=0; }
+  if(drawN) drawCards(s, seat, drawN, ev);
 }
 function lifestealHeal(s, seat, m, amount, ev){                    // v62 하수인의 생명력 흡수: 준 피해만큼 주인 영웅 회복 (최대 체력까지)
   if(!m.lifesteal || amount<=0) return;
@@ -1551,6 +1615,10 @@ function attackBeast(s, seat, m, ev){                          // v106 밴조사
   m.atk+=c.atk; m.hp+=c.hp; m.maxHp+=c.hp;
   ev.push({type:'buff', target:minionT(seat, m.id), name:m.name, value:c.atk, hpValue:c.hp, src});
 }
+function attackPing(s, seat, m, ev){                             // v117 다리 떠는 옆자리 수험생: 공격할 때마다 무작위 적(영웅·하수인)에게 피해
+  const fo=other(seat), cand=[heroT(fo), ...s.seats[fo].board.filter(x=>x.hp>0).map(x=>minionT(fo, x.id))];
+  hitTarget(s, cand[Math.floor(nextRand(s)*cand.length)], m.onAttackPing, ev, {seat, name:m.name});
+}
 function attackCopy(s, seat, m, ev){                             // v59: 공격할 때마다 이 하수인의 복사본(현재 공격력·체력 등 모든 강화 유지)을 비용 1로 손패에
   const P=s.seats[seat], bf=(P.mods&&P.mods.buff)||0, copy=structuredClone(m);
   copy.id=s.nextId++; copy.cost=1; copy.atk=m.atk-(m.tempAtk||0); copy.hp=m.maxHp-bf;
@@ -1602,7 +1670,7 @@ function weaverTrigger(s, seat, c, target, ev){               // v109 세데크 
   const P=s.seats[seat];
   for(const m of [...P.board]){
     if(!m.spellWeave || m.hp<=0) continue;
-    const pool=CARD_POOL.filter(x=>x.type==='spell' && !x.generatedOnly && canHitMinion(s, x)); if(!pool.length) continue;
+    const pool=GEN_POOL.filter(x=>x.type==='spell' && !x.generatedOnly && canHitMinion(s, x)); if(!pool.length) continue;
     const card={...structuredClone(pool[Math.floor(nextRand(s)*pool.length)]), id:s.nextId++}, burned=P.hand.length>=handMax(P);
     if(!burned) P.hand.push(card);
     ev.push({type:'generated', seat, name:card.name, burned, src:{seat, name:m.name}, ...(burned?{card}:{})});
@@ -1773,6 +1841,11 @@ function runDeath(s, seat, m, ev, sm){
         for(const sd of [other(seat), seat]){ hurtHero(s, sd, m.deathAoe, ev, 'battlecry', dsrc);
           for(const x of [...s.seats[sd].board]) if(x!==m && x.hp>0) hurtMinion(s, sd, x, m.deathAoe, ev, 'battlecry', dsrc); }
         s.sweepAgain=true; }
+      if(m.deathPoisonShot){                                             // v117 수능 샤프: 무작위 적 하수인에게 독성 피해 (보호막은 막는다)
+        const foe=s.seats[other(seat)], cand=foe.board.filter(x=>x.hp>0);
+        if(cand.length){ hurtMinion(s, other(seat), cand[Math.floor(nextRand(s)*cand.length)], m.deathPoisonShot, ev, 'battlecry', {seat, name:m.name}, {poison:true}); s.sweepAgain=true; } }
+      if(m.deathLunch){ const O=s.seats[other(seat)]; O.skipDraw=(O.skipDraw||0)+1; O.stunNext=(O.stunNext||0)+1;     // v117 보온도시락: 상대의 다음 턴 드로우 -1, 무작위 하수인 기절
+        logNote(ev, seat, {seat, name:m.name}, '점심을 먹고 얹혔습니다… 상대의 다음 턴 드로우 -1 · 식곤증'); }
       if(m.deathCopy) copyTopSpell(s, seat, ev, {seat, name:m.name});
       if(m.deathGain) gainSpells(s, seat, ev, {seat, name:m.name}, ['암흑','신성']);   // v59 죽음의 메아리: 속성별 무작위 주문 1장씩   // v58 죽음의 메아리: 손패에서 비용이 가장 높은 주문 복사
 }
@@ -1787,7 +1860,7 @@ function runSummons(s, seat, sm, ev){
           const m2={...structuredClone(base), id:s.nextId++, maxHp:base.hp+bf, hp:base.hp+bf, attacked:false, summoned:true, taunt:true}; delete m2.effect;
           P.board.push(m2); ev.push({type:'summon', seat, id:m2.id, name:m2.name, src:{seat, name:d.name}}); }
       } else if(d.randomCost){
-        const pool=CARD_POOL.filter(c=>c.type==='minion'&&c.cost===d.cost);
+        const pool=GEN_POOL.filter(c=>c.type==='minion'&&c.cost===d.cost);
         if(pool.length && P.board.length<CONFIG.MAX_BOARD){ const c=pool[Math.floor(nextRand(s)*pool.length)]; const bf=(P.mods&&P.mods.buff)||0; const m={...c,id:s.nextId++,maxHp:c.hp+bf,hp:c.hp+bf,atk:c.atk,attacked:false,summoned:true}; delete m.effect; delete m.deathSummonCost; P.board.push(m); ev.push({type:'summon',seat,id:m.id,name:m.name,src:{seat,name:d.name}}); }
       } else if(d.ghoul) summonTokens(s, seat, d.n, GHOUL, ev);
       else if(d.ptero) summonTokens(s, seat, d.n, PTERO_BABY, ev);
@@ -1929,7 +2002,7 @@ function battlecry(s, seat, m, target, ev){
     s.pending={kind:'choice',seat,options,src}; ev.push({type:'choiceWait',seat,name:m.name}); return; }
   if(e.type==='armorCry'){ const P=s.seats[seat]; P.armor=(P.armor||0)+e.value; ev.push({type:'armor', seat, amount:e.value, src}); return; }   // v80 지저왕
   if(e.type==='malakor'){                                          // v97: 덱의 모든 카드 → 무작위 혈기 룬 카드, 비용 -1
-    const P=s.seats[seat], bag=CARD_POOL.filter(c=>runeOf(c).includes('혈기') && !c.generatedOnly && !c.fatigue); let n=0;
+    const P=s.seats[seat], bag=GEN_POOL.filter(c=>runeOf(c).includes('혈기') && !c.generatedOnly && !c.fatigue); let n=0;
     if(!bag.length || !P.deck.length){ ev.push({type:'ignored', seat, src}); return; }
     P.deck=P.deck.map(x=>{ const y=structuredClone(bag[Math.floor(nextRand(s)*bag.length)]); const z={...y, id:x.id, cost:Math.max(0, y.cost-1)}; delete z.lifeCost; if(x.inDeck) z.inDeck=true; n++; return z; });
     ev.push({type:'deckTransform', seat, count:n, src}); return; }
@@ -2046,7 +2119,7 @@ function battlecry(s, seat, m, target, ev){
     if(drawn||burned) ev.push({type:'draw', seat, count:drawn, burned, src, ...(burned?{burnedCards:bcards}:{})}); else ev.push({type:'ignored', seat, src});
     return; }
   if(e.type==='faceCollector'){                                    // v112 얼굴 수집가: 비용 min 이상 무작위 하수인을 손으로, 그 비용 -discount (최소 0). 손패가 가득이면 소각
-    const P=s.seats[seat], pool=CARD_POOL.filter(x=>x.type==='minion' && x.cost>=e.min && !x.generatedOnly);
+    const P=s.seats[seat], pool=GEN_POOL.filter(x=>x.type==='minion' && x.cost>=e.min && !x.generatedOnly);
     if(!pool.length){ ev.push({type:'ignored', seat, src}); return; }
     const base=pool[Math.floor(nextRand(s)*pool.length)], card={...structuredClone(base), id:s.nextId++}; delete card.inDeck;
     card.cost=Math.max(0, card.cost-e.discount);
@@ -2087,6 +2160,9 @@ function battlecry(s, seat, m, target, ev){
     return;
   }
   if(e.type==='gainMana'){ s.seats[seat].mana+=e.value; ev.push({type:'mana', seat, amount:e.value, src}); return; }
+  if(e.type==='bcCrystal'){ addMax(s.seats[seat], e.value); ev.push({type:'crystal', seat, amount:e.value, src}); return; }   // v117 N수생: 빈 마나 수정
+  if(e.type==='lotto'){ const roll=1+Math.floor(nextRand(s)*5), dmg=roll===5?10:roll;                                      // v117 아랍어 로또 괴물
+    logNote(ev, seat, src, `🎲 ${roll}번으로 기둥 세우기!${roll===5?' 대박! 치명타':''} → ${dmg} 피해`); hurtHero(s, other(seat), dmg, ev, 'battlecry', src); return; }
   if(e.type==='manastorm'){                                    // v74 교도소 마나스톰
     s.seats[seat].stormCount=(s.seats[seat].stormCount||0)+1; ev.push({type:'storm', seat, src}); return;
   }
@@ -2230,6 +2306,10 @@ function validate(s, a, actor){
     case 'PLAY_CARD': {
       const c=P.hand.find(x=>x.id===a.cardId);
       if(!c) return '손패에 없는 카드입니다.';
+      if(!(c.effect && c.effect.type==='mana')){                                         // v117 수능 보스: 동전은 제외
+        if(P.noSpell && c.type==='spell') return '듣기평가 비행기 소음! 이번 턴에는 주문을 쓸 수 없습니다.';
+        const lim=enemyPlayLimit(s, actor); if(lim!=null && playsThisTurn(P)>=lim) return `감독관이 지켜보고 있어요. 이번 턴에는 카드를 ${lim}장까지만 낼 수 있습니다.`;
+      }
       if(c.lifeCost ? P.hp<=effCost(P,c) : effCost(P,c)>P.mana) return c.lifeCost ? '체력이 부족합니다.' : '마나가 부족합니다.';   // 생명력 비용은 죽을 만큼은 낼 수 없다
       if(c.type!=='spell' && P.board.length>=CONFIG.MAX_BOARD) return '전장이 가득 찼습니다.';   // 하수인만 전장 자리 필요
       const ts=cardTargets(s, actor, c);
@@ -2248,6 +2328,7 @@ function validate(s, a, actor){
       if(m.atk<=0) return '공격력이 0인 하수인은 공격할 수 없습니다.';
       if(m.attacked) return '이미 공격했습니다.';
       if(m.frozen) return '얼어 있어 공격할 수 없습니다.';
+      if(m.cantAttack) return '이 하수인은 공격할 수 없습니다.';                     // v117 비문학 지문
       if(m.needArmor && (P.armor||0)<m.needArmor) return `방어도가 ${m.needArmor} 이상일 때에만 공격할 수 있습니다.`;   // v103 강철나무 골렘
       const t=a.target;
       if(!t || t.seat!==other(actor)) return '공격 대상이 올바르지 않습니다.';
@@ -2408,6 +2489,7 @@ function apply(state, a, actor){
     if(t.kind==='hero'){
       ev.push({type:'attack', seat:actor, attackerId:m.id, name:m.name, target:t, targetName:null});
       if(m.onAttackCopy) attackCopy(s, actor, m, ev); if(m.onAttackBeast) attackBeast(s, actor, m, ev);
+      if(m.onAttackPing) attackPing(s, actor, m, ev);                                  // v117 다리 떠는 옆자리 수험생
       const ma=dmgOf(s, actor, m);
       hurtHero(s, t.seat, ma, ev, 'combat'); lifestealHeal(s, actor, m, ma, ev);
       const th=(s.seats[t.seat].mods||{}).thorns; if(th && m.atk>0) hurtMinion(s, actor, m, th, ev, 'combat');   // v98 치트 가시 갑옷: 영웅을 때린 하수인에게 N 피해
@@ -2415,6 +2497,8 @@ function apply(state, a, actor){
       const d=findMinion(s, t.seat, t.id);
       ev.push({type:'attack', seat:actor, attackerId:m.id, name:m.name, target:t, targetName:d.name});
       if(m.onAttackCopy) attackCopy(s, actor, m, ev); if(m.onAttackBeast) attackBeast(s, actor, m, ev);
+      if(m.onAttackPing) attackPing(s, actor, m, ev);                                  // v117 (대상이 이 피해로 죽으면 전투는 일어나지 않는다)
+      if(d.hp>0){
       const ma=dmgOf(s, actor, m), dAtk=dmgOf(s, t.seat, d), dShield=d.shield, mShield=m.shield;   // v105 골드린: 야수가 주는 피해 2배
       hurtMinion(s, t.seat, d, ma, ev, 'combat', null, m);
       hurtMinion(s, actor, m, dAtk, ev, 'combat', null, d);
@@ -2422,6 +2506,7 @@ function apply(state, a, actor){
       if(m.fishHeal && d.hp<=0 && m.hp>0 && m.hp<m.maxHp){ const before=m.hp; m.hp=m.maxHp; ev.push({type:'heal', target:minionT(actor, m.id), name:m.name, amount:m.hp-before, src:{seat:actor, name:m.name}}); }   // 오늘의 월척: 공격으로 하수인을 처치하면 생명력 전부 회복
       if(!dShield) lifestealHeal(s, actor, m, ma, ev);            // v62: 보호막이 막은 피해는 흡수하지 않음
       if(!mShield) lifestealHeal(s, t.seat, d, dAtk, ev);
+      }
     }
     if(m.windfury && !m.wfUsed) m.wfUsed=true; else m.attacked=true;   // v116 질풍: 턴마다 두 번 공격 (첫 공격에서는 아직 공격한 것으로 치지 않는다)
     delete m.stealth; delete m.stealthTemp;   // v75: 공격하면 은신이 풀린다
@@ -2526,6 +2611,11 @@ function apply(state, a, actor){
     P.eclipse=false;                              // v28 일식은 그 턴이 끝나면 사라진다
     P.heroAtk=0; P.heroAttacked=false;             // v80 영웅 공격력은 이번 턴만
     P.board.forEach(m=>{ if(m.tempAtk){ m.atk-=m.tempAtk; m.tempAtk=0; } });   // v29 금단의 과일의 공격력은 이번 턴만
+    { const fo=other(actor); let hit=false;                                                  // v117 비염 빌런: 내 턴이 끝날 때 모든 적 하수인에게 피해 (화상)
+      for(const x of [...P.board]){ if(!x.endSniff || x.hp<=0 || s.seats[0].hp<=0 || s.seats[1].hp<=0) continue; hit=true;
+        for(const y of [...s.seats[fo].board]) if(y.hp>0) hurtMinion(s, fo, y, x.endSniff, ev, 'battlecry', {seat:actor, name:x.name}); }
+      if(hit) sweepDead(s, ev); }
+    P.noSpell=false;                               // v117 비행기 소음: 내 한 턴 동안만
     P.board.forEach(m=>{ m.frozen=false; });      // 얼음은 그 하수인 주인의 한 턴이 끝나면 풀린다
     returnEternal(s, actor, ev); returnLoop(s, actor, ev);   // v66 극한 반복                  // v61 영원의 불화살
     if(s.seats[0].hp>0 && s.seats[1].hp>0) startTurn(s, other(actor), ev);
@@ -2546,9 +2636,9 @@ function viewFor(s, seat){
   return structuredClone({
     seat, turn:s.turn, turnNo:s.turnNo, first:s.first, over:s.over, winner:s.winner,
     // deckCards: 내 남은 덱 구성. 뽑는 순서가 드러나지 않도록 id 를 빼고 코스트·이름순으로 정렬해서 보낸다.
-    me:{heroAtk:me.heroAtk||0, heroAttacked:!!me.heroAttacked, corpses:me.corpses||0, spellTax:(me.spellTax||0)+(me.auraTax||0), taxNext:me.taxNext||0, lastSpellCost:me.lastSpellCost ?? -1, hp:me.hp, maxHp:me.maxHp, nextMana:me.nextMana||0, ascendNext:me.ascendNext||0, armorNext:me.armorNext||0, armor:me.armor||0, locked:me.locked||0, overloadNext:me.overloadNext||0, ones:(me.playedOnes||[]).length, castN:(me.castAll||[]).length, grave:(me.grave||[]).map(g=>({...g})), mods:me.mods, eclipse:!!me.eclipse, fatigue:me.fatigue||0, spellCount:me.spellCount||0, recastCount:(me.castLog||[]).length, mana:me.mana, maxMana:me.maxMana, hand:me.hand.map(c=>({...c, cost:effCost(me,c)})), board:me.board, deckCount:me.deck.length,
+    me:{noSpell:!!me.noSpell, playLimit:enemyPlayLimit(s, seat), plays:playsThisTurn(me), heroAtk:me.heroAtk||0, heroAttacked:!!me.heroAttacked, corpses:me.corpses||0, spellTax:(me.spellTax||0)+(me.auraTax||0), taxNext:me.taxNext||0, lastSpellCost:me.lastSpellCost ?? -1, hp:me.hp, maxHp:me.maxHp, nextMana:me.nextMana||0, ascendNext:me.ascendNext||0, armorNext:me.armorNext||0, armor:me.armor||0, locked:me.locked||0, overloadNext:me.overloadNext||0, ones:(me.playedOnes||[]).length, castN:(me.castAll||[]).length, grave:(me.grave||[]).map(g=>({...g})), mods:me.mods, eclipse:!!me.eclipse, fatigue:me.fatigue||0, spellCount:me.spellCount||0, recastCount:(me.castLog||[]).length, mana:me.mana, maxMana:me.maxMana, hand:me.hand.map(c=>({...c, cost:effCost(me,c)})), board:me.board, deckCount:me.deck.length,
         deckCards:me.deck.map(({id, ...rest})=>rest).sort((a,b)=>a.cost-b.cost || (a.name<b.name?-1:a.name>b.name?1:0))},
-    opp:{heroAtk:op.heroAtk||0, heroAttacked:!!op.heroAttacked, corpses:op.corpses||0, spellTax:(op.spellTax||0)+(op.auraTax||0), taxNext:op.taxNext||0, hp:op.hp, maxHp:op.maxHp, nextMana:op.nextMana||0, armorNext:op.armorNext||0, armor:op.armor||0, locked:op.locked||0, overloadNext:op.overloadNext||0, mods:op.mods, eclipse:!!op.eclipse, fatigue:op.fatigue||0, mana:op.mana, maxMana:op.maxMana, handCount:op.hand.length, board:op.board, deckCount:op.deck.length},
+    opp:{noSpell:!!op.noSpell, heroAtk:op.heroAtk||0, heroAttacked:!!op.heroAttacked, corpses:op.corpses||0, spellTax:(op.spellTax||0)+(op.auraTax||0), taxNext:op.taxNext||0, hp:op.hp, maxHp:op.maxHp, nextMana:op.nextMana||0, armorNext:op.armorNext||0, armor:op.armor||0, locked:op.locked||0, overloadNext:op.overloadNext||0, mods:op.mods, eclipse:!!op.eclipse, fatigue:op.fatigue||0, mana:op.mana, maxMana:op.maxMana, handCount:op.hand.length, board:op.board, deckCount:op.deck.length},
     pending: s.pending ? (s.pending.seat===seat
       ? (s.pending.kind==='target'
           ? {kind:'target', seat, card:{name:s.pending.card.name, cost:s.pending.card.cost, effect:s.pending.card.effect, school:s.pending.card.school, twin:s.pending.card.twin}, targets:s.pending.targets}
@@ -2817,6 +2907,8 @@ const Rule2 = (()=>{
       if(e.type==='yogg') v+= Math.min(10, (me.spellCount||0)*1.5);
       if(e.type==='sweep')  v+= view.opp.board.reduce((s,m)=>s+(m.shield?1:(m.hp<=e.value ? m.atk+m.hp : e.value*0.5)),0);
       if(e.type==='gainMana') v+= e.value;
+      if(e.type==='bcCrystal') v+= me.maxMana<=8 ? 2.5 : 0;   // v117
+      if(e.type==='lotto') v+= 4.4;                          // v117 기댓값 (1+2+3+4+10)/5
     }
     return v;
   }
@@ -2829,6 +2921,7 @@ const Rule2 = (()=>{
     // 적 필드가 비어 있으면 광역 피해 카드는 아껴 둔다
     // (동전은 따로 판단하고, 그 밖의 주문은 낼 가치가 SPELL_MIN 이상일 때만 후보에 넣는다)
     const cards=me.hand.filter(c=>!isCoin(c) && !c.lifeCost && c.cost<=budget && !(c.effect&&c.effect.type==='selfHurt' && me.hp+(me.armor||0)<=6) && !(c.effect&&c.effect.type==='deathwing' && !(me.hand.length-1<=2 || (view.opp.board.length-me.board.length>=2 && me.hand.length-1<=4))) && !(c.effect&&c.effect.type==='sweep'&&view.opp.board.length===0)
+                                  && !(me.noSpell && c.type==='spell') && !(me.playLimit!=null && me.plays>=me.playLimit)   // v117 수능 보스: 주문 금지·감독관
                                   && (c.type!=='spell' || spellWorth(c, view, ctx)>=SPELL_MIN));
     const gain=c=>(c.effect&&(c.effect.type==='gainMana'||c.effect.type==='growth'))?c.effect.value:0;   // 마나를 돌려주는 카드는 실질 비용이 낮다
     const slots=CONFIG.MAX_BOARD-me.board.length, n=cards.length;
@@ -2964,10 +3057,10 @@ const Rule2 = (()=>{
       const plan=bestPlan(view, ctx, me.mana);
       if(plan.length){
         plan.sort((x,y)=>rankOf(x)-rankOf(y) || y.cost-x.cost);
-        const card=plan[0];
-        const entries=plays.filter(a=>a.cardId===card.id);
+        const card=plan.find(c=>plays.some(a=>a.cardId===c.id));          // v117: 지금 낼 수 없는 카드(감독관 제한 등)는 건너뛴다
+        const entries=card ? plays.filter(a=>a.cardId===card.id) : [];
         if(entries.length===1) return entries[0];
-        return entries.reduce((b,a)=>targetScore(card,a.target,view,ctx)>targetScore(card,b.target,view,ctx)?a:b);
+        if(entries.length) return entries.reduce((b,a)=>targetScore(card,a.target,view,ctx)>targetScore(card,b.target,view,ctx)?a:b);
       }
     }
 
@@ -3028,6 +3121,6 @@ function selfPlay(games=1000, botA=BotPlayers.rule, botB=BotPlayers.random, maxT
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = {VERSION, CONFIG, CARD_POOL, BotPlayers, newGame, apply, viewFor, selfPlay, mulliganHand,
+  module.exports = {VERSION, CONFIG, CARD_POOL, GEN_POOL, BotPlayers, newGame, apply, viewFor, selfPlay, mulliganHand,
                     buildRandomDeck, validateDeckList, defaultDeckList, shuffle, runeOf, RUNE_NAME, RUNE_ORDER, EFFECT_TEXT};
 }

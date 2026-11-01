@@ -143,9 +143,12 @@
   </div>
   <div class="screen" id="screen-adventure">
     <h3>🗺 모험 모드</h3>
-    <p class="sub">보스는 정해진 덱만 사용합니다. 내 덱은 '덱 편집'에서 만든 덱을 씁니다.</p>
+    <p class="sub">보스는 정해진 덱만 사용합니다. 도장깨기 챕터는 앞 단계를 깨야 다음 단계가 열려요.</p>
+    <div class="adv-chapters" id="advChapters"></div>
+    <div class="adv-chdesc" id="advChapterDesc" style="display:none"></div>
     <div class="adv-tabs" id="advTabs"></div>
     <div class="boss-list" id="bossList"></div>
+    <button class="menu-btn" onclick="openAdvDeckEditor()">🎒 모험 덱 편집<span class="desc" id="advDeckDesc"></span></button>
     <button class="menu-btn back" onclick="showScreen('mode')">뒤로</button>
   </div>
   <div class="screen" id="screen-bossedit">
@@ -153,6 +156,7 @@
     <p class="dev-warn">개발자 전용. 여기서 저장한 보스 목록은 서버에 저장되어 모든 유저에게 바로 적용됩니다.</p>
     <div class="boss-list" id="bossEditList"></div>
     <button class="menu-btn" onclick="bossAdd()">＋ 보스 추가</button>
+    <button class="menu-btn" onclick="bossAddTemplate('ynu')">🎓 영남대 10단계 틀 추가<span class="desc">수능 → 학년별 에피소드 8개 → 졸업, 보스 10개를 한 번에 추가 (수능은 전용 카드 덱까지 완성 · 이미 있는 단계는 건너뜀)</span></button>
     <p class="dev-warn" id="bossFileStat"></p>
     <button class="menu-btn" onclick="$('regFile').click()">🔢 번호표(card_registry.json) 불러오기<span class="desc" id="regDesc"></span></button>
     <input type="file" id="regFile" accept=".json" style="display:none" onchange="bossLoadRegistry(this.files[0]); this.value=''">
@@ -166,8 +170,12 @@
     <h3 id="bfTitle">보스 설정</h3>
     <div class="bf-box">
       <label>이름</label><input id="bfName" maxlength="20">
-      <label>아이콘 (이모지 1~2자)</label><input id="bfIcon" maxlength="4">
+      <label>아이콘 <span class="hint">— 이모지 1~2자, 또는 그림 경로 (예: images/boss/ynu_suneung.jpg)</span></label><input id="bfIcon" maxlength="110">
       <label>소개</label><input id="bfDesc" maxlength="80">
+      <label>챕터 (도장깨기) <span class="hint">— 없음이면 '자유 보스전' 목록에 나옵니다</span></label><select id="bfChapter"></select>
+      <div id="bfStageRow"><label>단계 <span class="hint">(1부터. 낮은 단계를 모두 깨야 열립니다)</span></label><input id="bfStage" type="number" min="1" max="99" step="1"></div>
+      <label>첫 클리어 보상 카드 <span class="hint">— 카드 이름을 쉼표로 구분. 2장 주려면 두 번 적기 (예: 새내기 OT 조장, 새내기 OT 조장)</span></label><input id="bfRewardCards">
+      <div class="bf-stat" id="bfRewardStat"></div>
       <label>보스 특성 (치트) <span class="hint">— 고른 개수만큼 난이도 등급이 오릅니다 (0개 중급/상급 · 1 브론즈 · 2 실버 · 3 골드 · 4 플래티넘 · 5 에메랄드 · 6 다이아몬드 · 7 마스터 · 8 그랜드마스터 · 9개 이상 챌린저)</span></label>
       <div class="bf-stat" id="bfRank"></div>
       <div class="cheat-grid" id="bfCheats"></div>
@@ -256,6 +264,7 @@
 <script src="/js/cheats.js"></script>
 <script src="/js/economy.js"></script>
 <script src="/js/collection.js"></script>
+<script src="/js/adventure.js"></script>
 <script src="/js/shop.js"></script>
 <script src="/js/pvp.js"></script>
 <script src="/js/serverstore.js"></script>

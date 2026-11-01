@@ -7,7 +7,7 @@ const JS = path.join(__dirname, '..', 'public', 'js');
 const E = require(path.join(JS, 'engine.js'));
 const { PVP } = require(path.join(JS, 'pvp.js'));
 const { Economy } = require(path.join(JS, 'economy.js'));
-const { validateDeckOwned } = require(path.join(JS, 'collection.js'));
+const { validateDeckOwned, validateDeckScope } = require(path.join(JS, 'collection.js'));
 const { ensureCollection, collectionOf } = require('./collection');
 const { walletRow, walletOut, ensureWallet } = require('./wallet');
 
@@ -18,7 +18,7 @@ function loadDeck(uid) {
   if (d) {
     try {
       const list = JSON.parse(d.deck_json);
-      if (!E.validateDeckList(list) && !validateDeckOwned(list, collectionOf(uid))) return list;
+      if (!E.validateDeckList(list) && !validateDeckOwned(list, collectionOf(uid)) && !validateDeckScope(list, E.CARD_POOL, 'normal')) return list;   // v117: 모험·보스 전용 카드가 섞인 덱은 대전 불가
     } catch (_) {}
   }
   return E.defaultDeckList();

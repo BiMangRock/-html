@@ -1,5 +1,16 @@
 // cards.js — 카드 데이터(CARD_POOL). 브라우저·Node(서버) 공용.
 // 카드를 추가/수정할 때는 이 파일만 고친다. (효과 로직은 engine.js 의 EFFECTS 쪽)
+//
+// ▶ 카드 사용 범위 scope (v117) — 안 적으면 일반 카드
+//   (없음)            일반 카드: 상점 팩·스타터에서 나오고, 어느 모드에서나 쓸 수 있다
+//   scope:'adventure' 모험 전용: 모험 클리어 보상으로만 얻고, 유저는 '모험 덱'에만 넣을 수 있다 (AI 대전·유저 대전 덱에는 못 넣음)
+//   scope:'boss'      보스 전용: 유저는 절대 얻을 수 없고, 보스 덱에만 넣는다
+//   · 보스 덱은 scope 와 상관없이 모든 카드를 쓸 수 있다
+//   · scope 가 있는 카드는 상점 팩·스타터·"무작위 카드 생성/발견/변신" 효과에서 나오지 않는다
+//   · 보상으로 주려면: 개발자 메뉴 → 보스 덱 편집 → 보스 설정 → '첫 클리어 보상 카드'에 이름을 적는다
+//   예) {type:'minion', name:"새내기 OT 조장", cost:2, rarity:'희귀', atk:2, hp:3, taunt:true, scope:'adventure'},
+//       {type:'spell',  name:"학사 경고", cost:3, rarity:'특급', effect:{type:'damage', value:4}, scope:'boss'},
+//   ⚠ 새 카드 이름은 학습 모델의 번호표(card_registry.json)에도 추가해야 상급(학습 모델) 보스가 읽을 수 있다
 const CARD_POOL = [
   {type:'minion', name:"들쥐", cost:1, rarity:'일반', atk:1, hp:2},
   {type:'minion', name:"책벌레", cost:1, rarity:'일반', atk:1, hp:1, effect:{type:'draw', value:1}},
@@ -307,6 +318,24 @@ const CARD_POOL = [
   {type:'minion', name:"돌장인", cost:4, rarity:'일반', atk:5, hp:4, effect:{type:'stoneCry', value:2}},   // 전투의 함성: 이번 게임 동안 내 토템 공격력 +2
   {type:'minion', name:"칼바람 폭풍소환사", cost:5, rarity:'희귀', atk:5, hp:5, effect:{type:'stormCry', need:4}},   // 전투의 함성: 내 전장에 토템 4기 이상이면 알아키르 소환
   {type:'minion', name:"바람의 군주 알아키르", cost:8, rarity:'전설', atk:3, hp:6, tribe:'정령', windfury:true, charge:true, taunt:true, shield:true},   // 질풍, 돌진, 도발, 천상의 보호막
+
+  // ======== v117 영남대 모험 · 0단계 「수능」 보스 전용 카드 (scope:'boss' → 유저는 얻을 수 없음) ========
+  //  art: 카드 그림 경로 / flavor: 설명(분위기 글, 아직 화면에는 안 나옴)
+  {type:'minion', name:"다리 떠는 옆자리 수험생", cost:2, rarity:'일반', atk:1, hp:4, onAttackPing:1, scope:'boss', art:'images/ynu/ynu_legshake.jpg', flavor:'덜덜덜덜... 온 교실을 진동시키는 리듬감에 멘탈이 흔들립니다.'},
+  {type:'minion', name:"훌쩍거리는 앞자리 (비염 빌런)", cost:2, rarity:'일반', atk:2, hp:3, endSniff:1, scope:'boss', art:'images/ynu/ynu_sniff.jpg', flavor:'3초에 한 번씩 훌쩍... 팽! 소리를 내며 주변의 집중력을 갉아먹습니다.'},
+  {type:'minion', name:"시험지 팍팍 넘기는 N수생", cost:3, rarity:'희귀', atk:4, hp:2, rush:true, effect:{type:'bcCrystal', value:1}, scope:'boss', art:'images/ynu/ynu_nsusaeng.jpg', flavor:'난 아직 1페이지 푸는데 혼자 3페이지로 팍! 소리 내며 넘기는 소리의 위압감.'},
+  {type:'minion', name:"엄격한 복도 순찰 감독관", cost:4, rarity:'특급', atk:2, hp:6, cardLimit:2, scope:'boss', art:'images/ynu/ynu_supervisor.jpg', flavor:'뒷짐 지고 복도를 또각또각 걸어 다니며 수험생들의 손놀림을 감시합니다.'},
+  {type:'minion', name:"샤프심 똑 부러진 수능 샤프", cost:1, rarity:'일반', atk:3, hp:1, poison:true, deathPoisonShot:2, scope:'boss', art:'images/ynu/ynu_sharp.jpg', flavor:'결정적인 풀이 순간에 딱! 부러져 튀어 나가는 악몽의 보급형 샤프.'},
+  {type:'minion', name:"체증을 유발하는 보온도시락", cost:3, rarity:'희귀', atk:0, hp:7, taunt:true, deathLunch:true, scope:'boss', art:'images/ynu/ynu_lunchbox.jpg', flavor:'소화 잘되라고 싸 온 소고기죽인데 긴장해서 목구멍으로 안 넘어감.'},
+  {type:'minion', name:"아랍어 로또 괴물 (5교시의 악령)", cost:5, rarity:'전설', atk:5, hp:5, effect:{type:'lotto'}, scope:'boss', art:'images/ynu/ynu_lotto.jpg', flavor:'지렁이 글씨 하나도 모르겠어서 번호 하나로 기둥 세웠는데 기적이 일어날까?'},
+  {type:'spell', name:"OMR 카드 밀려쓰기", cost:3, rarity:'전설', effect:{type:'omrSwap'}, scope:'boss', art:'images/ynu/ynu_omr.jpg', flavor:'"어...? 20번 마킹할 자리가 왜 비어있지...?"'},
+  {type:'spell', name:"4교시 탐구영역 응시 규정 위반", cost:4, rarity:'특급', effect:{type:'destroyMinion'}, scope:'boss', art:'images/ynu/ynu_violation.jpg', flavor:'제1선택 과목 시간에 제2선택 과목 문제지를 올려뒀다는 이유로 즉시 부정행위 처리.'},
+  {type:'spell', name:"듣기평가 시간 비행기 소음 통제 실패", cost:2, rarity:'희귀', effect:{type:'noSpellNext'}, scope:'boss', art:'images/ynu/ynu_airplane.jpg', flavor:'굉음과 함께 8번부터 10번까지 세 문제가 머릿속에서 통째로 지워집니다.'},
+  {type:'spell', name:"수정테이프 빌리기 (손들기)", cost:1, rarity:'일반', effect:{type:'tapeHeal', value:4}, scope:'boss', art:'images/ynu/ynu_tape.jpg', flavor:'"감독관님, 수정테이프 좀..." 손들고 기다리는 1분이 1시간처럼 느껴집니다.'},
+  {type:'spell', name:"가채점표 멘탈 붕괴", cost:5, rarity:'특급', effect:{type:'mentalBreak'}, scope:'boss', art:'images/ynu/ynu_mental.jpg', flavor:'점심시간이나 끝나고 화장실에서 애들 답 맞추는 거 엿듣다가 멘탈 박살.'},
+  {type:'spell', name:"비문학 3연타 (철학+경제+양자역학)", cost:3, rarity:'희귀', effect:{type:'textTriple'}, scope:'boss', art:'images/ynu/ynu_bimunhak.jpg', flavor:'한국어로 쓰여 있는데 한국어가 아닌 기적의 외계어 지문.'},
+  {type:'spell', name:"종료령 5분 전 (마킹 타임어택)", cost:4, rarity:'희귀', effect:{type:'drawDiscard', draw:4, discard:1}, scope:'boss', art:'images/ynu/ynu_bell.jpg', flavor:'손을 덜덜 떨며 마킹하느라 컴퓨터용 싸인펜으로 종이를 찢을 뻔한 순간.'},
+  {type:'spell', name:"물수능 컷 폭발", cost:6, rarity:'전설', effect:{type:'cutCrash', value:3, armor:2}, scope:'boss', art:'images/ynu/ynu_cut_crash.jpg', flavor:'한 문제 실수로 1등급에서 3등급으로 수직 낙하하는 등급컷의 잔혹함.'},
 ];
 
 if (typeof module !== 'undefined') { module.exports = { CARD_POOL }; }

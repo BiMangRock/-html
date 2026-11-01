@@ -59,7 +59,8 @@ const server = http.createServer(app).listen(0, async () => {
 
     // ---- 4단계: 컬렉션 ----
     r = await A('GET', '/api/save'); const col = r.data.collection;
-    const commons = E.CARD_POOL.filter(c => c.rarity === '일반');
+    const commons = E.CARD_POOL.filter(c => c.rarity === '일반' && !c.scope);                 // v117: 모험·보스 전용 카드는 스타터로 주지 않는다
+    assert.ok(E.CARD_POOL.filter(c => c.scope).every(c => !col[c.name]), '보스·모험 전용 카드는 스타터에 없음');
     assert.ok(commons.every(c => col[c.name] >= 2), '일반 카드는 전부 2장 이상 지급');
     assert.ok(deck.every(n => col[n] >= 1), '추천 덱 카드는 등급과 상관없이 보유');
     assert.strictEqual(col[LEGEND], undefined, '전설은 스타터에 없음');

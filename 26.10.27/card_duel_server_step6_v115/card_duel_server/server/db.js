@@ -107,4 +107,13 @@ CREATE TABLE IF NOT EXISTS app_config (                 -- 모든 유저가 같�
 );
 `);
 
+// v117: 모험 덱 (모험 전용 카드를 넣을 수 있는 두 번째 덱). 없으면 일반 덱으로 모험에 나간다
+db.exec(`
+CREATE TABLE IF NOT EXISTS adventure_decks (
+  user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  deck_json   TEXT    NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+`);
+
 module.exports = db;

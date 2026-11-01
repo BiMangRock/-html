@@ -5,11 +5,11 @@
 //  - 로드 순서: economy.js 다음, ui.js 앞.  ui.js 는 ServerStore.ready 가 끝난 뒤에 시작한다.
 (() => {
   'use strict';
-  const S = { wallet: null, deck: null, cleared: {}, collection: {}, locked: false, isAdmin: false, bosses: null };
+  const S = { wallet: null, deck: null, advDeck: null, cleared: {}, collection: {}, locked: false, isAdmin: false, bosses: null };
   window.ServerStore = S;
 
   let rev = 0, lastSnap = '', running = false;
-  const pending = { wallet: null, deck: null, clears: new Set(), bosses: undefined };   // bosses: undefined=보낼 것 없음 / null=기본값으로 되돌리기 / 배열=저장
+  const pending = { wallet: null, deck: null, advDeck: null, clears: new Set(), bosses: undefined };   // bosses: undefined=보낼 것 없음 / null=기본값으로 되돌리기 / 배열=저장
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const J = { 'Content-Type': 'application/json' };
 
@@ -42,10 +42,18 @@
     try {
       if (job.k === 'wallet') res = await call('PUT', '/api/wallet', { ...job.v, rev });
       else if (job.k === 'deck') res = await call('PUT', '/api/deck', { deck: job.v });
+      else if (job.k === 'advDeck') res = await call('PUT', '/api/adventure/deck', { deck: job.v });
       else if (job.k === 'bosses') res = await call('PUT', '/api/bosses', { bosses: job.v });
       else res = await call('POST', '/api/adventure/clear', { bossId: job.v });
     } catch (e) { return 'retry'; }
-    if (res.ok) { if (job.k === 'wallet' && res.data.wallet) rev = res.data.wallet.rev; return 'ok'; }
+    if (res.ok) {
+      if (job.k === 'wallet' && res.data.wallet) rev = res.data.wallet.rev;
+      if (job.k === 'clear' && res.data.collection) {                  // v117: 첫 클리어 보상 카드가 들어온 최신 컬렉션
+        S.collection = res.data.collection;
+        if (res.data.granted && res.data.granted.length && S.onCardsGranted) S.onCardsGranted(res.data.granted);
+      }
+      return 'ok';
+    }
     if (res.status === 409) return 'conflict';
     if (res.status >= 500 || res.status === 429) return 'retry';
     console.warn('저장 거부됨:', job.k, res.status, res.data && res.data.error);
@@ -62,6 +70,7 @@
         let job = null;
         if (pending.wallet) job = { k: 'wallet', v: pending.wallet };
         else if (pending.deck) job = { k: 'deck', v: pending.deck };
+        else if (pending.advDeck) job = { k: 'advDeck', v: pending.advDeck };
         else if (pending.bosses !== undefined) job = { k: 'bosses', v: pending.bosses };
         else if (pending.clears.size) job = { k: 'clear', v: pending.clears.values().next().value };
         if (!job) break;
@@ -78,6 +87,7 @@
         }
         if (job.k === 'wallet') { if (pending.wallet === job.v) pending.wallet = null; }
         else if (job.k === 'deck') { if (pending.deck === job.v) pending.deck = null; }
+        else if (job.k === 'advDeck') { if (pending.advDeck === job.v) pending.advDeck = null; }
         else if (job.k === 'bosses') { if (pending.bosses === job.v) pending.bosses = undefined; if (r === 'ok') bossMsg('✔ 서버에 저장됨 (' + new Date().toLocaleTimeString() + ')'); }
         else pending.clears.delete(job.v);
       }
@@ -89,6 +99,9 @@
   const strip = w => ({ gold: w.gold, pool: w.pool, poolDay: w.poolDay, bet: w.bet });
   S.getDeck = () => S.deck;
   S.setDeck = list => { S.deck = list.slice(); pending.deck = S.deck; flush(); };
+  S.getAdvDeck = () => S.advDeck;                                                                   // v117 모험 덱
+  S.setAdvDeck = list => { S.advDeck = list.slice(); pending.advDeck = S.advDeck; flush(); };
+  S.onCardsGranted = null;                                                                          // v117: 서버가 보상 카드를 지급했을 때 ui.js 가 알림을 띄운다
   S.owned = name => S.collection[name] || 0;       // 내가 가진 카드 장수 (4단계)
   S.hasCleared = id => !!S.cleared[id];
   S.markCleared = id => { if (!S.cleared[id]) S.cleared[id] = Date.now(); pending.clears.add(id); flush(); };
@@ -126,7 +139,7 @@
   // 대전은 서버에 저장된 내 덱으로 하므로, 밀려 있는 저장이 모두 끝날 때까지 기다린다. 반환: 저장 완료 여부
   S.waitSaved = async () => {
     const t0 = Date.now();
-    while (!S.locked && (running || pending.wallet || pending.deck || pending.clears.size || pending.bosses !== undefined)) {
+    while (!S.locked && (running || pending.wallet || pending.deck || pending.advDeck || pending.clears.size || pending.bosses !== undefined)) {
       if (Date.now() - t0 > 15000) return false;
       if (!running) flush();
       await sleep(60);
@@ -176,6 +189,7 @@
         const d = await r.json();
         S.wallet = strip(d.wallet); rev = d.wallet.rev; lastSnap = JSON.stringify(S.wallet);
         S.deck = Array.isArray(d.deck) ? d.deck : null;
+        S.advDeck = Array.isArray(d.advDeck) ? d.advDeck : null;
         S.cleared = (d.adventure && d.adventure.cleared) || {};
         S.collection = d.collection || {};
         S.isAdmin = !!d.isAdmin; S.bosses = Array.isArray(d.bosses) ? d.bosses : null;
@@ -190,6 +204,6 @@
   })();
 
   window.addEventListener('beforeunload', e => {     // 아직 못 보낸 변경이 있으면 닫기 전에 경고
-    if (pending.wallet || pending.deck || pending.clears.size) { e.preventDefault(); e.returnValue = ''; }
+    if (pending.wallet || pending.deck || pending.advDeck || pending.clears.size) { e.preventDefault(); e.returnValue = ''; }
   });
 })();

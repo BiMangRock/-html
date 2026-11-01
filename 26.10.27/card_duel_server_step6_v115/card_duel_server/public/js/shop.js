@@ -26,10 +26,11 @@ function shopPickRarity(rng, minRarity) {
   return list[list.length - 1];
 }
 
-// 카드 풀을 등급별로 나눈다.
+// 카드 풀을 등급별로 나눈다. 모험 전용·보스 전용(scope 가 있는 카드)은 팩에서 나오지 않는다.
+const shopCardOk = c => !c.scope || c.scope === 'normal';
 function shopPoolsByRarity(pool) {
   const by = {}; SHOP_RARITIES.forEach(r => { by[r] = []; });
-  pool.forEach(c => { if (by[c.rarity]) by[c.rarity].push(c); });
+  pool.forEach(c => { if (by[c.rarity] && shopCardOk(c)) by[c.rarity].push(c); });
   return by;
 }
 
@@ -82,4 +83,4 @@ const shopPityLeft = pity => ({
   legend: Math.max(1, SHOP.PITY_LEGEND - pity.sinceLegend),
 });
 
-if (typeof module !== 'undefined') { module.exports = { SHOP, SHOP_RARITIES, rollPack, shopPickRarity, shopPoolsByRarity, shopRatePercent, shopPityLeft }; }
+if (typeof module !== 'undefined') { module.exports = { SHOP, SHOP_RARITIES, shopCardOk, rollPack, shopPickRarity, shopPoolsByRarity, shopRatePercent, shopPityLeft }; }

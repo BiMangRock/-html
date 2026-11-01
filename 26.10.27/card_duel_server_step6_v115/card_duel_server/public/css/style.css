@@ -732,3 +732,23 @@ html,body{overscroll-behavior:none; -webkit-tap-highlight-color:transparent; tou
   #deckEditor.filters-collapsed #edFilters{display:block;}
   #edFilterToggle{display:none !important;}
 }
+
+/* v117: 모험 챕터(도장깨기) · 카드 사용 범위 표시 */
+.adv-chapters{display:flex; gap:.5rem; width:100%;}
+.adv-ch{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:.1rem; padding:.55rem .4rem; border-radius:10px; border:1px solid var(--gold-d); background:#1c1830; color:var(--parch-d); font:inherit; cursor:pointer;}
+.adv-ch .ic{font-size:1.5rem; line-height:1.1;}
+.adv-ch b{font-size:.9rem; white-space:nowrap;} .adv-ch small{font-size:.68rem; opacity:.8;}
+.adv-ch.on{background:linear-gradient(180deg,#3a2f12,#1c1830); border-color:var(--gold); color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset;}
+.adv-chdesc{width:100%; box-sizing:border-box; text-align:left; padding:.55rem .7rem; border-radius:8px; background:#14112a; border:1px solid rgba(201,162,39,.35); color:var(--parch); font-size:.85rem;}
+.adv-chdesc small{color:var(--parch-d); font-size:.72rem;} .adv-chdesc .prog{float:right; color:var(--gold); font-weight:700;}
+.adv-bar{margin-top:.4rem; height:6px; border-radius:3px; background:#2a2440; overflow:hidden;} .adv-bar i{display:block; height:100%; background:var(--gold);}
+.boss-btn .stage{display:inline-block; margin-right:.4rem; padding:0 .45rem; border-radius:999px; background:var(--gold); color:var(--ink); font-size:.7rem; font-weight:800; vertical-align:1px;}
+.boss-btn.locked{opacity:.55; filter:grayscale(.7);} .boss-btn.locked .stage{background:#666;}
+.boss-btn .tags s{opacity:.6;}
+.ed-scope{font-size:.66rem; font-weight:800; padding:1px 7px; border-radius:4px; line-height:1.4;}
+.ed-scope.sc-adventure{background:#1f5e3a; color:#b6f5cf;} .ed-scope.sc-boss{background:#6b1d1d; color:#ffc9c9;}
+#overlayReward .sub2.cards{color:#b6f5cf; font-weight:700;}
+/* v117: 그림 보스 아이콘 · 대전 화면 보스 초상화 */
+.boss-btn .ic .boss-img{width:2.6rem; height:2.6rem; object-fit:cover; object-position:center 25%; border-radius:50%; border:2px solid var(--gold-d); display:block; margin:0 auto;}
+body.boss-portrait #aiAvatar{display:block;}
+body.boss-portrait #aiAvatar>span{background-size:cover; background-position:center 22%; background-repeat:no-repeat;}
