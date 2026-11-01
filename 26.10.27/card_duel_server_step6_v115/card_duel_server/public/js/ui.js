@@ -1023,7 +1023,6 @@ function cardEl(c, opts={}){
   if(c.cantAttack) tags+='<span class="tag" style="background:#4a4a4a;color:#ddd">공격 불가</span>';   // v117 비문학 지문
   if(c.confused) tags+=`<span class="tag" style="background:#5a2a7a;color:#f0d0ff">🌀 ${c.confusedPerm?'영구 ':''}혼란</span>`;
   if(c.knightBy) tags+='<span class="tag" style="background:#2a3a5a;color:#cfe0ff">🛡 흑기사</span>';
-  if(c.guardAll) tags+='<span class="tag" style="background:#3a2a1a;color:#ffd9a0">독박</span>';
   if(c.caffeineDoom) tags+='<span class="tag" style="background:#7a3a10;color:#ffd9a0">⚡ 카페인 쇼크 예정</span>';
   if(c.freezeNext) tags+='<span class="tag frozen">겁먹음</span>';
   if(c.deathPoisonShot||c.deathLunch||c.deathKill||c.deathFace||c.deathCaffeine||c.deathKillAlly||c.deathHandMinion) tags+='<span class="tag revive">죽음의 메아리</span>';
@@ -2374,42 +2373,93 @@ updateDeckMenuDesc();
 showScreen('main');
 });
 
+// ---------- v117 키워드 사전: 카드 문구는 짧게, 뜻은 마우스를 올렸을 때 크게 보이는 카드 옆에 ----------
+//  카드 문구(종족·키워드 표시 포함)에 이 단어가 있으면 설명을 띄운다. 새 키워드를 만들면 여기에 한 줄 추가
+const KEYWORD_HELP = [
+  ['영구 혼란','혼란과 같지만, 공격한 뒤에도 풀리지 않습니다.'],
+  ['혼란','주인이 조종할 수 없습니다. 주인의 턴이 끝날 때 무작위 대상(양쪽 하수인·영웅)을 한 번 공격하고 풀립니다.'],
+  ['흑기사','정해진 아군 하수인이 받을 피해를 대신 받습니다.'],
+  ['독박','아군 하수인이 피해를 입을 때 대신 맞습니다. 한 번에 받는 피해는 1로 고정됩니다.'],
+  ['휴면','전장에서 잠시 사라졌다가, 정해진 턴이 지나면 돌아옵니다.'],
+  ['근육통','내 턴이 시작될 때 아군 하수인이 전부 빙결되고, 영웅도 공격할 수 없습니다.'],
+  ['번아웃','이번 턴에 공격할 수 없습니다.'],
+  ['소심함','공격력이 1이 됩니다.'],
+  ['식곤증','다음 턴에 카드를 1장 덜 뽑고, 무작위 하수인 하나가 빙결됩니다.'],
+  ['화상','적힌 숫자만큼 피해를 받습니다.'],
+  ['겁먹음','다음 내 턴 동안 빙결됩니다.'],
+  ['우주공강','다음 턴 동안 영웅이 공격하거나 주문을 쓸 수 없습니다.'],
+  ['숙취','다음 턴 동안 카드를 낼 때마다 그 비용만큼 영웅이 피해를 입습니다.'],
+  ['카페인 쇼크','그 하수인 주인의 턴이 끝나면 처치됩니다.'],
+  ['실격','누구든 하수인을 낼 때 50% 확률로 소환되지 못하고 손으로 돌아갑니다. 마나는 그대로 씁니다.'],
+  ['장소','공격하지 않는 구조물. 생명력이 내구도이고, 내 턴이 끝날 때마다 1씩 줄어듭니다.'],
+  ['1학년 하수인','원래 비용이 1이거나 이름에 「1학년」이 들어간 하수인.'],
+  ['내일로 버프','생명력 +2 · 공격력 +2 · 질풍 · 도발 · 보호막 · 생명력 흡수 중 하나.'],
+  ['만취한 손님','0/2 토큰. 공격 불가, 양옆 하수인 공격력 -1.'],
+  ['PC방 올빼미','4/4 속공 토큰.'],
+  ['당근마켓 정산금','동전: 이번 턴 마나 +1.'],
+  ['카페인 충전','0코스트 주문: 이번 턴 마나 +1.'],
+  ['게임 불감증','0/1 토큰. 죽음의 메아리: 그 주인의 손에서 무작위 하수인 제거.'],
+  ['지문','도발 · 공격 불가 토큰.'],
+  ['블러드 엘프','3/3 토큰 (상대 전장).'],
+  ['오크','3/3 토큰.'],
+  ['도발','적은 도발 하수인을 먼저 공격해야 합니다.'],
+  ['돌진','낸 턴에 바로 공격할 수 있습니다.'],
+  ['속공','낸 턴에 하수인만 공격할 수 있습니다.'],
+  ['독성','이 카드에게 피해를 입은 하수인은 죽습니다.'],
+  ['보호막','처음 받는 피해를 한 번 막습니다.'],
+  ['은신','공격하기 전까지 적이 대상으로 고를 수 없습니다.'],
+  ['빙결','다음 공격 기회를 한 번 잃습니다.'],
+  ['침묵','하수인의 능력과 효과를 모두 지웁니다.'],
+  ['죽음의 메아리','하수인이 죽을 때 발동합니다.'],
+  ['전투의 함성','손에서 낼 때 발동합니다.'],
+  ['과부하','다음 턴에 마나 수정이 그만큼 잠깁니다.'],
+  ['발견','3장 중 1장을 골라 손에 넣습니다.'],
+  ['질풍','한 턴에 두 번 공격할 수 있습니다.'],
+  ['생명력 흡수','준 피해만큼 내 영웅이 회복합니다.'],
+];
+function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(out.length>=6) break; if(text.includes(k) && !out.some(([x])=>x.includes(k))) out.push([k,d]); } return out; }   // '영구 혼란'이 있으면 '혼란'은 한 번만
+
 // ---------- v83: 카드 위에 마우스를 올리면 큰 미리보기 (하스스톤 방식) ----------
-// v117: 보상 묶음 창 위에서도 보이도록 맨 위(z-index)에 띄우고, 보상 창 카드는 터치(누르고 있기)로도 볼 수 있다
+// v117: 보상 묶음 창 위에서도 보이도록 맨 위(z-index)에 띄우고, 보상 창 카드는 터치(누르고 있기)로도 볼 수 있다. 옆에 키워드 설명
 (function(){
   const hover=!!(window.matchMedia && matchMedia('(hover:hover)').matches);
   const box=document.createElement('div'); box.id='cardPreview'; box.style.zIndex='8000'; document.body.appendChild(box);
   const SKIP='#mulliganModal,#discoverModal,#spellCast,#burnCast,#cardPreview';
   let cur=null;
   function hide(){ box.style.display='none'; box.innerHTML=''; cur=null; }
-  function show(el){
-    cur=el; box.innerHTML='';
-    const cl=el.cloneNode(true);
-    cl.classList.remove('selected','attackable','dead','frozen-x'); cl.style.cssText=''; cl.removeAttribute('title');
-    box.appendChild(cl); box.style.display='block';
-    const r=el.getBoundingClientRect(), p=cl.getBoundingClientRect(), w=p.width, h=p.height;
-    let x=r.right+14; if(x+w>innerWidth-6) x=r.left-w-14; if(x<6) x=Math.max(6,Math.min(innerWidth-w-6, r.left+r.width/2-w/2));
-    let y=r.top+r.height/2-h/2; y=Math.max(6, Math.min(innerHeight-h-6, y));
+  function place(anchor, cardNode, textForNotes, preferLeft){              // 카드(확대)를 띄우고, 오른쪽에 키워드 설명을 붙인다
+    box.innerHTML=''; box.appendChild(cardNode); box.style.display='block';
+    const p=cardNode.getBoundingClientRect(), notes=keywordNotes(textForNotes);
+    let nw=0;
+    if(notes.length){ const n=document.createElement('div'); n.className='kw-notes'; n.style.left=(p.width+10)+'px';
+      n.innerHTML=notes.map(([k,d])=>`<div><b>${escHtml(k)}</b><span>${escHtml(d)}</span></div>`).join(''); box.appendChild(n); nw=n.getBoundingClientRect().width+10; }
+    const r=anchor.getBoundingClientRect(), w=p.width+nw, h=Math.max(p.height, box.lastChild.getBoundingClientRect().height);
+    let x=preferLeft ? r.left-w-14 : r.right+14;
+    if(!preferLeft && x+w>innerWidth-6) x=r.left-w-14;
+    if(x<6) x=Math.max(6, Math.min(innerWidth-w-6, preferLeft ? r.right+14 : r.left+r.width/2-w/2));
+    const y=Math.max(6, Math.min(innerHeight-h-6, r.top+r.height/2-h/2));
     box.style.left=x+'px'; box.style.top=y+'px';
+  }
+  function show(el){
+    cur=el;
+    const cl=el.cloneNode(true);
+    cl.classList.remove('selected','attackable','dead','frozen-x'); cl.style.cssText='filter:none; opacity:1;'; cl.removeAttribute('title');   // 덱 편집의 흐림(0장·미보유) 효과는 빼고 보여 준다
+    place(el, cl, el.textContent||'', false);
   }
   const target=e=>{ const c=e.target.closest && e.target.closest('.card'); return (!c || c.closest(SKIP) || c.classList.contains('card-back') || !c.querySelector('.cname')) ? null : c; };
   document.addEventListener('mouseover', e=>{
     if(!hover && !(e.target.closest && e.target.closest('#offerModal'))) return;          // 터치 기기는 보상 창만
-    const c=target(e); if(!c){ if(cur) hide(); return; }
+    const c=target(e); if(!c){ if(cur && !(cur.dataset && cur.dataset.card)) hide(); return; }
     if(c!==cur) show(c);
   });
   document.addEventListener('touchstart', e=>{ const c=target(e); if(c && c.closest('#offerModal')) show(c); else if(cur) hide(); }, {passive:true});
-  document.addEventListener('touchend', ()=>{ if(cur && cur.closest('#offerModal')) setTimeout(hide, 900); }, {passive:true});
-  // v117 전투 기록: 카드 이름이 들어 있는 줄에 마우스를 올리면 그 카드를 띄운다
+  document.addEventListener('touchend', ()=>{ if(cur && cur.closest && cur.closest('#offerModal')) setTimeout(hide, 900); }, {passive:true});
+  // v117 전투 기록: 카드 이름이 들어 있는 줄에 마우스를 올리면 그 카드를 띄운다 (기록 창은 오른쪽이라 왼쪽에)
   document.addEventListener('mouseover', e=>{
     const li=e.target.closest && e.target.closest('#logList [data-card]');
     if(!li){ if(cur && cur.dataset && cur.dataset.card) hide(); return; }
     if(cur===li) return; const c=cardByName(li.dataset.card); if(!c) return;
-    const tmp=cardEl(c); tmp.removeAttribute('title'); cur=li; box.innerHTML=''; box.appendChild(tmp); box.style.display='block';
-    const r=li.getBoundingClientRect(), p=tmp.getBoundingClientRect(), w=p.width, h=p.height;
-    let x=r.left-w-14; if(x<6) x=Math.min(innerWidth-w-6, r.right+14);                     // 기록 창은 오른쪽에 있으니 왼쪽에 띄운다
-    const y=Math.max(6, Math.min(innerHeight-h-6, r.top+r.height/2-h/2));
-    box.style.left=x+'px'; box.style.top=y+'px';
+    const tmp=cardEl(c); tmp.removeAttribute('title'); cur=li; place(li, tmp, tmp.textContent||'', true);
   });
   ['mousedown','wheel','dragstart'].forEach(t=>document.addEventListener(t, ()=>{ if(cur) hide(); }, true));
   setInterval(()=>{ if(cur && !document.body.contains(cur)) hide(); }, 250);     // 화면이 다시 그려져 카드가 사라지면 미리보기도 치운다

@@ -779,3 +779,7 @@ body.boss-portrait #aiAvatar>span{background-size:cover; background-position:cen
 /* v117: 카드가 들어 있는 전투 기록 줄 — 마우스를 올리면 카드 미리보기 */
 #logList div.has-card{cursor:help;}
 #logList div.has-card:hover{color:var(--gold); background:rgba(201,162,39,.08);}
+/* v117: 키워드 설명 (크게 보기 옆) */
+#cardPreview .kw-notes{position:absolute; top:0; width:13.5rem; display:flex; flex-direction:column; gap:.35rem;}
+#cardPreview .kw-notes div{background:rgba(18,15,38,.96); border:1px solid var(--gold-d); border-radius:8px; padding:.4rem .55rem; font-size:.74rem; line-height:1.4; color:var(--parch-d); box-shadow:0 4px 14px rgba(0,0,0,.5);}
+#cardPreview .kw-notes b{display:block; color:var(--gold); font-size:.8rem; margin-bottom:.1rem;}
