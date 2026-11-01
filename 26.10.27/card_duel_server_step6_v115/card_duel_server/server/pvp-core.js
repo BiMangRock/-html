@@ -16,8 +16,10 @@ const crypto = require('crypto');
 const JS = path.join(__dirname, '..', 'public', 'js');
 const E = require(path.join(JS, 'engine.js'));
 const { PVP } = require(path.join(JS, 'pvp.js'));
+const { PROGRESS } = require(path.join(JS, 'progress.js'));   // v132 감정 표현 목록
+const EMOTE_IDS = PROGRESS.EMOTES.map(e => e.id);
 
-const ALLOWED = new Set(['PLAY_CARD', 'ATTACK', 'HERO_ATTACK', 'END_TURN', 'TARGET', 'CHOOSE', 'SURRENDER']);
+const ALLOWED = new Set(['PLAY_CARD', 'ATTACK', 'HERO_ATTACK', 'HERO_POWER', 'END_TURN', 'TARGET', 'CHOOSE', 'SURRENDER']);   // v131 HERO_POWER
 const cryptoRng = () => crypto.randomInt(0, 2 ** 30) / 2 ** 30;
 
 // 클라이언트가 보낸 행동에서 엔진이 아는 필드만 골라낸다 (이상한 값·큰 객체를 엔진에 넘기지 않는다)
@@ -124,8 +126,9 @@ function createPvp(opts = {}) {
   }
 
   // ---------- 대기열 ----------
-  function queueJoin(uid, mode) {
+  function queueJoin(uid, mode, heroPower) {
     const u = users.get(uid); const md = mode === 'rank' ? 'rank' : 'normal';   // v127 일반전 / 랭크전
+    if (u) u.qpower = E.HERO_POWERS[heroPower] ? heroPower : null;            // v131 고른 영웅 능력 (없거나 잘못되면 판 시작 때 무작위)
     if (!u || !u.conns.size) return { ok: false, error: '서버와 연결되어 있지 않아요. 화면을 새로고침해 주세요.' };
     if (u.matchId) return { ok: false, error: '이미 대전 중이에요.' };
     if (u.queued && u.qmode === md) return { ok: true, already: true };
@@ -168,7 +171,8 @@ function createPvp(opts = {}) {
       for (const uid of order) { const u = users.get(uid); if (u) { sendTo(u, { t: 'error', error: '덱을 불러오지 못했어요. 잠시 뒤 다시 해 주세요.' }); pushStatus(u); } }
       return;
     }
-    const state = E.newGame(rng, { decks });
+    const heroPowers = order.map(uid => { const u = users.get(uid); return (u && u.qpower) || E.randomHeroPower(rng); });   // v131
+    const state = E.newGame(rng, { decks, heroPowers });
     const now = Date.now();
     const m = {
       id: crypto.randomBytes(8).toString('hex'), ranked: mode === 'rank', uids: order, names: order.map(uid => users.get(uid).username),
@@ -216,6 +220,18 @@ function createPvp(opts = {}) {
     E.mulliganHand(m.state, seat, ids);
     m.mull[seat].done = true;
     if (m.mull[0].done && m.mull[1].done) beginPlay(m); else broadcast(m);
+  }
+  // v132 감정 표현: 상대에게 말풍선만 전달 (게임 상태와 무관). 너무 자주 보내면 거절
+  function emote(uid, matchId, id) {
+    const m = matchOf(uid, matchId);
+    if (!m || m.over) return { ok: false, error: '진행 중인 판이 없어요.' };
+    if (!EMOTE_IDS.includes(id)) return { ok: false, error: '잘못된 감정 표현이에요.' };
+    const seat = m.uids.indexOf(uid), now = Date.now();
+    m.emoteAt = m.emoteAt || [0, 0];
+    if (now - m.emoteAt[seat] < PROGRESS.EMOTE_GAP_MS) return { ok: false, error: '조금 뒤에 다시 보내 주세요.' };
+    m.emoteAt[seat] = now;
+    const o = users.get(m.uids[1 - seat]); if (o) sendTo(o, { t: 'emote', matchId: m.id, seat, id });
+    return { ok: true };
   }
   function mulligan(uid, matchId, ids) {
     const m = matchOf(uid, matchId);
@@ -342,7 +358,7 @@ function createPvp(opts = {}) {
   function shutdown() { clearInterval(timer); }
 
   return {
-    connect, disconnect, queueJoin, queueCancel, mulligan, action, stateOf, shutdown,
+    connect, disconnect, queueJoin, queueCancel, mulligan, emote, action, stateOf, shutdown,
     _users: users, _matches: matches, _queue: () => queue, _tick: tick, cfg,
   };
 }

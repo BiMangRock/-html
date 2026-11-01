@@ -197,6 +197,33 @@
     } finally { S.shopBusy = false; }
   };
 
+  // ---------- v132 카드 제작·분해 · 일일 퀘스트 ----------
+  S.progress = null;                                 // {dust, quests:{day, list, rerollsLeft, gamesLeft}}
+  S.onProgress = null;                               // 가루·퀘스트가 바뀌면 화면이 다시 그린다
+  const takeProgress = d => { if (d && d.quests) { S.progress = { dust: d.dust, quests: d.quests }; if (S.onProgress) S.onProgress(); } if (d && d.collection) S.collection = d.collection; };
+  S.loadProgress = async () => { try { const r = await call('GET', '/api/progress'); if (r.ok) takeProgress(r.data); return r.ok; } catch (e) { return false; } };
+  const progCall = async (url, body) => {
+    let r; try { r = await call('POST', url, body); } catch (e) { return { ok: false, error: '서버에 연결할 수 없어요.' }; }
+    if (r.ok) takeProgress(r.data);
+    return r.ok ? { ok: true, ...r.data } : { ok: false, error: (r.data && r.data.error) || '처리하지 못했어요.' };
+  };
+  S.craft = name => progCall('/api/craft', { name });
+  S.disenchant = (name, count) => progCall('/api/disenchant', { name, count });
+  S.disenchantExtra = () => progCall('/api/disenchant-extra');
+  S.rerollQuest = index => progCall('/api/quests/reroll', { index });
+  // 한 판이 끝나면 기록을 보낸다. 퀘스트 보상 골드는 서버가 지갑에 넣으므로, 밀린 골드 저장을 먼저 끝내고 저장 번호(rev)를 같이 보낸다
+  S.reportGame = async stats => {
+    if (S.locked) return { ok: false };
+    if (!(await waitWalletSaved())) return { ok: false };
+    let r; try { r = await call('POST', '/api/quests/report', { stats, rev }); } catch (e) { return { ok: false }; }
+    if (r.status === 409) { S.locked = true; banner('⚠ 다른 기기나 탭에서 먼저 저장되었어요. 이 화면의 변경은 저장되지 않으니 새로고침해 주세요.', true); return { ok: false }; }
+    if (!r.ok) return { ok: false };
+    const d = r.data;
+    if (d.wallet) { rev = d.wallet.rev; S.wallet = strip(d.wallet); lastSnap = JSON.stringify(S.wallet); Economy.set({ ...Economy.get(), gold: d.wallet.gold }); }
+    takeProgress(d);
+    return { ok: true, completed: d.completed || [], gold: d.gold || 0, capped: !!d.capped };
+  };
+
   // ---------- 시작: 서버에서 불러오기 ----------
   S.ready = (async () => {
     overlay('불러오는 중…');
@@ -216,6 +243,7 @@
         S.isAdmin = !!d.isAdmin; S.bosses = Array.isArray(d.bosses) ? d.bosses : null;
         Economy.useStore(walletStore);
         overlayOff();
+        S.loadProgress();                            // v132 가루·퀘스트 (실패해도 게임은 그대로)
         return;
       } catch (e) {
         overlay('서버에 연결할 수 없어요. 다시 시도하는 중…');

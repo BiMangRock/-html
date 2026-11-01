@@ -6,7 +6,7 @@ const express = require('express');
 const db = require('./db');
 const { requireAuth, requireAdmin } = require('./auth');
 const JS = path.join(__dirname, '..', 'public', 'js');
-const { validateDeckList } = require(path.join(JS, 'engine.js'));
+const { validateDeckList, HERO_POWERS: E_HP } = require(path.join(JS, 'engine.js'));
 const { BOSS_DEFAULT, advCleanFields, advCleanIcon } = require(path.join(JS, 'adventure.js'));
 
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
@@ -35,6 +35,7 @@ function cleanBoss(b, i) {
     tier: high ? 'high' : 'mid',
     bot: high ? 'model' : (b.bot === 'rule' ? 'rule' : 'rule2'),
     model: String(b.model || '').slice(0, 200),
+    heroPower: E_HP[b.heroPower] ? b.heroPower : '',   // v131 영웅 능력 ('' = 판마다 무작위)
     deck: b.deck.map(String),
     ...advCleanFields(b),          // v117: chapter · stage · rewardCards
   };

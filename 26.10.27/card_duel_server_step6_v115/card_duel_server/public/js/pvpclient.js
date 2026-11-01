@@ -83,6 +83,8 @@ const PvpClient = (() => {
       renderScreen();
     } else if (m.t === 'match') {
       S.chain = S.chain.then(() => handleMatch(m)).catch(e => console.error('[pvp]', e));
+    } else if (m.t === 'emote') {                                         // v132 상대 감정 표현
+      if (m.matchId === S.matchId) { const x = PROGRESS.EMOTES.find(e => e.id === m.id); if (x) showBubble(OPP, x.text); }
     } else if (m.t === 'presence') {
       if (m.matchId === S.matchId) { S.oppOffAt = m.oppOnline ? 0 : Date.now() - (m.oppOfflineMs || 0); S.reconnectMs = m.reconnectMs || S.reconnectMs; tickHud(); }
     } else if (m.t === 'error') {
@@ -134,14 +136,14 @@ const PvpClient = (() => {
     showMsg(''); const b = el('pvpFindBtn'); b.disabled = true;
     const saved = await ServerStore.waitSaved();                       // 대전은 서버에 저장된 내 덱으로 한다 → 방금 고친 덱이 저장될 때까지 기다린다
     if (!saved) { showMsg('저장이 아직 끝나지 않았어요. 잠시 뒤 다시 눌러 주세요.'); renderScreen(); return; }
-    const r = await post('/api/pvp/queue', { mode: S.mode });
+    const r = await post('/api/pvp/queue', { mode: S.mode, heroPower: HeroPowerPref.get() });   // v131
     if (!r.ok) showMsg(r.data.error || '대기열에 들어가지 못했어요.');
     renderScreen();
   }
   el('pvpFindBtn').onclick = toggleQueue;
   // ---------- v127 랭크전: 모드 탭 · 등급 배지 · 순위표 · 일반전 전환 ----------
   document.querySelectorAll('#pvpModes button').forEach(b => b.onclick = () => { if (S.status && S.status.state === 'queue') return; S.mode = b.dataset.mode; showMsg(''); renderScreen(); });
-  el('pvpFallbackBtn').onclick = async () => { S.mode = 'normal'; S.queuedAt = Date.now(); const r = await post('/api/pvp/queue', { mode: 'normal' }); if (!r.ok) showMsg(r.data.error || '일반전으로 바꾸지 못했어요.'); renderScreen(); };
+  el('pvpFallbackBtn').onclick = async () => { S.mode = 'normal'; S.queuedAt = Date.now(); const r = await post('/api/pvp/queue', { mode: 'normal', heroPower: HeroPowerPref.get() }); if (!r.ok) showMsg(r.data.error || '일반전으로 바꾸지 못했어요.'); renderScreen(); };
   const rankLine = rk => !rk ? '-' : rk.tier >= RANK.LEGEND ? `${ladderLabel(rk)}${rk.place ? ` · ${rk.place}위` : ''}` : `${ladderLabel(rk)} <span class="stars">${ladderStars(rk)}</span>`;
   function renderRank(rk) {
     if (!rk) return;
@@ -186,6 +188,7 @@ const PvpClient = (() => {
     Host.state = st;
   }
   function beginMatchUi(m) {
+    QStats.start(); emo.muted = false;                                      // v132
     S.matchId = m.matchId; S.lastSeq = -1; S.over = false; S.phase = null; clearTimeout(S.waitTimer); S.ranked = !!m.ranked; S.mode = m.ranked ? 'rank' : 'normal';
     MY = m.seat; OPP = 1 - m.seat;
     game = { key: 'pvp', mode: 'pvp', bet: 0, tier: 0, cheats: [], pool: 0, settled: true, result: null, deckNames: Array.isArray(m.deck) ? m.deck.slice() : DeckBook.get(), pvpTitle: '', pvpHTML: '' };
@@ -292,6 +295,7 @@ const PvpClient = (() => {
       : `<img src="${IMG}no_reward.webp" alt="보상 없음">`;
     if (r.wallet) ServerStore.adoptWallet(r.wallet);                       // 서버가 이미 지갑에 넣은 골드 → 새 저장 번호로 이어서 쓴다
     updateWallet();
+    if (!r.void) QStats.finish(!!r.youWon, 'pvp');                         // v132 일일 퀘스트 기록
     game.pvpHTML = resultHTML(r);
     el('pvpAgainBtn').style.display = '';
     el('pvpTimer').style.display = 'none'; el('pvpRope').style.display = 'none'; banner(null);
@@ -341,5 +345,6 @@ const PvpClient = (() => {
     } catch (_) {}
   });
 
-  return { openScreen, act, afterMatch, _state: S };
+  async function emote(id) { if (!S.matchId || S.over) return; const r = await post('/api/pvp/emote', { matchId: S.matchId, id }); if (!r.ok && r.data && r.data.error) logLine('⚠ ' + r.data.error); }   // v132
+  return { openScreen, act, afterMatch, emote, _state: S };
 })();

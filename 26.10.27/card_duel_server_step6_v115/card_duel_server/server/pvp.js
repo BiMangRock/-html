@@ -45,12 +45,18 @@ function makeHandlers(pvp) {
     // GET /pvp/status — 페이지를 새로 열었을 때 진행 중인 판이 있는지 (있으면 화면이 스트림을 열어 이어서 한다)
     status(req, res) { res.set('Cache-Control', 'no-store'); res.json({ state: pvp.stateOf(req.user.id) }); },
     // POST /pvp/queue · /pvp/cancel
-    queue(req, res) { if (!queueOk(req.user.id)) return tooMany(res); const r = pvp.queueJoin(req.user.id, (req.body || {}).mode); res.status(r.ok ? 200 : 400).json(r); },   // v127 {mode:'normal'|'rank'}
+    queue(req, res) { if (!queueOk(req.user.id)) return tooMany(res); const r = pvp.queueJoin(req.user.id, (req.body || {}).mode, (req.body || {}).heroPower); res.status(r.ok ? 200 : 400).json(r); },   // v127 {mode:'normal'|'rank'}
     cancel(req, res) { const r = pvp.queueCancel(req.user.id); res.status(r.ok ? 200 : 400).json(r); },
     // POST /pvp/mulligan {matchId, ids}
     mulligan(req, res) {
       if (!actionOk(req.user.id)) return tooMany(res);
       const b = req.body || {}; const r = pvp.mulligan(req.user.id, String(b.matchId || ''), b.ids);
+      res.status(r.ok ? 200 : 400).json(r);
+    },
+    // POST /pvp/emote {matchId, id}   v132 감정 표현
+    emote(req, res) {
+      if (!actionOk(req.user.id)) return tooMany(res);
+      const b = req.body || {}; const r = pvp.emote(req.user.id, String(b.matchId || ''), String(b.id || ''));
       res.status(r.ok ? 200 : 400).json(r);
     },
     // POST /pvp/action {matchId, seq, action}   (결과 화면은 스트림으로 온다. 여기서는 접수 여부만)
@@ -68,6 +74,7 @@ const router = express.Router();
 router.use('/pvp', requireAuth);
 router.get('/pvp/stream', h.stream);
 router.get('/pvp/status', h.status);
+router.post('/pvp/emote', h.emote);
 router.post('/pvp/queue', h.queue);
 router.post('/pvp/cancel', h.cancel);
 router.post('/pvp/mulligan', h.mulligan);

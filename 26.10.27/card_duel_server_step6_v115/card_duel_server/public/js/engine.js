@@ -215,6 +215,68 @@ const onMinion = fn => (s, seat, c, target, ev, src) => {           // 대상 �
 };
 const viaBattlecry = (s, seat, c, target, ev) => battlecry(s, seat, {name:c.name, effect:c.effect, spell:true, school:c.school}, target, ev);   // 피해·회복·드로우는 전투의 함성과 같은 처리
 
+// ---- v131 영웅 능력: 턴마다 한 번, 비용 1. 표에 한 줄 추가하면 새 영웅 능력이 생긴다 (id 는 바꾸지 말 것 — 저장된 선택·보스 설정이 id 로 가리킨다) ----
+//   targets(s, seat): 대상 목록 (없으면 대상 없음) · blocked(s, seat): 지금 못 쓰는 이유 문자열 · use(s, seat, target, ev, src): 효과
+//   bot(view, acts): 봇이 쓸 행동 (null 이면 이번 턴엔 안 씀)
+const HP_COST = 1;
+const hpCanTarget = (s, seat, sd, m) => !m.elusive && !(sd!==seat && (m.stealth || m.airpods));   // 모면은 대상 불가 · 적의 은신·노이즈캔슬링도 불가
+const hpMinions = (s, seat, sides) => sides.flatMap(sd => s.seats[sd].board.filter(m => m.hp>0 && hpCanTarget(s, seat, sd, m)).map(m => minionT(sd, m.id)));
+const hpAll = (s, seat) => [heroT(other(seat)), ...hpMinions(s, seat, [other(seat), seat]), heroT(seat)];
+const hpPick = (view, acts, score) => { let best=null, bs=-Infinity; for(const a of acts){ const v=score(a.target); if(v>bs){ bs=v; best=a; } } return bs>-Infinity ? best : null; };
+const hpMin = (view, t) => t && t.kind==='minion' ? (t.seat===view.seat ? view.me.board : view.opp.board).find(m=>m.id===t.id) : null;
+const HERO_POWERS = {
+  fireblast: {name:'화염 작렬', icon:'🔥', text:'대상에게 피해 1', targets:hpAll,
+    use:(s,seat,t,ev,src)=>hitTarget(s, t, 1, ev, src),
+    bot:(view,acts)=>hpPick(view, acts, t=>{ if(t.seat===view.seat) return -Infinity; const m=hpMin(view,t); if(!m) return 1; return m.hp<=1 && !m.shield ? 10+m.atk : -Infinity; })},
+  armorUp:   {name:'방어 태세', icon:'🛡', text:'방어도 2',
+    use:(s,seat,t,ev,src)=>{ const P=s.seats[seat]; P.armor=(P.armor||0)+2; ev.push({type:'armor', seat, amount:2, src}); },
+    bot:(view,acts)=>acts[0]},
+  recruit:   {name:'신병 소집', icon:'⚔', text:'1/1 신병 소환',
+    blocked:(s,seat)=> s.seats[seat].board.length>=CONFIG.MAX_BOARD ? '전장이 가득 찼습니다.' : null,
+    use:(s,seat,t,ev,src)=>summonTokens(s, seat, 1, {name:'신병', atk:1, hp:1, rush:false}, ev),
+    bot:(view,acts)=>acts[0]},
+  lesserHeal:{name:'치유의 손길', icon:'✚', text:'대상 생명력 2 회복', targets:hpAll,
+    use:(s,seat,t,ev,src)=>battlecry(s, seat, {name:src.name, effect:{type:'heal', value:2}}, t, ev),
+    bot:(view,acts)=>hpPick(view, acts, t=>{ if(t.seat!==view.seat) return -Infinity; if(t.kind==='hero'){ const lost=(view.me.maxHp||30)-view.me.hp; return lost>=2 ? lost : -Infinity; } const m=hpMin(view,t); const lost=m ? (m.maxHp||m.hp)-m.hp : 0; return lost>0 ? lost+m.atk : -Infinity; })},
+  dagger:    {name:'단검 숙련', icon:'🗡', text:'이번 턴 영웅 공격력 +1',
+    use:(s,seat,t,ev,src)=>{ const P=s.seats[seat]; P.heroAtk=(P.heroAtk||0)+1; ev.push({type:'heroAtk', seat, amount:1, src}); },
+    bot:(view,acts)=> view.me.heroAttacked ? null : acts[0]},
+  lifeTap:   {name:'생명력 전환', icon:'🩸', text:'내 영웅에게 피해 2, 카드 1장 뽑기',
+    use:(s,seat,t,ev,src)=>{ hurtHero(s, seat, 2, ev, 'battlecry', src); if(s.seats[seat].hp>0) drawCards(s, seat, 1, ev, src); },
+    bot:(view,acts)=> view.me.hp>10 && view.me.hand.length<=8 && view.me.deckCount>0 ? acts[0] : null},
+  steadyShot:{name:'고정 사격', icon:'🏹', text:'적 영웅에게 피해 2',
+    use:(s,seat,t,ev,src)=>hurtHero(s, other(seat), 2, ev, 'battlecry', src),
+    bot:(view,acts)=>acts[0]},
+  shapeshift:{name:'변신', icon:'🐾', text:'이번 턴 영웅 공격력 +1, 방어도 1',
+    use:(s,seat,t,ev,src)=>{ const P=s.seats[seat]; P.heroAtk=(P.heroAtk||0)+1; ev.push({type:'heroAtk', seat, amount:1, src}); P.armor=(P.armor||0)+1; ev.push({type:'armor', seat, amount:1, src}); },
+    bot:(view,acts)=>acts[0]},
+  totem:     {name:'토템 소환', icon:'🗿', text:'0/2 도발 토템 소환',
+    blocked:(s,seat)=> s.seats[seat].board.length>=CONFIG.MAX_BOARD ? '전장이 가득 찼습니다.' : null,
+    use:(s,seat,t,ev,src)=>summonTokens(s, seat, 1, {name:'돌 토템', atk:0, hp:2, taunt:true, rush:false, extra:{tribe:'토템'}}, ev),
+    bot:(view,acts)=>acts[0]},
+  inspire:   {name:'격려', icon:'✨', text:'아군 하수인 하나 공격력 +1', targets:(s,seat)=>hpMinions(s, seat, [seat]),
+    use:(s,seat,t,ev,src)=>{ const m=findMinion(s, t.seat, t.id); if(!m){ ev.push({type:'ignored', seat, src}); return; } m.atk+=1; ev.push({type:'buff', target:t, name:m.name, value:1, hpValue:0, src}); },
+    bot:(view,acts)=>hpPick(view, acts, t=>{ const m=hpMin(view,t); return m ? m.hp*2-(m.attacked?3:0) : -Infinity; })},
+  frostTouch:{name:'냉기의 손길', icon:'❄', text:'적 하수인 하나 빙결', targets:(s,seat)=>hpMinions(s, seat, [other(seat)]).filter(t=>!findMinion(s, t.seat, t.id).frozen),
+    use:(s,seat,t,ev,src)=>{ const m=findMinion(s, t.seat, t.id); if(!m){ ev.push({type:'ignored', seat, src}); return; } m.frozen=true; ev.push({type:'freeze', target:t, name:m.name, src}); },
+    bot:(view,acts)=>hpPick(view, acts, t=>{ const m=hpMin(view,t); return m && m.atk>=3 ? m.atk : -Infinity; })},
+  cram:      {name:'벼락치기', icon:'📚', text:'내 손의 무작위 카드 비용 -1',
+    blocked:(s,seat)=> s.seats[seat].hand.some(c=>c.cost>0) ? null : '비용을 줄일 카드가 없습니다.',
+    use:(s,seat,t,ev,src)=>{ const L=s.seats[seat].hand.filter(c=>c.cost>0); const c=L[Math.floor(nextRand(s)*L.length)]; c.cost-=1; logNote(ev, seat, src, '손의 카드 1장 비용 -1'); },
+    bot:(view,acts)=> view.me.hand.some(c=>c.cost>view.me.mana-1 && c.cost<=view.me.mana) ? acts[0] : null},
+  nag:       {name:'잔소리', icon:'💢', text:'무작위 적 하수인에게 피해 1 (없으면 적 영웅)',
+    use:(s,seat,t,ev,src)=>{ const L=s.seats[other(seat)].board.filter(m=>m.hp>0); if(L.length){ const m=L[Math.floor(nextRand(s)*L.length)]; hurtMinion(s, other(seat), m, 1, ev, 'battlecry', src); } else hurtHero(s, other(seat), 1, ev, 'battlecry', src); },
+    bot:(view,acts)=>acts[0]},
+};
+const HERO_POWER_IDS = Object.keys(HERO_POWERS);
+const randomHeroPower = (rng=Math.random) => HERO_POWER_IDS[Math.floor(rng()*HERO_POWER_IDS.length)];
+const heroPowerInfo = id => { const h=HERO_POWERS[id]; return h ? {id, name:h.name, icon:h.icon, text:h.text, cost:HP_COST} : null; };
+function heroPowerTargets(s, seat){ const h=HERO_POWERS[s.seats[seat].heroPower]; return h && h.targets ? h.targets(s, seat) : []; }
+function heroPowerChoice(view){                    // 봇: 영웅 능력을 쓸지, 쓴다면 어떤 대상에
+  const acts=(view.legal||[]).filter(a=>a.type==='HERO_POWER'); if(!acts.length || !view.me.heroPower) return null;
+  const h=HERO_POWERS[view.me.heroPower.id]; if(!h) return null;
+  try{ return h.bot ? h.bot(view, acts) : acts[0]; }catch(e){ return null; }
+}
 function hitTarget(s, t, amount, ev, src){                      // v38: 영웅 또는 하수인 한 곳에 피해
   if(t.kind==='hero') hurtHero(s, t.seat, amount, ev, 'battlecry', src);
   else { const m=findMinion(s, t.seat, t.id); if(m) hurtMinion(s, t.seat, m, amount, ev, 'battlecry', src); }
@@ -1984,7 +2046,8 @@ function newGame(rng=Math.random, opts={}){
     src.forEach(c=>deck.push({...c, inDeck:true, cost:c.type==='spell' ? c.cost : Math.max(0, c.cost-(mods.costDown||0)), id:s.nextId++}));   // inDeck: 게임 시작 때 덱에 있던 카드 (v56 롬메스는 이 표시가 없는 주문만 다시 시전)   // costDown 은 하수인만
     shuffle(deck, rng);
     const maxHp=CONFIG.HERO_HP+(mods.hp||0);
-    s.seats.push({hp:maxHp, maxHp, armor:mods.startArmor||0, mana:0, maxMana:mods.startMana?Math.max(0, mods.startMana-1):0, deck, hand:[], board:[], mods});
+    const hpId=opts.heroPowers && opts.heroPowers[seat];   // v131 영웅 능력 (없으면 영웅 능력 없음 — 예전 테스트·자체 대전과 같게)
+    s.seats.push({hp:maxHp, maxHp, armor:mods.startArmor||0, mana:0, maxMana:mods.startMana?Math.max(0, mods.startMana-1):0, deck, hand:[], board:[], mods, heroPower:HERO_POWERS[hpId]?hpId:null, powerUsed:false});
   }
   for(let seat=0; seat<2; seat++){
     const P=s.seats[seat];
@@ -2040,6 +2103,7 @@ function startTurn(s, seat, ev){
   if(P.armorNext){ P.armor=(P.armor||0)+P.armorNext; ev.push({type:'armor', seat, amount:P.armorNext, src:{seat, name:'키틴질 껍질'}}); P.armorNext=0; }   // v32 키틴질 껍질: 내 턴 시작에 방어도
   P.board.forEach(m=>{ m.attacked=false; m.wfUsed=false; m.summoned=false; if(m.stealthTemp){ delete m.stealth; delete m.stealthTemp; } });   // v100: 은신은 공격할 때까지 유지, 엄폐(stealthTemp)만 내 다음 턴 시작에 풀림
   P.heroAtk=0; P.heroAttacked=false;   // v80 영웅 공격: 공격력은 그 턴에만, 공격은 턴마다 1번
+  P.powerUsed=false;                  // v131 영웅 능력: 턴마다 한 번
   if(P.soreTurns>0){ P.soreTurns--; P.heroFrozen=true; for(const x of P.board) x.frozen=true;          // v117 일당 15만 원의 유혹: 근육통 (이번 턴 아군 전부 빙결)
     logNote(ev, seat, {seat, name:'일당 15만 원의 유혹'}, `근육통… 이번 턴 아군 전부 빙결${P.soreTurns?` (${P.soreTurns}턴 더)`:''}`); }
   if(P.dormant && P.dormant.length){                                                                  // v117 입영 통지서: 휴면 → 전역 (능력치 ×배수)
@@ -3018,6 +3082,19 @@ function validate(s, a, actor){
       }
       return '공격 대상이 올바르지 않습니다.';
     }
+    case 'HERO_POWER': {                                   // v131 영웅 능력
+      const h=HERO_POWERS[P.heroPower];
+      if(!h) return '영웅 능력이 없습니다.';
+      if(P.powerUsed) return '영웅 능력은 이번 턴에 이미 사용했습니다.';
+      if(P.heroFrozen) return '영웅이 이번 턴에는 행동할 수 없습니다. (근육통·우주공강)';
+      if(HP_COST>P.mana) return '마나가 부족합니다.';
+      const why=h.blocked && h.blocked(s, actor); if(why) return why;
+      if(h.targets){ const ts=h.targets(s, actor);
+        if(!ts.length) return '영웅 능력의 대상이 없습니다.';
+        if(!a.target || !ts.some(t=>tkey(t)===tkey(a.target))) return '올바른 대상을 선택해야 합니다.'; }
+      else if(a.target) return '대상이 필요 없는 영웅 능력입니다.';
+      return null;
+    }
     case 'HERO_ATTACK': {                                  // v80 영웅 공격: 영웅 공격력이 있을 때 턴마다 한 번
       if(!(P.heroAtk>0)) return '영웅에게 공격력이 없습니다.';
       if(P.heroFrozen) return '영웅이 이번 턴에는 행동할 수 없습니다. (근육통·우주공강)';   // v117 일당 15만 원의 유혹 · 수강신청 대참사
@@ -3057,6 +3134,8 @@ function legalActions(s, actor){
     if(!validate(s,a,actor)) out.push(a);
   }
   if(P.heroAtk>0 && !P.heroAttacked) for(const t of targets){ const a={type:'HERO_ATTACK', target:t}; if(!validate(s,a,actor)) out.push(a); }   // v80
+  if(P.heroPower && !P.powerUsed){ const h=HERO_POWERS[P.heroPower];                                   // v131 영웅 능력
+    for(const t of (h && h.targets ? heroPowerTargets(s, actor) : [null])){ const a={type:'HERO_POWER', target:t}; if(!validate(s,a,actor)) out.push(a); } }
   out.push({type:'END_TURN'});
   return out;
 }
@@ -3188,6 +3267,11 @@ function apply(state, a, actor){
         P.board.push(cp); ev.push({type:'summon', seat:actor, id:cp.id, name:cp.name, src:{seat:actor, name:x.name}}); } }
     } }   // end 하수인
     if(momN && runeOf(c).includes('혈기') && s.seats[0].hp>0 && s.seats[1].hp>0) summonTokens(s, actor, momN, LEECH, ev);   // v97 발토라
+  } else if(a.type==='HERO_POWER'){                                  // v131 영웅 능력: 비용 1, 턴마다 한 번
+    const h=HERO_POWERS[P.heroPower], src={seat:actor, name:h.name};
+    P.mana-=HP_COST; P.powerUsed=true;
+    ev.push({type:'heroPower', seat:actor, id:P.heroPower, name:h.name, icon:h.icon, text:h.text, target:a.target||null});
+    h.use(s, actor, a.target||null, ev, src);
   } else if(a.type==='ATTACK'){
     const m=P.board.find(x=>x.id===a.attackerId); let t=a.target;
     if(m.mutiny){ const al=P.board.filter(x=>x!==m && x.hp>0);                                          // v119 조별과제 내부분열: 원래 대상 대신 무작위 아군
@@ -3406,9 +3490,9 @@ function viewFor(s, seat){
   return structuredClone({
     seat, turn:s.turn, turnNo:s.turnNo, first:s.first, over:s.over, winner:s.winner,
     // deckCards: 내 남은 덱 구성. 뽑는 순서가 드러나지 않도록 id 를 빼고 코스트·이름순으로 정렬해서 보낸다.
-    me:{dormant:(me.dormant||[]).map(d=>({name:d.m.name, left:d.left})), hangover:!!me.hangover, heroFrozen:!!me.heroFrozen, noSpell:!!me.noSpell, playLimit:enemyPlayLimit(s, seat), plays:playsThisTurn(me), heroAtk:me.heroAtk||0, heroAttacked:!!me.heroAttacked, corpses:me.corpses||0, spellTax:(me.spellTax||0)+(me.auraTax||0), taxNext:me.taxNext||0, lastSpellCost:me.lastSpellCost ?? -1, hp:me.hp, maxHp:me.maxHp, nextMana:me.nextMana||0, ascendNext:me.ascendNext||0, armorNext:me.armorNext||0, armor:me.armor||0, locked:me.locked||0, overloadNext:me.overloadNext||0, ones:(me.playedOnes||[]).length, castN:(me.castAll||[]).length, grave:(me.grave||[]).map(g=>({...g})), mods:me.mods, eclipse:!!me.eclipse, fatigue:me.fatigue||0, spellCount:me.spellCount||0, recastCount:(me.castLog||[]).length, mana:me.mana, maxMana:me.maxMana, hand:me.hand.map(c=>({...c, cost:effCost(me,c)})), board:me.board, deckCount:me.deck.length,
+    me:{heroPower:me.heroPower?{...heroPowerInfo(me.heroPower), used:!!me.powerUsed}:null, maxHp:me.maxHp, dormant:(me.dormant||[]).map(d=>({name:d.m.name, left:d.left})), hangover:!!me.hangover, heroFrozen:!!me.heroFrozen, noSpell:!!me.noSpell, playLimit:enemyPlayLimit(s, seat), plays:playsThisTurn(me), heroAtk:me.heroAtk||0, heroAttacked:!!me.heroAttacked, corpses:me.corpses||0, spellTax:(me.spellTax||0)+(me.auraTax||0), taxNext:me.taxNext||0, lastSpellCost:me.lastSpellCost ?? -1, hp:me.hp, maxHp:me.maxHp, nextMana:me.nextMana||0, ascendNext:me.ascendNext||0, armorNext:me.armorNext||0, armor:me.armor||0, locked:me.locked||0, overloadNext:me.overloadNext||0, ones:(me.playedOnes||[]).length, castN:(me.castAll||[]).length, grave:(me.grave||[]).map(g=>({...g})), mods:me.mods, eclipse:!!me.eclipse, fatigue:me.fatigue||0, spellCount:me.spellCount||0, recastCount:(me.castLog||[]).length, mana:me.mana, maxMana:me.maxMana, hand:me.hand.map(c=>({...c, cost:effCost(me,c)})), board:me.board, deckCount:me.deck.length,
         deckCards:me.deck.map(({id, ...rest})=>rest).sort((a,b)=>a.cost-b.cost || (a.name<b.name?-1:a.name>b.name?1:0))},
-    opp:{dormant:(op.dormant||[]).map(d=>({name:d.m.name, left:d.left})), hangover:!!op.hangover, heroFrozen:!!op.heroFrozen, noSpell:!!op.noSpell, heroAtk:op.heroAtk||0, heroAttacked:!!op.heroAttacked, corpses:op.corpses||0, spellTax:(op.spellTax||0)+(op.auraTax||0), taxNext:op.taxNext||0, hp:op.hp, maxHp:op.maxHp, nextMana:op.nextMana||0, armorNext:op.armorNext||0, armor:op.armor||0, locked:op.locked||0, overloadNext:op.overloadNext||0, mods:op.mods, eclipse:!!op.eclipse, fatigue:op.fatigue||0, mana:op.mana, maxMana:op.maxMana, handCount:op.hand.length, board:op.board, deckCount:op.deck.length},
+    opp:{heroPower:op.heroPower?{...heroPowerInfo(op.heroPower), used:!!op.powerUsed}:null, maxHp:op.maxHp, dormant:(op.dormant||[]).map(d=>({name:d.m.name, left:d.left})), hangover:!!op.hangover, heroFrozen:!!op.heroFrozen, noSpell:!!op.noSpell, heroAtk:op.heroAtk||0, heroAttacked:!!op.heroAttacked, corpses:op.corpses||0, spellTax:(op.spellTax||0)+(op.auraTax||0), taxNext:op.taxNext||0, hp:op.hp, maxHp:op.maxHp, nextMana:op.nextMana||0, armorNext:op.armorNext||0, armor:op.armor||0, locked:op.locked||0, overloadNext:op.overloadNext||0, mods:op.mods, eclipse:!!op.eclipse, fatigue:op.fatigue||0, mana:op.mana, maxMana:op.maxMana, handCount:op.hand.length, board:op.board, deckCount:op.deck.length},
     pending: s.pending ? (s.pending.seat===seat
       ? (s.pending.kind==='target'
           ? {kind:'target', seat, card:{name:s.pending.card.name, cost:s.pending.card.cost, effect:s.pending.card.effect, school:s.pending.card.school, twin:s.pending.card.twin}, targets:s.pending.targets}
@@ -3851,6 +3935,10 @@ const Rule2 = (()=>{
   return {decide, W};
 })();
 BotPlayers.rule2 = { decide: Rule2.decide };
+for(const k of ['rule','rule2']){                     // v131 규칙 봇: 할 일이 끝나 턴을 끝내려 할 때 영웅 능력을 쓸 만하면 먼저 쓴다
+  const d=BotPlayers[k].decide, B=BotPlayers[k];
+  B.decide=function(view){ const a=d.call(B, view); if(a && a.type==='END_TURN' && !view.pending){ const h=heroPowerChoice(view); if(h) return h; } return a; };
+}
 
 // v80 영웅 공격: 두 규칙 봇은 하던 대로 행동하다가 턴을 끝내기 직전, 영웅 공격력이 남아 있으면 한 번 휘두른다.
 //  마무리 가능 → 영웅 / 반격에 죽지 않고 처치할 수 있는 하수인 → 가장 센 것 / 아니면 영웅 / 도발 때문에 하수인뿐이면 반격이 가장 약한 것 (반격에 죽으면 안 침)
@@ -3895,5 +3983,6 @@ function selfPlay(games=1000, botA=BotPlayers.rule, botB=BotPlayers.random, maxT
 
 if (typeof module !== 'undefined') {
   module.exports = {VERSION, CONFIG, CARD_POOL, GEN_POOL, BotPlayers, newGame, apply, viewFor, selfPlay, mulliganHand,
-                    buildRandomDeck, validateDeckList, defaultDeckList, shuffle, runeOf, RUNE_NAME, RUNE_ORDER, EFFECT_TEXT, effectText, YNU2_GADGETS, ABS_GRADE, DRINKS};
+                    buildRandomDeck, validateDeckList, defaultDeckList, shuffle, runeOf, RUNE_NAME, RUNE_ORDER, EFFECT_TEXT, effectText, YNU2_GADGETS, ABS_GRADE, DRINKS,
+                    HERO_POWERS, HERO_POWER_IDS, HP_COST, randomHeroPower, heroPowerInfo, heroPowerChoice};
 }
