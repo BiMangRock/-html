@@ -336,6 +336,56 @@ const CARD_POOL = [
   {type:'spell', name:"비문학 3연타 (철학+경제+양자역학)", cost:3, rarity:'희귀', effect:{type:'textTriple'}, scope:'boss', art:'images/ynu/ynu_bimunhak.jpg', flavor:'한국어로 쓰여 있는데 한국어가 아닌 기적의 외계어 지문.'},
   {type:'spell', name:"종료령 5분 전 (마킹 타임어택)", cost:4, rarity:'희귀', effect:{type:'drawDiscard', draw:4, discard:1}, scope:'boss', art:'images/ynu/ynu_bell.jpg', flavor:'손을 덜덜 떨며 마킹하느라 컴퓨터용 싸인펜으로 종이를 찢을 뻔한 순간.'},
   {type:'spell', name:"물수능 컷 폭발", cost:6, rarity:'전설', effect:{type:'cutCrash', value:3, armor:2}, scope:'boss', art:'images/ynu/ynu_cut_crash.jpg', flavor:'한 문제 실수로 1등급에서 3등급으로 수직 낙하하는 등급컷의 잔혹함.'},
+
+  // ======== v117 영남대 모험 · 1단계(수능) 클리어 보상 카드 (scope:'adventure' → 모험 덱에만 넣을 수 있음) ========
+  //  수능 보스 첫 클리어 때 이 15종을 5종씩 3묶음(각 2장)으로 나눠 보여 주고, 하나를 고르게 한다 (보스 설정의 '보상 묶음 후보')
+  {type:'minion', name:"멘붕의 카페 알바생", cost:3, rarity:'특급', atk:3, hp:4, startCafe:true, scope:'adventure', art:'images/ynu/ynu_r_cafe.jpg', flavor:'레시피 암기 지옥. 아이스 바닐라 라떼 샷 추가 시럽 반만… 네?'},
+  {type:'minion', name:"야간 편의점 근무자", cost:3, rarity:'희귀', atk:2, hp:5, taunt:true, onHurtDrunk:true, scope:'adventure', art:'images/ynu/ynu_r_conveni.jpg', flavor:'새벽 3시, 취객 손님은 오늘도 계산대 앞에 드러눕는다.'},
+  {type:'spell', name:"일당 15만 원의 유혹", cost:1, rarity:'특급', effect:{type:'laborRush', turns:2}, scope:'adventure', art:'images/ynu/ynu_r_labor.jpg', flavor:'물류센터 상하차 원데이 체험. 다음 날 아침, 팔이 안 올라간다.'},
+  {type:'minion', name:"불판 세척 특공대", cost:4, rarity:'일반', atk:4, hp:3, effect:{type:'bcSilence'}, scope:'adventure', art:'images/ynu/ynu_r_grill.jpg', flavor:'고깃집 불판 닦기 특공대. 눌어붙은 기름때까지 박박!'},
+  {type:'minion', name:"마의 T자 코스", cost:3, rarity:'특급', atk:0, hp:3, tribe:'장소', cantAttack:true, tCourse:true, endDecay:1, effect:{type:'tCourseBc'}, scope:'adventure', art:'images/ynu/ynu_r_tcourse.jpg', flavor:'삐———! 연석을 밟았습니다. 실격입니다.'},
+  {type:'spell', name:"파격적인 탈색 3연타", cost:2, rarity:'희귀', effect:{type:'bleach'}, scope:'adventure', art:'images/ynu/ynu_r_bleach.jpg', flavor:'수험표 할인으로 미용실 탈색 3연타. 거울 속의 나는 누구?'},
+  {type:'spell', name:"안경 탈출 수술", cost:1, rarity:'특급', effect:{type:'lasik'}, scope:'adventure', art:'images/ynu/ynu_r_lasik.jpg', flavor:'수험생 할인 라식. 안경을 벗자 세상이 선명해졌다.'},
+  {type:'spell', name:"헬스장 3개월 등록", cost:0, rarity:'희귀', effect:{type:'gym', value:3}, scope:'adventure', art:'images/ynu/ynu_r_gym.jpg', flavor:'새해맞이 3개월 등록. 출석은 첫날 하루. (관장님: "회원님 감사합니다!")'},
+  {type:'minion', name:"방구석 통기타", cost:1, rarity:'일반', atk:0, hp:3, guitarLeft:3, scope:'adventure', art:'images/ynu/ynu_r_guitar.jpg', flavor:'F코드라는 통곡의 벽. 결국 당근마켓 판매 중.'},
+  {type:'spell', name:"청춘의 내일로 티켓", cost:5, rarity:'특급', effect:{type:'naeilro'}, scope:'adventure', art:'images/ynu/ynu_r_naeilro.jpg', flavor:'친구들과 내일로 기차여행. 잠은 찜질방에서.'},
+  {type:'spell', name:"당당한 주민등록증", cost:1, rarity:'일반', effect:{type:'adultId', armor:5, atk:2}, scope:'adventure', art:'images/ynu/ynu_r_adultid.jpg', flavor:'1월 1일 0시 땡! 생애 첫 합법적 민증 검사.'},
+  {type:'spell', name:"인생 첫 술", cost:3, rarity:'희귀', effect:{type:'confuse'}, scope:'adventure', art:'images/ynu/ynu_r_confuse.jpg', flavor:'한 잔만 마셨는데 세상이 빙글빙글. 다들 정신이 없다.'},
+  {type:'minion', name:"롤 다이아 승급전: 캐리 머신", cost:6, rarity:'특급', atk:6, hp:6, rush:true, killRefresh:true, scope:'adventure', art:'images/ynu/ynu_r_carry.jpg', flavor:'수능 끝났다! 배치부터 다이아까지. 새벽 4시까지 하드 캐리.'},
+  {type:'spell', name:"PC방 30시간 올나잇 파티", cost:9, rarity:'특급', effect:{type:'pcbang', draw:3}, scope:'adventure', art:'images/ynu/ynu_r_pcbang.jpg', flavor:'통금 해제! 삼겹살 덮밥, 치킨마요, 아이스티 줄줄이. 해가 뜰 때까지.'},
+  {type:'spell', name:"봉인 해제: 무한 백수 라이프", cost:10, rarity:'전설', effect:{type:'neet'}, scope:'adventure', art:'images/ynu/ynu_r_neet.jpg', flavor:'시험도, 과제도, 출석도 없다. 오후 2시 기상, 넷플릭스 정주행.'},
+
+  // ======== v117 영남대 모험 · 1학년 보스 전용 카드 (scope:'boss') ========
+  {type:'minion', name:"F폭격기 교수님", cost:8, rarity:'전설', atk:6, hp:6, effect:{type:'bcWipeOthers'}, scope:'boss', art:'images/ynu/ynu_1_professor.jpg', flavor:'"너희 고등학교 때 공부 잘했다며? 여긴 대학이야." 전공기초 학점 폭격.'},
+  {type:'minion', name:"발표 10분 전 잠수탄 조원", cost:6, rarity:'특급', atk:4, hp:8, taunt:true, ghostLeech:2, deathFace:6, scope:'boss', art:'images/ynu/ynu_1_ghost.jpg', flavor:'"개인 사정이 있어서요 ㅠㅠ" 회의 불참, 읽씹, 자료 복붙, 발표 당일 연락 두절.'},
+  {type:'minion', name:"군기반장 복학생", cost:8, rarity:'전설', atk:7, hp:7, effect:{type:'bcSeniority', max:4, limit:1}, scope:'boss', art:'images/ynu/ynu_1_senior.jpg', flavor:'"나 때는 말이야… 인사 똑바로 안 하냐?" 과방 구석의 화석 선배.'},
+  {type:'spell', name:"수강신청 대참사와 8시간 우주공강", cost:6, rarity:'특급', effect:{type:'courseCrash', value:2}, scope:'boss', art:'images/ynu/ynu_1_course.jpg', flavor:'접속 대기자 4,200명. 남은 건 아침 9시 교양 하나와 저녁 6시 야간 수업 하나.'},
+  {type:'spell', name:"숙취 속 월요일 아침 9시 출석 체크", cost:4, rarity:'희귀', effect:{type:'hangover'}, scope:'boss', art:'images/ynu/ynu_1_hangover.jpg', flavor:'지각 3번이면 F인데, 눈앞이 빙빙 돈다.'},
+  {type:'spell', name:"핫식스+레드불 붕붕드링크의 부작용", cost:3, rarity:'희귀', effect:{type:'energyDrink', value:4}, scope:'boss', art:'images/ynu/ynu_1_energy.jpg', flavor:'중간고사 전날 노베이스. 고카페인 원샷 후 찾아온 심장 두근거림.'},
+  {type:'spell', name:"본가로 직배송된 학사경고 통지서", cost:10, rarity:'전설', effect:{type:'probation', burn:3, value:10}, scope:'boss', art:'images/ynu/ynu_1_probation.jpg', flavor:'"너 이번 학기 성적이 이게 뭐니…?" 평점 1.2, 부모님이 먼저 뜯어보신 우편물.'},
+
+  // ======== v117 영남대 모험 · 공통 보스 하수인 (수능 이후 보스들이 같이 씀, scope:'boss') ========
+  {type:'minion', name:"과잠 뽕에 취한 새내기", cost:1, rarity:'일반', atk:2, hp:1, effect:{type:'bcPeek', min:5}, scope:'boss', art:'images/ynu/ynu_c_fresh.jpg', flavor:'"저기 선배님… 인문관 302호가 어디예요…?" 빳빳한 과잠에 캠퍼스 지도.'},
+  {type:'minion', name:"전공 벽에 부딪힌 2학년", cost:3, rarity:'일반', atk:2, hp:5, onHurtHeal:1, scope:'boss', art:'images/ynu/ynu_c_2nd.jpg', flavor:'"교양은 A+였는데… 전공 첫 시험이 왜 28점이지?" 군대나 갈까, 휴학할까.'},
+  {type:'minion', name:"영혼까지 갈려 나가는 사망년", cost:5, rarity:'희귀', atk:3, hp:7, taunt:true, startSelfHurt:1, deathCaffeine:true, scope:'boss', art:'images/ynu/ynu_c_3rd.jpg', flavor:'월화수목금 풀강, 토익 학원, 대외활동 마감은 내일. 하루 수면 3시간.'},
+  {type:'minion', name:"츄리닝 삼디다스 취준 화석", cost:2, rarity:'희귀', atk:2, hp:3, stealth:true, hideGrow:1, scope:'boss', art:'images/ynu/ynu_c_fossil.jpg', flavor:'"…누구세요? 저 아세요?" 도서관과 취업지원센터만 오가는 캠퍼스의 유령.'},
+
+  // ======== v117 영남대 모험 · 2학년 보스 전용 카드 (scope:'boss') — 종족/속성 '2학년' ========
+  {type:'minion', name:"입대 직전의 광기", cost:1, rarity:'희귀', atk:3, hp:4, charge:true, endHeroHurt:2, scope:'boss', art:'images/ynu/ynu_2_army.jpg', flavor:'"어차피 다음 달에 군대 가는데 내일이 어딨어? 명치 쳐!"'},
+  {type:'minion', name:"독박 쓴 조장", cost:2, rarity:'특급', atk:0, hp:5, tribe:'2학년', stealth:true, guardAll:true, dmgCapOne:true, deathKillAlly:true, scope:'boss', art:'images/ynu/ynu_2_leader.jpg', flavor:'"선배님이 조장해 주시면 안 돼요?" …이 한 마디에 인생이 꼬였다.'},
+  {type:'minion', name:"전공 필수에서 마주친 전 CC", cost:1, rarity:'희귀', atk:0, hp:4, tribe:'2학년', endHeroHurt:2, effect:{type:'bcSilenceAdj'}, scope:'boss', art:'images/ynu/ynu_2_excc.jpg', flavor:'분반이 하나밖에 없는 전공 필수 과목의 잔인함.'},
+  {type:'spell', name:"외계어 전공 강의", cost:4, rarity:'특급', school:['2학년'], effect:{type:'alienLecture', value:4}, scope:'boss', art:'images/ynu/ynu_2_alien.jpg', flavor:'"교수님, 한국어로 말씀하시는데 왜 하나도 안 들리죠?"'},
+  {type:'spell', name:"증원 요청 읍소 메일", cost:1, rarity:'일반', school:['2학년'], effect:{type:'discover'}, scope:'boss', art:'images/ynu/ynu_2_mail.jpg', flavor:'메일 본문 첫 줄: 존경하는 교수님께, 저는 졸업이 간절한 2학년…'},
+  {type:'spell', name:"21학점의 무리수", cost:2, rarity:'희귀', school:['2학년'], effect:{type:'overCredit', draw:4, value:6}, scope:'boss', art:'images/ynu/ynu_2_credit21.jpg', flavor:'학점 세탁의 꿈은 중간고사 3일 차에 산산조각 났다.'},
+  {type:'spell', name:"10년 만에 개편된 족보", cost:2, rarity:'희귀', school:['2학년'], effect:{type:'notesRevamp'}, scope:'boss', art:'images/ynu/ynu_2_notes.jpg', flavor:'선배는 웃으며 족보를 주었고, 교수님은 웃으며 신유형을 냈다.'},
+  {type:'spell', name:"후배의 밥약 공격", cost:0, rarity:'특급', school:['2학년'], effect:{type:'mealSteal', value:2}, scope:'boss', art:'images/ynu/ynu_2_meal.jpg', flavor:'"선배님 파스타 사주세요!" (통장 잔고: 3,420원)'},
+  {type:'minion', name:"필름 끊긴 멋진 선배", cost:5, rarity:'희귀', atk:3, hp:8, tribe:'2학년', effect:{type:'bcBlackKnight'}, scope:'boss', art:'images/ynu/ynu_2_blackout.jpg', flavor:'다음 날 아침, 과 단톡방을 켤 용기가 나지 않는다.'},
+  {type:'minion', name:"지식 밑천 드러난 선배", cost:2, rarity:'희귀', atk:4, hp:4, tribe:'2학년', freshScare:true, scope:'boss', art:'images/ynu/ynu_2_senior_noknow.jpg', flavor:'"선배님 이거 어떻게 해요?" "어… 에타에 물어볼까?"'},
+  {type:'spell', name:"입영 통지서", cost:1, rarity:'특급', school:['2학년'], effect:{type:'enlist', turns:3, mul:3}, scope:'boss', art:'images/ynu/ynu_2_enlist.jpg', flavor:'"머리 밀러 간다. 술 사줘라."'},
+  {type:'minion', name:"지독한 겜태기", cost:3, rarity:'희귀', atk:4, hp:4, cantAttack:true, effect:{type:'bcGameBore'}, scope:'boss', art:'images/ynu/ynu_2_gamebore.jpg', flavor:'롤을 켜놓고 로비 화면만 30분째 응시하는 중.'},
+  {type:'spell', name:"어색해진 3대3 미팅", cost:3, rarity:'희귀', effect:{type:'blindDate'}, scope:'boss', art:'images/ynu/ynu_2_meeting.jpg', flavor:'"저… 군대는 다녀오셨어요?"'},
+  // ---- 3학년 보스 카드 (그림 없음) ----
+  {type:'minion', name:"영혼 탈곡된 동아리 회장", cost:6, rarity:'전설', atk:6, hp:6, tribe:'3학년', overload:3, freshBuffEnd:1, endSelfHpLoss:1, scope:'boss', flavor:'"믿음직해서 맡긴다"는 선배들의 유언을 믿지 말았어야 했다. (코볼트 회장 & 노움 신입생들)'},
 ];
 
 if (typeof module !== 'undefined') { module.exports = { CARD_POOL }; }

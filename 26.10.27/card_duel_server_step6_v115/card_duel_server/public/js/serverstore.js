@@ -5,7 +5,7 @@
 //  - 로드 순서: economy.js 다음, ui.js 앞.  ui.js 는 ServerStore.ready 가 끝난 뒤에 시작한다.
 (() => {
   'use strict';
-  const S = { wallet: null, deck: null, advDeck: null, cleared: {}, collection: {}, locked: false, isAdmin: false, bosses: null };
+  const S = { wallet: null, deck: null, advDeck: null, offers: [], runs: {}, cleared: {}, collection: {}, locked: false, isAdmin: false, bosses: null };
   window.ServerStore = S;
 
   let rev = 0, lastSnap = '', running = false;
@@ -51,6 +51,10 @@
       if (job.k === 'clear' && res.data.collection) {                  // v117: 첫 클리어 보상 카드가 들어온 최신 컬렉션
         S.collection = res.data.collection;
         if (res.data.granted && res.data.granted.length && S.onCardsGranted) S.onCardsGranted(res.data.granted);
+        if (res.data.chapter) { if (res.data.run) S.runs[res.data.chapter] = res.data.run; else delete S.runs[res.data.chapter]; }   // v117 입학(런) 진행
+        if (res.data.graduated && S.onGraduated) S.onGraduated(res.data.chapter);
+        if (res.data.chapter && S.onRunChange) S.onRunChange(res.data.chapter);
+        if (res.data.offer) { S.offers = S.offers.filter(o => o.bossId !== res.data.offer.bossId).concat([res.data.offer]); if (S.onOffer) S.onOffer(res.data.offer); }   // v117 보상 묶음
       }
       return 'ok';
     }
@@ -101,7 +105,22 @@
   S.setDeck = list => { S.deck = list.slice(); pending.deck = S.deck; flush(); };
   S.getAdvDeck = () => S.advDeck;                                                                   // v117 모험 덱
   S.setAdvDeck = list => { S.advDeck = list.slice(); pending.advDeck = S.advDeck; flush(); };
-  S.onCardsGranted = null;                                                                          // v117: 서버가 보상 카드를 지급했을 때 ui.js 가 알림을 띄운다
+  S.onCardsGranted = null;
+  S.onOffer = null; S.onGraduated = null; S.onRunChange = null;
+  // ---- v117 입학(런): 바로 서버에 보내고 결과를 기다린다 (화면이 결과에 따라 바뀌므로) ----
+  const runCall = async (url, body) => { await S.waitSaved(); try { const r = await call('POST', url, body); return r; } catch (e) { return { ok: false, data: { error: '서버에 연결할 수 없어요.' } }; } };
+  S.enroll = async (chapter, deck) => { const r = await runCall('/api/adventure/enroll', { chapter, deck }); if (r.data && r.data.run) S.runs[chapter] = r.data.run; return r.ok ? { ok: true } : { ok: false, error: (r.data && r.data.error) || '입학하지 못했어요.' }; };
+  S.loseRun = async bossId => { const r = await runCall('/api/adventure/lose', { bossId }); if (r.ok && r.data.ended) delete S.runs[r.data.chapter]; return !!(r.ok && r.data.ended); };
+  S.dropRun = async chapter => { const r = await runCall('/api/adventure/drop', { chapter }); if (r.ok) delete S.runs[chapter]; return r.ok; };
+                                                                                // v117: 첫 클리어 보상 묶음이 도착했을 때
+  // v117 보상 묶음 고르기. 반환: {ok:true, granted} | {ok:false, error}
+  S.pickOffer = async (bossId, index) => {
+    let res; try { res = await call('POST', '/api/adventure/pick', { bossId, index }); } catch (e) { return { ok: false, error: '서버에 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.' }; }
+    if (res.data && res.data.collection) S.collection = res.data.collection;
+    if (res.data && res.data.run && res.data.chapter){ S.runs[res.data.chapter] = res.data.run; if (S.onRunChange) S.onRunChange(res.data.chapter); }   // v117: 잠긴 덱에 보상 묶음이 더해짐
+    if (res.ok || res.status === 409 || res.status === 404) S.offers = S.offers.filter(o => o.bossId !== bossId);
+    return res.ok ? { ok: true, granted: res.data.granted } : { ok: false, error: (res.data && res.data.error) || '보상을 받지 못했어요.' };
+  };                                                                          // v117: 서버가 보상 카드를 지급했을 때 ui.js 가 알림을 띄운다
   S.owned = name => S.collection[name] || 0;       // 내가 가진 카드 장수 (4단계)
   S.hasCleared = id => !!S.cleared[id];
   S.markCleared = id => { if (!S.cleared[id]) S.cleared[id] = Date.now(); pending.clears.add(id); flush(); };
@@ -191,6 +210,8 @@
         S.deck = Array.isArray(d.deck) ? d.deck : null;
         S.advDeck = Array.isArray(d.advDeck) ? d.advDeck : null;
         S.cleared = (d.adventure && d.adventure.cleared) || {};
+        S.offers = (d.adventure && Array.isArray(d.adventure.offers)) ? d.adventure.offers : [];
+        S.runs = (d.adventure && d.adventure.runs) || {};
         S.collection = d.collection || {};
         S.isAdmin = !!d.isAdmin; S.bosses = Array.isArray(d.bosses) ? d.bosses : null;
         Economy.useStore(walletStore);

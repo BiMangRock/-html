@@ -3,7 +3,7 @@ const Host = {
   state:null,
   startTest(cfg){ this.state=newGame(Math.random, {mods:[{hp:cfg.hp-CONFIG.HERO_HP, startMana:cfg.mana}, {}], decks:[cfg.deck, buildRandomDeck()], freeDeck:[true,false]}); },   // v54 테스트: 내 체력·시작 마나·자유 덱, 상대는 치트 없음
   start(mods, deck){ this.state=newGame(Math.random, {mods:[{}, mods||{}], decks:[deck||null, buildRandomDeck()]}); },   // AI(좌석 1)에게만 치트 적용 / 내 덱은 편집한 덱 / AI 덱은 매 판 랜덤 30장 (v17)
-  startBoss(boss, myDeck){ this.state=newGame(Math.random, {mods:[{}, bossMods(boss)], decks:[myDeck||null, boss.deck.slice()]}); },   // v114 모험: 보스 좌석(1)은 보스 고정 덱
+  startBoss(boss, myDeck, free){ this.state=newGame(Math.random, {mods:[{}, bossMods(boss)], decks:[myDeck||null, boss.deck.slice()], freeDeck:[!!free, false]}); },   // v117 free: 입학 덱(보상으로 30장 넘음)   // v114 모험: 보스 좌석(1)은 보스 고정 덱
   view(seat){ return viewFor(this.state, seat); },
   submit(seat, action){
     const r=apply(this.state, action, seat);
@@ -64,9 +64,18 @@ document.addEventListener('focusout',  e=>{ if(tipOwner(e)) hideTip(); });
 document.addEventListener('click',     e=>{ const c=tipOwner(e); if(c) showTip(c); else hideTip(); });   // 터치 기기용
 
 // ---------- 로그 / 이벤트 문장 ----------
+// v117: 로그 문장 속 카드 이름을 찾아 둔다 → 그 줄에 마우스를 올리면 카드가 크게 보인다 (문장에 보이는 이름만 쓰므로 숨겨진 정보는 새지 않음)
+let LOG_NAMES=null;
+function logCardOf(msg){
+  if(!LOG_NAMES) LOG_NAMES=CARD_POOL.map(c=>c.name).filter(n=>n.length>=2).sort((a,b)=>b.length-a.length);
+  let best=null, at=Infinity;
+  for(const n of LOG_NAMES){ const i=msg.indexOf(n); if(i>=0 && (i<at || (i===at && n.length>best.length))){ best=n; at=i; } }   // 가장 앞에 나온 카드 (같은 자리면 긴 이름)
+  return best;
+}
 function logLine(msg){
   const list=$('logList'), item=document.createElement('div');
   item.textContent=msg; list.appendChild(item);
+  const cn=logCardOf(String(msg)); if(cn){ item.dataset.card=cn; item.classList.add('has-card'); }
   while(list.children.length>60) list.removeChild(list.firstChild);
 }
 const who = seat => seat===MY ? '내' : '상대';
@@ -523,14 +532,23 @@ function finishGame(){
         const sv=Economy.get(); Economy.set({...sv, gold:sv.gold+amount}); updateWallet();
         AdventureBook.clear(game.boss.id);
         const gotCards=first && game.boss.rewardCards && game.boss.rewardCards.length ? rewardCardsText(game.boss.rewardCards) : '';   // v117: 첫 클리어 보상 카드 (서버가 지급)
-        const next=first && game.boss.chapter ? advChapterBosses(BossBook.get(), game.boss.chapter).find(b=>b.stage>game.boss.stage) : null;
+        const next=game.boss.chapter ? advChapterBosses(BossBook.get(), game.boss.chapter).find(b=>b.stage>game.boss.stage) : null;
+        const grad=!!(game.boss.chapter && !next);                                                    // v117 마지막 단계 → 졸업
         game.advReward=`<span class="plus">+${fmt(amount)}골드</span><span class="sub2">${first?'첫 클리어 보상':'재도전 보상 (첫 클리어 보상의 '+Math.round(BOSS_REPEAT_RATIO*100)+'%)'}</span>`+
           (gotCards?`<span class="sub2 cards">🎁 획득 카드: ${escHtml(gotCards)}</span>`:'')+
-          (next?`<span class="sub2">🔓 다음 단계 열림: ${escHtml(next.name)}</span>`:'')+
+          ((game.boss.chapter || first) && game.boss.rewardChoice && game.boss.rewardChoice.length?`<span class="sub2 cards">🎁 보상 카드 묶음을 고를 수 있어요! (고른 카드는 잠긴 덱에 바로 더해져요)</span>`:'')+
+          (next?`<span class="sub2">🔓 다음 상대: ${escHtml(next.name)}</span>`:'')+(grad?`<span class="sub2 cards">🎓 졸업을 축하합니다! 덱 잠금이 풀렸어요.</span>`:'')+
           `<span class="sub2">보유 골드 ${fmt(Economy.get().gold)}</span>`;
         logLine(`보스 격파! ${first?'첫 클리어':'재도전'} 보상 +${fmt(amount)}골드`+(gotCards?` · 카드 ${gotCards}`:''));
       }
-    } else logLine(winner===null?'무승부':'패배... 다시 도전해 보세요.');
+    } else {
+      logLine(winner===null?'무승부':'패배... 다시 도전해 보세요.');
+      if(winner===OPP && game.boss.chapter && !game.devTest && runOf(game.boss.chapter)){         // v117 입학(런): 지면 처음부터
+        game.advReward=`<span class="minus">📕 유급…</span><span class="sub2">입학이 끝났어요. 덱 잠금이 풀렸으니, 덱을 다듬고 다시 입학해 보세요.</span>`;
+        ServerStore.loseRun(game.boss.id).then(()=>{ if($('screen-adventure').classList.contains('show')) openAdventure(); });
+        logLine('📕 유급! 입학이 끝났습니다. 처음부터 다시 입학해야 해요.');
+      }
+    }
     return;
   }
   if(game.mode==='test'){ logLine(winner===null?'테스트 종료: 무승부':winner===MY?'테스트 종료: 승리 (골드 변동 없음)':'테스트 종료: 패배 (골드 변동 없음)'); return; }   // v54
@@ -1003,7 +1021,12 @@ function cardEl(c, opts={}){
   if(c.lifesteal) tags+='<span class="tag lifesteal">생명력 흡수</span>';
   if(c.poison) tags+='<span class="tag poison">독성</span>';
   if(c.cantAttack) tags+='<span class="tag" style="background:#4a4a4a;color:#ddd">공격 불가</span>';   // v117 비문학 지문
-  if(c.deathPoisonShot||c.deathLunch||c.deathKill) tags+='<span class="tag revive">죽음의 메아리</span>';
+  if(c.confused) tags+=`<span class="tag" style="background:#5a2a7a;color:#f0d0ff">🌀 ${c.confusedPerm?'영구 ':''}혼란</span>`;
+  if(c.knightBy) tags+='<span class="tag" style="background:#2a3a5a;color:#cfe0ff">🛡 흑기사</span>';
+  if(c.guardAll) tags+='<span class="tag" style="background:#3a2a1a;color:#ffd9a0">독박</span>';
+  if(c.caffeineDoom) tags+='<span class="tag" style="background:#7a3a10;color:#ffd9a0">⚡ 카페인 쇼크 예정</span>';
+  if(c.freezeNext) tags+='<span class="tag frozen">겁먹음</span>';
+  if(c.deathPoisonShot||c.deathLunch||c.deathKill||c.deathFace||c.deathCaffeine||c.deathKillAlly||c.deathHandMinion) tags+='<span class="tag revive">죽음의 메아리</span>';
   if(c.deathSummonCost) tags+='<span class="tag revive">죽음의 메아리</span>'; 
   if(c.deathCopy||c.deathGain) tags+='<span class="tag revive">죽음의 메아리</span>';
   if(c.deathDraw||c.deathSummon||c.deathStego||c.deathArmor||c.deathBuffAll||c.deathGrave||c.eggChicken||c.deathProto||c.deathAdjBuff||c.deathAoe||c.deathPtero||c.deathBeast||c.deathGhoul) tags+='<span class="tag revive">죽음의 메아리</span>';
@@ -1028,7 +1051,7 @@ function cardEl(c, opts={}){
 // 마나 표시 (내 쪽·상대 쪽 공통). '매 턴 마나 +N' 치트가 있으면 그 추가분까지 총량에 포함한다.
 function renderMana(textId, crystalsId, p){
   const total=Math.max(1, p.maxMana+((p.mods&&p.mods.manaBonus)||0));
-  $(textId).textContent=`마나 ${p.mana} / ${total}`+(p.locked?` · 과부하 ${p.locked}`:'')+(p.overloadNext?` · 다음 턴 과부하 ${p.overloadNext}`:'')+(p.nextMana?` · 다음 턴 마나 +${p.nextMana}`:'')+(p.ascendNext?` · 다음 턴 최대 마나 +${p.ascendNext}`:'')+(p.spellTax?` · 주문 비용 +${p.spellTax}`:'')+(p.taxNext?` · 다음 턴 주문 비용 +${p.taxNext}`:'')+(p.noSpell?' · ✈ 주문 금지':'')+(p.playLimit!=null?` · 👀 카드 ${p.plays||0}/${p.playLimit}장`:'');
+  $(textId).textContent=`마나 ${p.mana} / ${total}`+(p.locked?` · 과부하 ${p.locked}`:'')+(p.overloadNext?` · 다음 턴 과부하 ${p.overloadNext}`:'')+(p.nextMana?` · 다음 턴 마나 +${p.nextMana}`:'')+(p.ascendNext?` · 다음 턴 최대 마나 +${p.ascendNext}`:'')+(p.spellTax?` · 주문 비용 +${p.spellTax}`:'')+(p.taxNext?` · 다음 턴 주문 비용 +${p.taxNext}`:'')+(p.noSpell?' · ✈ 주문 금지':'')+(p.heroFrozen?' · 🧊 영웅 행동 불가':'')+(p.hangover?' · 🍺 숙취(카드 비용만큼 피해)':'')+((p.dormant&&p.dormant.length)?' · 💤 '+p.dormant.map(d=>`${d.name} ${d.left}턴`).join(', '):'')+(p.playLimit!=null?` · 👀 카드 ${p.plays||0}/${p.playLimit}장`:'');
   const cz=$(crystalsId); cz.innerHTML='';
   for(let i=0;i<Math.max(total, p.mana);i++){     // 동전 등으로 최대치를 넘긴 마나도 수정으로 보여준다
     const d=document.createElement('div'); d.className='crystal'+(i<p.mana?'':' empty'); cz.appendChild(d);
@@ -1162,10 +1185,10 @@ const DeckBook = {                                   // 일반 덱: AI 대전 ·
   get(){ const raw=ServerStore.getDeck(); return (raw && !userDeckError(raw,'normal')) ? raw.slice() : defaultDeckList(); },   // 없거나 규칙·보유 카드에 안 맞으면 추천 덱
   set(list){ if(userDeckError(list,'normal')) return false; ServerStore.setDeck(list.slice()); return true; },
 };
-const AdvDeckBook = {                                // v117 모험 덱: 모험 전용 카드를 넣을 수 있다. 아직 안 만들었으면 일반 덱으로 나간다
-  has(){ const raw=ServerStore.getAdvDeck(); return !!(raw && !userDeckError(raw,'adventure')); },
-  get(){ const raw=ServerStore.getAdvDeck(); return (raw && !userDeckError(raw,'adventure')) ? raw.slice() : DeckBook.get(); },
-  set(list){ if(userDeckError(list,'adventure')) return false; ServerStore.setAdvDeck(list.slice()); return true; },
+const AdvDeckBook = {                                // v117 모험 덱 = 입학할 때 들고 가는 30장 (일반 카드만. 모험 전용 카드는 입학 중 보상으로만 잠긴 덱에 들어감). 없으면 일반 덱
+  has(){ const raw=ServerStore.getAdvDeck(); return !!(raw && !userDeckError(raw,'normal')); },
+  get(){ const raw=ServerStore.getAdvDeck(); return (raw && !userDeckError(raw,'normal')) ? raw.slice() : DeckBook.get(); },
+  set(list){ if(userDeckError(list,'normal')) return false; ServerStore.setAdvDeck(list.slice()); return true; },
 };
 
 // ---------- 덱 편집 ----------
@@ -1177,7 +1200,7 @@ const TEST_COPIES=10, TEST_MAX_DECK=60;                 // v54 테스트 덱: �
 // 한 카드를 덱에 넣을 수 있는 최대 장수. 일반 덱은 "가진 장수"까지만 (4단계), 테스트·보스 덱은 전체 카드풀을 그대로 쓴다.
 const edOwnedMode = () => !ed.test && !ed.boss;
 // v117: 이 편집 화면에 보여 줄 카드 — 일반 덱: 일반 카드만 / 모험 덱: 일반 + 모험 전용 / 보스·테스트 덱: 전부
-const edPoolOk = c => { const sc=cardScope(c); return ed.boss || ed.test ? true : ed.adv ? sc!=='boss' : sc==='normal'; };
+const edPoolOk = c => { const sc=cardScope(c); return ed.boss || ed.test ? true : sc==='normal'; };   // 일반 덱·모험 덱은 일반 카드만
 const edCap = name => ed.test ? TEST_COPIES : edOwnedMode() ? Math.min(CONFIG.COPIES, ServerStore.owned(name)) : CONFIG.COPIES;
 function edAdjust(name, d){
   const n=(ed.counts[name]||0)+d;
@@ -1220,7 +1243,7 @@ function renderDeckEditor(){
   }
   $('edCurve').innerHTML=`<div class="cv-title">마나 곡선 <small>(코스트별 장수 · 막대를 누르면 해당 코스트만 표시)</small></div><div class="cv-chart">${bars}</div>`;
   $('edCurve').querySelectorAll('.cv-col').forEach(el=>el.onclick=()=>{ const k=+el.dataset.cost; ed.cost=(ed.cost===k?null:k); edScrollTop(); renderDeckEditor(); });
-  if(ed.adv){ $('edTitle').textContent=`🎒 모험 덱 편집 — ${total} / ${size}장 (주문 ${spellCnt}장)`; if(saveOk) $('edNote').textContent='모험 모드에서만 쓰는 덱입니다. 모험 전용 카드도 넣을 수 있어요. (AI 대전·유저 대전은 일반 덱을 씁니다)'; }
+  if(ed.adv){ $('edTitle').textContent=`🎒 모험 덱 편집 — ${total} / ${size}장 (주문 ${spellCnt}장)`; if(saveOk) $('edNote').textContent='영남대 입학 때 들고 가는 30장이에요. 처음엔 일반 카드만 넣을 수 있고, 모험 전용 카드는 입학한 뒤 보상으로 잠긴 덱에 더해져요.'; }
   if(ed.boss){ $('edTitle').textContent=`보스 덱 — ${ed.bossName||''} ${total} / ${size}장 (주문 ${spellCnt}장)`; $('edNote').textContent = saveOk ? '저장할 수 있습니다. 이 덱이 보스가 쓰는 덱입니다.' : `정확히 ${size}장을 채워야 저장할 수 있습니다 (같은 카드는 최대 ${CONFIG.COPIES}장).`; }
   $('edSave').disabled=!saveOk;
   const grid=$('edGrid'), st=grid.scrollTop; grid.innerHTML='';
@@ -1233,9 +1256,10 @@ function renderDeckEditor(){
   const tribeOf=c=>((c.tribe||'').split('/')[0].trim())||'무종족';
   const groupOf=c=>c.type==='spell' ? schoolOf(c) : tribeOf(c);
   const groupIdx=c=>{ const o=c.type==='spell'?schoolOrder:tribeOrder, i=o.indexOf(groupOf(c)); return i<0?99:i; };
-  const TABS=[['all','전체'],['minion','하수인'],['spell','주문'],['tribe:야수','야수'],['tribe:언데드','언데드'],['tribe:악마','악마'],['tribe:용족','용족'],['tribe:정령','정령'],['tribe:해적','해적'],['tribe:토템','토템'],['tribe:기계','기계'],['rune:부정','부정 룬'],['rune:냉기','냉기 룬'],['rune:혈기','혈기 룬'],['rar:일반','일반'],['rar:희귀','희귀'],['rar:특급','특급'],['rar:전설','전설']];
-  const tabOk=(c,t)=> t==='all' || (t==='minion'||t==='spell' ? c.type===t : t.startsWith('tribe:') ? (c.type==='minion' && (c.tribe||'').includes(t.slice(6))) : t.startsWith('rar:') ? c.rarity===t.slice(4) : runeOf(c).includes(t.slice(5)));
-  if(!ed.tab) ed.tab='all';
+  const TABS=[['all','전체'],['minion','하수인'],['spell','주문'],['tribe:야수','야수'],['tribe:언데드','언데드'],['tribe:악마','악마'],['tribe:용족','용족'],['tribe:정령','정령'],['tribe:해적','해적'],['tribe:토템','토템'],['tribe:기계','기계'],['rune:부정','부정 룬'],['rune:냉기','냉기 룬'],['rune:혈기','혈기 룬'],['rar:일반','일반'],['rar:희귀','희귀'],['rar:특급','특급'],['rar:전설','전설'],
+    ...((ed.boss||ed.test)?[['scope:adventure','🎒 모험 전용']]:[]), ...((ed.boss||ed.test)?[['scope:boss','👹 보스 전용']]:[])];   // v117 사용 범위 필터
+  const tabOk=(c,t)=> t==='all' || (t.startsWith('scope:') ? cardScope(c)===t.slice(6) : null) || (!t.startsWith('scope:') && (t==='minion'||t==='spell' ? c.type===t : t.startsWith('tribe:') ? (c.type==='minion' && (c.tribe||'').includes(t.slice(6))) : t.startsWith('rar:') ? c.rarity===t.slice(4) : runeOf(c).includes(t.slice(5))));
+  if(!ed.tab || !TABS.some(([k])=>k===ed.tab)) ed.tab='all';   // 모드가 바뀌어 없는 탭이면 전체로
   $('edTabs').innerHTML=TABS.map(([k,l])=>`<button data-tab="${k}" class="${ed.tab===k?'on':''}">${l}<span class="n">${CARD_POOL.filter(c=>edPoolOk(c) && tabOk(c,k)).length}</span></button>`).join('');
   $('edTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ed.tab=b.dataset.tab; edScrollTop(); renderDeckEditor(); });
   if(edOwnedMode()){      // 4단계: 보유 카드만 보기 (일반 덱 편집에서만)
@@ -1285,13 +1309,13 @@ function renderDeckEditor(){
 }
 function updateDeckMenuDesc(){ $('deckMenuDesc').textContent=`내 덱을 직접 구성합니다 (${CONFIG.DECK_SIZE}장, 같은 카드 최대 ${CONFIG.COPIES}장)`; }
 function openDeckEditor(){ ed.test=false; ed.boss=false; ed.adv=false; $('edClear').style.display=''; ed.counts=countsOf(DeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }
-function openAdvDeckEditor(){ ed.test=false; ed.boss=false; ed.adv=true; $('edClear').style.display=''; ed.counts=countsOf(AdvDeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }   // v117
+function openAdvDeckEditor(){ if(Object.keys(ServerStore.runs).length){ alert('재학 중에는 덱을 바꿀 수 없어요. (졸업·자퇴하거나 보스에게 지면 풀려요)'); return; } ed.test=false; ed.boss=false; ed.adv=true; $('edClear').style.display=''; ed.counts=countsOf(AdvDeckBook.get()); renderDeckEditor(); $('deckEditor').classList.add('show'); }   // v117
 function closeDeckEditor(){ $('deckEditor').classList.remove('show'); }
 $('edSave').onclick=()=>{
   if(ed.boss){ if(edTotal()!==CONFIG.DECK_SIZE) return; bossDeckSaved(listOf(ed.counts)); return; }   // v114 보스 덱
   if(ed.test){ if(edTotal()<1) return; testCfg.deck=listOf(ed.counts); TestBook.set(testCfg); refreshTestUI(); closeDeckEditor(); return; }
   if(edTotal()!==CONFIG.DECK_SIZE) return;
-  if(ed.adv){ if(!AdvDeckBook.set(listOf(ed.counts))) return alert('모험 덱에 넣을 수 없는 카드가 있어요.'); closeDeckEditor(); if($('screen-adventure').classList.contains('show')) openAdventure(); return; }
+  if(ed.adv){ if(!AdvDeckBook.set(listOf(ed.counts))) return alert('모험 덱에는 일반 카드만 넣을 수 있어요.'); closeDeckEditor(); if($('screen-adventure').classList.contains('show')) openAdventure(); return; }
   DeckBook.set(listOf(ed.counts)); closeDeckEditor(); };
 $('edReset').onclick=()=>{ ed.counts=countsOf(defaultDeckList()); renderDeckEditor(); };
 $('edClear').onclick=()=>{ ed.counts={}; renderDeckEditor(); };
@@ -1642,6 +1666,37 @@ const AdventureBook = {                              // 보스 첫 클리어 기
   has(id){ return ServerStore.hasCleared(id); },
   clear(id){ ServerStore.markCleared(id); },
 };
+// ---- v117 보상 묶음 고르기 창 (3묶음 중 하나) ----
+let offerShowing=null;
+function showOffer(offer){
+  if(!offer) return; offerShowing=offer;
+  const box=$('offerBundles'); box.innerHTML='';
+  $('offerTitle').textContent=`🎁 ${offer.bossName} 클리어 보상`;
+  $('offerMsg').textContent='카드 묶음 하나를 고르세요. 고른 카드는 모험 덱에 넣을 수 있어요.';
+  offer.bundles.forEach((list,i)=>{
+    const col=document.createElement('div'); col.className='offer-bundle';
+    const cnt={}; list.forEach(n=>cnt[n]=(cnt[n]||0)+1);
+    const head=document.createElement('div'); head.className='offer-head'; head.textContent=`${['첫','두','세'][i]||i+1}번째 묶음 · ${list.length}장`; col.appendChild(head);
+    const row=document.createElement('div'); row.className='offer-cards';
+    Object.entries(cnt).forEach(([n,k])=>{ const c=cardByName(n); if(!c) return; const el=cardEl(c); const b=document.createElement('div'); b.className='copies'; b.textContent=`×${k}`; el.appendChild(b); row.appendChild(el); });
+    col.appendChild(row);
+    const btn=document.createElement('button'); btn.className='menu-btn primary'; btn.textContent='이 묶음 받기';
+    btn.onclick=async()=>{ box.querySelectorAll('button').forEach(x=>x.disabled=true); $('offerMsg').textContent='받는 중…';
+      const r=await ServerStore.pickOffer(offer.bossId, i);
+      if(!r.ok){ $('offerMsg').textContent='⚠ '+r.error; box.querySelectorAll('button').forEach(x=>x.disabled=false); return; }
+      $('offerMsg').textContent = Object.keys(ServerStore.runs).length ? `✔ ${rewardCardsText(r.granted)} — 잠긴 덱에 더해졌어요! (이번 입학 동안만)` : `✔ ${rewardCardsText(r.granted)} 획득!`;
+      box.innerHTML=''; $('offerAfter').style.display='flex'; $('offerGoDeck').style.display='none';
+      try{ logLine('🎁 보상 카드 획득: '+rewardCardsText(r.granted)); }catch(e){}
+      if($('screen-adventure').classList.contains('show')) openAdventure(); };
+    col.appendChild(btn); box.appendChild(col);
+  });
+  $('offerAfter').style.display='none'; $('offerLater').textContent='나중에 고르기';
+  $('offerModal').classList.add('show');
+}
+function closeOffer(){ $('offerModal').classList.remove('show'); offerShowing=null; const next=ServerStore.offers[0]; if(next && !$('menu').classList.contains('hidden')) showOffer(next); }
+ServerStore.onOffer = offer => { if(!offerShowing) showOffer(offer); };
+ServerStore.onRunChange = () => { if($('screen-adventure').classList.contains('show')) openAdventure(); };   // v117 입학 진행이 바뀌면 화면 갱신
+ServerStore.onGraduated = ch => { try{ logLine(`🎓 ${advChapterInfo(ch).name} 졸업! 덱 잠금이 풀렸어요.`); }catch(e){} };
 ServerStore.onCardsGranted = names => { try{ logLine('🎁 보상 카드가 내 컬렉션에 들어왔어요: '+rewardCardsText(names)); }catch(e){} };   // v117
 
 
@@ -1877,7 +1932,15 @@ function deckBrief(deck){
 const escHtml=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 let advTier='mid', advView=null;     // advView: 챕터 id 또는 'free'(자유 보스전)
 const bossIconHTML=b=>advIsImgIcon(b.icon) ? `<img class="boss-img" src="${escHtml(b.icon.replace(/^\//,''))}" alt="">` : escHtml(b.icon);   // v117 그림 아이콘
-const bossLocked=(b,all)=>advBlocker(b, all, id=>AdventureBook.has(id));
+// v117 입학(런): 챕터 보스는 입학 중일 때 '이번 입학의 다음 단계'만 도전할 수 있다
+const runOf=ch=>ServerStore.runs[ch]||null;
+function bossLocked(b, all){                       // 잠겨 있으면 {why} , 열려 있으면 null
+  if(!b.chapter) return null;
+  const run=runOf(b.chapter); if(!run) return {why:'입학하기를 눌러야 도전할 수 있어요'};
+  if((run.cleared||[]).includes(b.id)) return {why:'이번 입학에서 통과했어요', passed:true};
+  const next=advRunNext(all, b.chapter, run); if(next && next.id===b.id) return null;
+  return {why: next ? `${next.name}을(를) 먼저 깨야 해요` : '이미 모든 단계를 깼어요'};
+}
 const rewardCardsText=list=>{ const c={}; list.forEach(n=>c[n]=(c[n]||0)+1); return Object.entries(c).map(([n,k])=>k>1?`${n} ×${k}`:n).join(', '); };
 function bossButton(b, i, all, opts={}){
   const bad=BossBook.deckError(b), lock=opts.chapter ? bossLocked(b, all) : null, done=AdventureBook.has(b.id);
@@ -1885,9 +1948,10 @@ function bossButton(b, i, all, opts={}){
   const gold=done?'재도전 +'+Math.max(1,Math.round(bossReward(b)*BOSS_REPEAT_RATIO)):'첫 클리어 +'+bossReward(b);
   const cards=b.rewardCards&&b.rewardCards.length ? ` · 🎁 ${done?'<s>':''}${escHtml(rewardCardsText(b.rewardCards))}${done?'</s>':''}` : '';
   const stage=opts.chapter && b.stage>0 ? `<span class="stage">${b.stage}단계</span>` : '';
-  const btn=document.createElement('button'); btn.className='menu-btn boss-btn'+(lock?' locked':''); btn.disabled=!!bad || !!lock;
-  btn.innerHTML=`<span class="ic">${lock?'🔒':bossIconHTML(b)}</span><span class="bt">${done?'<span class="clr">✔ 클리어</span>':''}${stage}${escHtml(b.name)}`+
-    `<span class="desc">${lock?`${escHtml(lock.name)}을(를) 먼저 클리어하세요`:escHtml(b.desc)}</span>`+
+  const btn=document.createElement('button'); btn.className='menu-btn boss-btn'+(lock&&!lock.passed?' locked':'')+(lock&&lock.passed?' passed':''); btn.disabled=!!bad || !!lock;
+  const badge=opts.chapter ? (lock&&lock.passed?'<span class="clr">✔ 통과</span>':(!lock?'<span class="clr now">▶ 도전!</span>':'')) : (done?'<span class="clr">✔ 클리어</span>':'');
+  btn.innerHTML=`<span class="ic">${lock&&!lock.passed?'🔒':bossIconHTML(b)}</span><span class="bt">${badge}${stage}${escHtml(b.name)}`+
+    `<span class="desc">${lock&&!lock.passed?escHtml(lock.why):escHtml(b.desc)}</span>`+
     `<span class="tags">${opts.chapter?rankTag(bossRank(b))+' ':''}${deckBrief(b.deck)} · 🏆 ${gold}골드${cards}${bad?' · ⚠ 덱 오류':''}</span>${chips&&!lock?`<span class="tags">${chips}</span>`:''}</span>`;
   btn.onclick=()=>startBoss(i);
   return btn;
@@ -1904,7 +1968,7 @@ function openAdventure(rank){
   views.forEach(v=>{
     const t=document.createElement('button'); t.className='adv-ch'+(advView===v?' on':'');
     if(v==='free'){ const of=all.filter(b=>!b.chapter); t.innerHTML=`<span class="ic">⚔️</span><b>자유 보스전</b><small>${of.filter(b=>AdventureBook.has(b.id)).length}/${of.length} 클리어</small>`; }
-    else { const info=advChapterInfo(v), of=advChapterBosses(all,v); t.innerHTML=`<span class="ic">${escHtml(info.icon)}</span><b>${escHtml(info.name)}</b><small>${of.filter(b=>AdventureBook.has(b.id)).length}/${of.length} 단계</small>`; }
+    else { const info=advChapterInfo(v), of=advChapterBosses(all,v), run=runOf(v); t.innerHTML=`<span class="ic">${escHtml(info.icon)}</span><b>${escHtml(info.name)}</b><small>${run?`재학 중 ${(run.cleared||[]).length}/${of.length}`:'입학 전'}</small>`; }
     t.onclick=()=>{ advView=v; openAdventure(); }; ct.appendChild(t);
   });
   ct.style.display=views.length>1?'':'none';
@@ -1922,22 +1986,52 @@ function openAdventure(rank){
     all.forEach((b,i)=>{ if(!b.chapter && bossRank(b)===advTier) box.appendChild(bossButton(b,i,all)); });
   } else {
     tabs.style.display='none';
-    const info=advChapterInfo(advView), list=advChapterBosses(all, advView), done=list.filter(b=>AdventureBook.has(b.id)).length;
+    const info=advChapterInfo(advView), list=advChapterBosses(all, advView), run=runOf(advView), done=run?(run.cleared||[]).length:0, next=advRunNext(all, advView, run);
     $('advChapterDesc').style.display='';
-    $('advChapterDesc').innerHTML=`<b>${escHtml(info.icon)} ${escHtml(info.name)}</b> <span class="prog">${done} / ${list.length}</span><br><small>${escHtml(info.desc||'')}</small><div class="adv-bar"><i style="width:${list.length?Math.round(done/list.length*100):0}%"></i></div>`;
+    $('advChapterDesc').innerHTML=`<b>${escHtml(info.icon)} ${escHtml(info.name)}</b> <span class="prog">${run?`${done} / ${list.length}`:'입학 전'}</span><br><small>${escHtml(info.desc||'')}</small><div class="adv-bar"><i style="width:${list.length?Math.round(done/list.length*100):0}%"></i></div>`+
+      (run ? `<div class="run-box"><b>📖 재학 중</b> · 잠긴 덱 ${run.deck.length}장${next?` · 다음 상대: ${escHtml(next.name)}`:''}<br><small>보스에게 지면 입학이 끝나고 처음부터 다시 시작해요. 고른 보상 카드는 이 덱에 바로 더해져요.</small>`+
+             `<div class="run-btns"><button type="button" onclick="showRunDeck('${advView}')">🗒 잠긴 덱 보기</button><button type="button" class="drop" onclick="dropRun('${advView}')">자퇴하기</button></div></div>`
+           : `<div class="run-box"><button type="button" class="enroll" onclick="enrollRun('${advView}')">🎓 입학하기</button><br><small>${AdvDeckBook.has()?'모험 덱':'일반 덱'} 30장(일반 카드만)으로 입학해요. <b>입학하면 덱을 바꿀 수 없어요.</b> 모험 전용 카드는 단계를 깰 때마다 보상으로 덱에 더해지고, 입학이 끝나면 사라져요. 보스에게 지면 처음부터 다시.</small></div>`);
     list.forEach(b=>box.appendChild(bossButton(b, all.indexOf(b), all, {chapter:true})));
   }
-  $('advDeckDesc').textContent=AdvDeckBook.has() ? `모험 덱 사용 중 · ${deckBrief(AdvDeckBook.get())}` : '아직 모험 덱이 없어 일반 덱으로 싸웁니다 · 모험 전용 카드를 얻으면 여기서 넣으세요';
+  { const n=ServerStore.offers.length, ob=$('advOfferBtn'); ob.style.display=n?'':'none'; if(n) ob.innerHTML=`🎁 받지 않은 보상이 있어요 (${n})<span class="desc">${escHtml(ServerStore.offers[0].bossName)} 클리어 보상 — 눌러서 카드 묶음을 고르세요</span>`; }   // v117
+  $('advDeckBtn').style.display=advView==='free'?'none':'';
+  $('advDeckBtn').disabled=Object.keys(ServerStore.runs).length>0;
+  $('advFreeNote').style.display=advView==='free'?'':'none';
+  $('advDeckDesc').textContent=Object.keys(ServerStore.runs).length ? '재학 중에는 덱을 바꿀 수 없어요 (졸업·자퇴하거나 보스에게 지면 풀려요)' : AdvDeckBook.has() ? `모험 덱 사용 중 · ${deckBrief(AdvDeckBook.get())}` : '아직 모험 덱이 없어 일반 덱으로 입학해요 · 입학 때 들고 갈 30장(일반 카드만)을 따로 만들 수 있어요';
   showScreen('adventure');
+}
+// ---- v117 입학하기 · 자퇴 · 잠긴 덱 보기 ----
+async function enrollRun(ch){
+  const deck=AdvDeckBook.get();
+  if(!confirm(`${advChapterInfo(ch).name}에 입학할까요?\n\n지금 모험 덱 30장이 잠기고, 졸업·자퇴하거나 보스에게 질 때까지 바꿀 수 없어요.`)) return;
+  const r=await ServerStore.enroll(ch, deck);
+  if(!r.ok){ alert('⚠ '+r.error); return; }
+  advView=ch; openAdventure();
+}
+async function dropRun(ch){
+  if(!confirm('자퇴할까요? 이번 입학의 진행과 잠긴 덱(보상으로 받은 모험 전용 카드 포함)이 사라지고, 처음부터 다시 입학해야 해요.')) return;
+  await ServerStore.dropRun(ch); openAdventure();
+}
+function showRunDeck(ch){
+  const run=runOf(ch); if(!run) return;
+  const cnt={}; run.deck.forEach(n=>cnt[n]=(cnt[n]||0)+1);
+  $('offerTitle').textContent=`🗒 잠긴 덱 — ${run.deck.length}장`;
+  $('offerMsg').textContent='입학할 때의 덱에 고른 보상 묶음이 더해진 덱이에요. 졸업·자퇴하거나 보스에게 지기 전까지 바뀌지 않아요.';
+  const box=$('offerBundles'); box.innerHTML=''; const col=document.createElement('div'); col.className='offer-bundle'; const row=document.createElement('div'); row.className='offer-cards';
+  CARD_POOL.forEach(c=>{ if(!cnt[c.name]) return; const el=cardEl(c); const b=document.createElement('div'); b.className='copies'; b.textContent=`×${cnt[c.name]}`; el.appendChild(b); row.appendChild(el); });
+  col.appendChild(row); box.appendChild(col); $('offerAfter').style.display='none'; $('offerLater').textContent='닫기'; $('offerModal').classList.add('show');
 }
 async function startBoss(idx, opts={}){
   const all=BossBook.get(), boss=all[idx]; if(!boss || BossBook.deckError(boss)) return;
-  if(!opts.devTest && bossLocked(boss, all)) return;                       // v117: 도장깨기 — 이전 단계를 깨야 도전 가능
+  if(!opts.devTest && bossLocked(boss, all)) return;                       // v117: 입학 중 + 이번 입학의 다음 단계만
+  if(!opts.devTest && boss.chapter){ const po=ServerStore.offers.find(o=>{ const ob=all.find(x=>x.id===o.bossId); return ob && ob.chapter===boss.chapter; });
+    if(po){ showOffer(po); return; } }                                                // 고르지 않은 보상 묶음이 있으면 먼저 고르게 (잠긴 덱에 더해야 하므로)
   const r=await resolveBossBot(boss);
   const d=DIFFICULTY.normal2;
-  game={key:'adventure', mode:'adventure', boss, bossIdx:idx, devTest:!!opts.devTest, bet:0, tier:0, cheats:[], pool:0, settled:false, result:null, deckNames:AdvDeckBook.get()};   // v117: 모험 덱 (없으면 일반 덱)
+  game={key:'adventure', mode:'adventure', boss, bossIdx:idx, devTest:!!opts.devTest, bet:0, tier:0, cheats:[], pool:0, settled:false, result:null, deckNames:boss.chapter?(runOf(boss.chapter)?runOf(boss.chapter).deck.slice():AdvDeckBook.get()):DeckBook.get()};   // v117: 도장깨기 챕터(영남대 입학)만 모험 덱, 자유 보스전은 일반 덱 (모험 전용 카드는 챕터에서만)
   Bot=r.bot;
-  Host.startBoss(boss, game.deckNames);
+  Host.startBoss(boss, game.deckNames, !!(boss.chapter && runOf(boss.chapter)));
   view=Host.view(MY);
   ui.selected=null; ui.pending=null; ui.busy=false; stopArrow(); closeDeck(); resetSurrenderBtn();
   $('logList').innerHTML='';
@@ -1988,10 +2082,26 @@ function bossAdd(){
 // v117: 챕터 틀 추가 (예: 영남대 9단계). 이미 같은 id 의 보스가 있으면 건너뛴다. 덱은 추천 덱으로 채워 둔다
 function bossAddTemplate(chapter){
   const tpl=ADV_TEMPLATES[chapter]; if(!tpl) return;
-  const list=BossBook.get(), add=tpl.filter(([id])=>!list.some(b=>b.id===id));
-  if(!add.length){ alert('이미 모든 단계가 목록에 있어요.'); return; }
-  if(!confirm(`${advChapterInfo(chapter).name} 보스 ${add.length}개를 목록 끝에 추가할까요? (덱이 아직 없는 단계는 추천 덱으로 채워지니 하나씩 바꿔 주세요)`)) return;
-  add.forEach(([id,name,icon,desc,deck])=>{ const st=tpl.findIndex(t=>t[0]===id)+1; list.push({id, name, icon, desc, cheats:[], reward:0, tier:'mid', bot:'rule2', model:'', deck:(deck && !validateDeckList(deck))?deck.slice():defaultDeckList(), chapter, stage:st, rewardCards:[]}); });
+  let list=BossBook.get();
+  const legacy=list.filter(b=>ADV_LEGACY_IDS.includes(b.id));                                     // v117: 예전 틀(학년별 2단계) 정리
+  const add=tpl.filter(([id])=>!list.some(b=>b.id===id));
+  // 이미 추가된 단계: ① 단계 번호를 새 순서로 ② 보상 묶음 후보가 비어 있으면 채움 ③ 덱이 추천 덱(빈 틀) 그대로면 틀의 덱·아이콘으로 (직접 고친 덱은 건드리지 않음)
+  const dflt=JSON.stringify(defaultDeckList()), fill=[];
+  for(const b of list){ const k=tpl.findIndex(x=>x[0]===b.id); if(k<0) continue; const t=tpl[k], ch=[];
+    if(b.stage!==k+1 || b.chapter!==chapter) ch.push(()=>{ b.stage=k+1; b.chapter=chapter; });
+    if(ADV_TEMPLATE_REWARDS[b.id] && !(b.rewardChoice||[]).length) ch.push(()=>{ b.rewardChoice=ADV_TEMPLATE_REWARDS[b.id].slice(); });
+    if(t[4] && JSON.stringify(b.deck)===dflt) ch.push(()=>{ b.deck=t[4].slice(); b.icon=t[2]; b.desc=t[3]; b.name=t[1]; });
+    else if(t[4] && JSON.stringify(b.deck)!==JSON.stringify(t[4]) && (ADV_OLD_TEMPLATE_DECKS[b.id]||[]).some(d=>JSON.stringify(d)===JSON.stringify(b.deck))) ch.push(()=>{ b.deck=t[4].slice(); });   // 예전 틀의 임시 덱 → 새 덱
+    if(ch.length) fill.push({b, ch}); }
+  if(!add.length && !fill.length && !legacy.length){ alert('이미 최신 틀이에요.'); return; }
+  const lines=[];
+  if(legacy.length) lines.push(`예전 학년별 2단계 보스 ${legacy.length}개(${legacy.map(b=>b.name).join(', ')})를 지웁니다`);
+  if(add.length) lines.push(`새 단계 ${add.length}개(${add.map(t=>t[1]).join(', ')})를 추가합니다`);
+  if(fill.length) lines.push(`이미 있는 ${fill.map(f=>f.b.name).join(', ')}의 단계 번호·임시 덱·보상 후보를 새 틀로 맞춥니다 (직접 고친 덱은 그대로)`);
+  if(!confirm(`${advChapterInfo(chapter).name} 틀을 새 구조(수능 → 1·2·3·4학년 → 졸업)로 맞출까요?\n\n· `+lines.join('\n· '))) return;
+  list=list.filter(b=>!ADV_LEGACY_IDS.includes(b.id));
+  fill.forEach(f=>f.ch.forEach(fn=>fn()));
+  add.forEach(([id,name,icon,desc,deck])=>{ const st=tpl.findIndex(t=>t[0]===id)+1; list.push({id, name, icon, desc, cheats:[], reward:0, tier:'mid', bot:'rule2', model:'', deck:(deck && !validateDeckList(deck))?deck.slice():defaultDeckList(), chapter, stage:st, rewardCards:[], rewardChoice:(ADV_TEMPLATE_REWARDS[id]||[]).slice()}); });
   bossListSave(list); openBossEdit();
 }
 function openBossForm(i){
@@ -2000,7 +2110,7 @@ function openBossForm(i){
   $('bfTitle').textContent=`보스 설정 — ${bossDraft.id}`;
   $('bfName').value=bossDraft.name; $('bfIcon').value=bossDraft.icon; $('bfDesc').value=bossDraft.desc;
   $('bfChapter').innerHTML='<option value="">없음 (자유 보스전)</option>'+[...new Set([...ADV_CHAPTERS.map(c=>c.id), ...(bossDraft.chapter?[bossDraft.chapter]:[])])].map(id=>`<option value="${escHtml(id)}">${escHtml(advChapterInfo(id).icon+' '+advChapterInfo(id).name)}</option>`).join('');
-  $('bfChapter').value=bossDraft.chapter||''; $('bfStage').value=bossDraft.stage||''; $('bfRewardCards').value=(bossDraft.rewardCards||[]).join(', ');
+  $('bfChapter').value=bossDraft.chapter||''; $('bfStage').value=bossDraft.stage||''; $('bfRewardCards').value=(bossDraft.rewardCards||[]).join(', '); $('bfRewardChoice').value=(bossDraft.rewardChoice||[]).join(', ');
   buildCheatChecks(); $('bfReward').value=bossDraft.reward||0; $('bfTier').value=bossDraft.tier; $('bfBot').value=bossDraft.bot==='rule'?'rule':'rule2'; $('bfModel').value=bossDraft.model;
   refreshBossForm(); showScreen('bossform');
 }
@@ -2008,6 +2118,7 @@ function readBossForm(){
   bossDraft.name=$('bfName').value.trim()||'이름 없음'; bossDraft.icon=$('bfIcon').value.trim()||'👹'; bossDraft.desc=$('bfDesc').value.trim();
   bossDraft.chapter=$('bfChapter').value; bossDraft.stage=Math.max(0,Math.floor(Number($('bfStage').value)||0));
   bossDraft.rewardCards=$('bfRewardCards').value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+  bossDraft.rewardChoice=$('bfRewardChoice').value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
   bossDraft.reward=Math.max(0,Math.floor(Number($('bfReward').value)||0)); bossDraft.cheats=[...document.querySelectorAll('#bfCheats input:checked')].map(i=>i.value); bossDraft.tier=$('bfTier').value; bossDraft.bot=bossDraft.tier==='high'?'model':$('bfBot').value; bossDraft.model=$('bfModel').value.trim();
 }
 function buildCheatChecks(){
@@ -2027,7 +2138,10 @@ function refreshBossForm(){
   $('bfRank').textContent=`현재 등급: ${rankLabel(bossRank(bossDraft))} (치트 ${cl.length}개) · 첫 클리어 보상 ${bossReward(bossDraft)}골드`+(dup.length?` · ⚠ 같은 계열을 함께 골랐습니다: ${dup.join(', ')} (일반 판에서는 하나만 뽑는 조합이라 매우 셀 수 있음)`:'');
   { const raw=bossDraft.rewardCards||[], kept=advCleanFields({...bossDraft, chapter:bossDraft.chapter||'x'}).rewardCards, dropped=raw.filter((n,i)=>raw.slice(0,i+1).filter(x=>x===n).length>(kept.filter(x=>x===n).length));
     $('bfRewardStat').textContent = raw.length ? (dropped.length?`⚠ 저장되지 않는 카드: ${dropped.join(', ')} (없는 이름 · 보스 전용 · 같은 카드 3장 이상 · 10장 초과)`:`✔ 첫 클리어 때 ${rewardCardsText(kept)} 지급`)+(kept.some(n=>cardScope(cardByName(n))==='normal')?' · 일반 카드도 줄 수 있어요 (상점에서도 나오는 카드)':'') : '없음';
-    $('bfStageRow').style.display=$('bfChapter').value?'':'none'; }
+    $('bfStageRow').style.display=$('bfChapter').value?'':'none';
+    const rc=bossDraft.rewardChoice||[], keep=advCleanFields({...bossDraft, chapter:bossDraft.chapter||'x'}).rewardChoice, bad=rc.filter(n=>!keep.includes(n));
+    const per=Math.floor(keep.length/ADV_BUNDLES), extra=keep.length-per*ADV_BUNDLES;
+    $('bfChoiceStat').textContent = rc.length ? (bad.length?`⚠ 빠지는 카드: ${[...new Set(bad)].join(', ')} (없는 이름 · 보스 전용 · 중복) · `:'')+`${keep.length}종 → ${ADV_BUNDLES}묶음 × ${per}종${extra?` (+${extra}종은 무작위 묶음에 하나씩)`:''}, 종류마다 2장`+(keep.some(n=>cardScope(cardByName(n))!=='adventure')?' · ⚠ 모험 전용이 아닌 카드가 섞여 있어요':'') : '없음'; }
   const err=validateDeckList(bossDraft.deck);
   $('bfDeckDesc').textContent=`${bossDraft.deck.length}장 · ${deckBrief(bossDraft.deck)}${err?' · ⚠ '+err:''}`;
   const high=$('bfTier').value==='high';
@@ -2059,7 +2173,7 @@ async function bossLoadRegistry(file){
   catch(e){ el.textContent='⚠ 번호표를 쓸 수 없습니다: '+e.message; }
 }
 $('bfBot').addEventListener('change', refreshBossForm); $('bfTier').addEventListener('change', refreshBossForm);
-['bfChapter','bfStage','bfRewardCards'].forEach(id=>$(id).addEventListener('input', ()=>{ readBossForm(); refreshBossForm(); }));
+['bfChapter','bfStage','bfRewardCards','bfRewardChoice'].forEach(id=>$(id).addEventListener('input', ()=>{ readBossForm(); refreshBossForm(); }));
 function bossFormSave(quiet){
   readBossForm();
   const list=BossBook.get(); list[bossDraftIdx]=BossBook.clean(bossDraft); bossListSave(list);
@@ -2261,26 +2375,41 @@ showScreen('main');
 });
 
 // ---------- v83: 카드 위에 마우스를 올리면 큰 미리보기 (하스스톤 방식) ----------
+// v117: 보상 묶음 창 위에서도 보이도록 맨 위(z-index)에 띄우고, 보상 창 카드는 터치(누르고 있기)로도 볼 수 있다
 (function(){
-  if(!window.matchMedia || !matchMedia('(hover:hover)').matches) return;     // 터치 기기는 제외
-  const box=document.createElement('div'); box.id='cardPreview'; document.body.appendChild(box);
+  const hover=!!(window.matchMedia && matchMedia('(hover:hover)').matches);
+  const box=document.createElement('div'); box.id='cardPreview'; box.style.zIndex='8000'; document.body.appendChild(box);
   const SKIP='#mulliganModal,#discoverModal,#spellCast,#burnCast,#cardPreview';
   let cur=null;
   function hide(){ box.style.display='none'; box.innerHTML=''; cur=null; }
   function show(el){
     cur=el; box.innerHTML='';
     const cl=el.cloneNode(true);
-    cl.classList.remove('selected','attackable','dead','frozen-x'); cl.style.cssText='';
+    cl.classList.remove('selected','attackable','dead','frozen-x'); cl.style.cssText=''; cl.removeAttribute('title');
     box.appendChild(cl); box.style.display='block';
     const r=el.getBoundingClientRect(), p=cl.getBoundingClientRect(), w=p.width, h=p.height;
     let x=r.right+14; if(x+w>innerWidth-6) x=r.left-w-14; if(x<6) x=Math.max(6,Math.min(innerWidth-w-6, r.left+r.width/2-w/2));
     let y=r.top+r.height/2-h/2; y=Math.max(6, Math.min(innerHeight-h-6, y));
     box.style.left=x+'px'; box.style.top=y+'px';
   }
+  const target=e=>{ const c=e.target.closest && e.target.closest('.card'); return (!c || c.closest(SKIP) || c.classList.contains('card-back') || !c.querySelector('.cname')) ? null : c; };
   document.addEventListener('mouseover', e=>{
-    const c=e.target.closest && e.target.closest('.card');
-    if(!c || c.closest(SKIP) || c.classList.contains('card-back') || !c.querySelector('.cname')){ if(cur) hide(); return; }
+    if(!hover && !(e.target.closest && e.target.closest('#offerModal'))) return;          // 터치 기기는 보상 창만
+    const c=target(e); if(!c){ if(cur) hide(); return; }
     if(c!==cur) show(c);
+  });
+  document.addEventListener('touchstart', e=>{ const c=target(e); if(c && c.closest('#offerModal')) show(c); else if(cur) hide(); }, {passive:true});
+  document.addEventListener('touchend', ()=>{ if(cur && cur.closest('#offerModal')) setTimeout(hide, 900); }, {passive:true});
+  // v117 전투 기록: 카드 이름이 들어 있는 줄에 마우스를 올리면 그 카드를 띄운다
+  document.addEventListener('mouseover', e=>{
+    const li=e.target.closest && e.target.closest('#logList [data-card]');
+    if(!li){ if(cur && cur.dataset && cur.dataset.card) hide(); return; }
+    if(cur===li) return; const c=cardByName(li.dataset.card); if(!c) return;
+    const tmp=cardEl(c); tmp.removeAttribute('title'); cur=li; box.innerHTML=''; box.appendChild(tmp); box.style.display='block';
+    const r=li.getBoundingClientRect(), p=tmp.getBoundingClientRect(), w=p.width, h=p.height;
+    let x=r.left-w-14; if(x<6) x=Math.min(innerWidth-w-6, r.right+14);                     // 기록 창은 오른쪽에 있으니 왼쪽에 띄운다
+    const y=Math.max(6, Math.min(innerHeight-h-6, r.top+r.height/2-h/2));
+    box.style.left=x+'px'; box.style.top=y+'px';
   });
   ['mousedown','wheel','dragstart'].forEach(t=>document.addEventListener(t, ()=>{ if(cur) hide(); }, true));
   setInterval(()=>{ if(cur && !document.body.contains(cur)) hide(); }, 250);     // 화면이 다시 그려져 카드가 사라지면 미리보기도 치운다

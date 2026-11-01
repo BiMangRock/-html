@@ -116,4 +116,29 @@ CREATE TABLE IF NOT EXISTS adventure_decks (
 );
 `);
 
+// v117: 모험 보상 묶음 (첫 클리어 때 만든 3묶음. 고르기 전까지 남아 있어서 창을 닫아도 나중에 고를 수 있다)
+db.exec(`
+CREATE TABLE IF NOT EXISTS adventure_offers (
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  boss_id      TEXT    NOT NULL,
+  bundles_json TEXT    NOT NULL,                         -- [[카드 이름…], …]
+  created_at   INTEGER NOT NULL,
+  picked_index INTEGER,                                  -- 고른 묶음 번호 (아직이면 NULL)
+  picked_at    INTEGER,
+  PRIMARY KEY (user_id, boss_id)
+);
+`);
+
+// v117: 입학(런) — 챕터마다 하나. 입학할 때의 모험 덱이 잠기고(보상 묶음은 여기에 더해짐), 지거나 졸업·자퇴하면 지운다
+db.exec(`
+CREATE TABLE IF NOT EXISTS adventure_runs (
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  chapter      TEXT    NOT NULL,
+  deck_json    TEXT    NOT NULL,                         -- 잠긴 덱 (30장 + 고른 보상 묶음)
+  cleared_json TEXT    NOT NULL DEFAULT '[]',            -- 이번 입학에서 깬 보스 id
+  started_at   INTEGER NOT NULL,
+  PRIMARY KEY (user_id, chapter)
+);
+`);
+
 module.exports = db;

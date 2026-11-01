@@ -10,7 +10,12 @@ const BOSS_DECK = Adv.SUNEUNG_CARDS.flatMap(n => [n, n]);
 assert.strictEqual(E.validateDeckList(BOSS_DECK), null, '수능 보스 덱 30장 규칙');
 assert(Col.validateDeckScope(BOSS_DECK, E.CARD_POOL, 'adventure'), '유저 덱에는 못 넣음');
 for (const n of Adv.SUNEUNG_CARDS) assert.strictEqual(E.CARD_POOL.find(c => c.name === n).scope, 'boss', n + ' 보스 전용');
-const tpl = Adv.ADV_TEMPLATES.ynu; assert.strictEqual(tpl.length, 10, '영남대 10단계'); assert.deepStrictEqual(tpl[0][4], BOSS_DECK, '수능 틀에 덱 포함');
+const tpl = Adv.ADV_TEMPLATES.ynu; assert.deepStrictEqual(tpl.map(t => t[1]), ['수능', '1학년', '2학년', '3학년', '4학년', '졸업'], '영남대 6단계');
+for (const t of tpl) assert.strictEqual(E.validateDeckList(t[4]), null, t[1] + ' 덱');
+{ const legends = sh => new Set(Adv.advFillDeck(Adv.YNU_COMMON, sh).filter(n => E.CARD_POOL.find(c => c.name === n).rarity === '전설')).size;   // 채움 규칙: 학년이 오를수록 전설 증가
+  const L = [1, 2, 3, 4, 'final'].map(k => legends(Adv.ADV_LEGEND_SHARE[k])); assert.strictEqual(L[0], 0, '1학년 채움엔 전설 없음');
+  for (let i = 1; i < L.length; i++) assert(L[i] >= L[i - 1], '전설 비율 증가 ' + L); }
+{ const d = Adv.advFillDeck(['물수능 컷 폭발'], 0.5); assert.strictEqual(d.length, 30); assert.strictEqual(new Set(d).size, 15); } assert.deepStrictEqual(tpl[0][4], BOSS_DECK, '수능 틀에 덱 포함');
 assert.strictEqual(Adv.advCleanIcon('images/boss/ynu_suneung.jpg'), 'images/boss/ynu_suneung.jpg', '그림 아이콘 허용');
 assert.strictEqual(Adv.advCleanIcon('images/../secret.png').length <= 4, true, '경로 탈출 거부');
 
@@ -30,11 +35,16 @@ const end = (s, seat) => ok(E.apply(s, { type: 'END_TURN' }, seat));
 const mt = (seat, id) => ({ kind: 'minion', seat, id }), ht = seat => ({ kind: 'hero', seat });
 const bear = { name: '시험 곰', atk: 5, hp: 5 };
 
-// OMR 카드 밀려쓰기: 하수인 주인 교체, 넘어온 하수인은 이번 턴 공격 불가
-{ let s = setup(); put(s, 0, bear); put(s, 1, bear); put(s, 1, { name: '시험 늑대', atk: 3, hp: 3 });
-  s = play(s, 0, give(s, 0, 'OMR 카드 밀려쓰기'));
-  assert.strictEqual(s.seats[0].board.length, 2); assert.strictEqual(s.seats[1].board.length, 1);
-  assert(s.seats[0].board.every(m => m.summoned), '넘어온 하수인은 소환 직후 상태'); }
+// OMR 카드 밀려쓰기: 하수인마다 주인이 무작위 (50%), 주인이 바뀐 하수인은 이번 턴 공격 불가
+{ const splits = new Set();
+  for (let k = 0; k < 40; k++) { let s = setup(); s.seed = k * 313 + 7; const mine = put(s, 0, bear); put(s, 1, bear); put(s, 1, { name: '시험 늑대', atk: 3, hp: 3 });
+    s = play(s, 0, give(s, 0, 'OMR 카드 밀려쓰기'));
+    assert.strictEqual(s.seats[0].board.length + s.seats[1].board.length, 3, '하수인 수는 그대로');
+    for (const sd of [0, 1]) for (const m of s.seats[sd].board) { const moved = (m.id === mine.id) !== (sd === 0); if (moved) assert(m.summoned, '넘어간 하수인은 공격 불가'); }
+    splits.add(s.seats[0].board.length); }
+  assert(splits.size >= 3, '나뉘는 결과가 매번 다름: ' + [...splits]); }
+{ let s = setup(); for (let i = 0; i < 7; i++) { put(s, 0, bear); put(s, 1, bear); } s.seats[0].board.pop();   // 6 + 7
+  s = play(s, 0, give(s, 0, 'OMR 카드 밀려쓰기')); assert(s.seats[0].board.length <= 7 && s.seats[1].board.length <= 7); assert.strictEqual(s.seats[0].board.length + s.seats[1].board.length, 13, '전장 한도 7 지키며 하나도 안 사라짐'); }
 // 규정 위반: 보호막 무시 제거
 { let s = setup(); const m = put(s, 1, bear, { shield: true });
   s = play(s, 0, give(s, 0, '4교시 탐구영역 응시 규정 위반'), mt(1, m.id)); assert.strictEqual(s.seats[1].board.length, 0); }

@@ -76,13 +76,28 @@ const server = http.createServer(app).listen(0, async () => {
     r = await user('GET', '/api/save'); assert.strictEqual(r.data.advDeck, null, '처음엔 모험 덱 없음');
     r = await user('PUT', '/api/adventure/deck', { deck: deckWith(ADV) }); assert.strictEqual(r.status, 400, '없는 카드로 모험 덱 X');
 
+    r = await user('POST', '/api/adventure/clear', { bossId: 'ynu1' }); assert.strictEqual(r.status, 400, '입학 전에는 챕터 보스 기록 불가');
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck: deckWith(ADV) }); assert.strictEqual(r.status, 400, '없는 카드로 입학 불가');
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'nope', deck }); assert.strictEqual(r.status, 400, '없는 챕터');
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck }); assert.strictEqual(r.status, 200); assert.deepStrictEqual(r.data.run.deck, deck, '덱 잠금');
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck }); assert.strictEqual(r.status, 409, '이미 입학');
     r = await user('POST', '/api/adventure/clear', { bossId: 'ynu2' }); assert.strictEqual(r.status, 400, '1단계 전에 2단계 클리어 불가');
     r = await user('POST', '/api/adventure/clear', { bossId: 'ynu1' });
     assert.strictEqual(r.status, 200); assert.strictEqual(r.data.first, true);
     assert.deepStrictEqual(r.data.granted, [ADV, ADV], '첫 클리어 보상 카드'); assert.strictEqual(r.data.collection[ADV], 2);
-    r = await user('POST', '/api/adventure/clear', { bossId: 'ynu1' });
-    assert.strictEqual(r.data.first, false); assert.deepStrictEqual(r.data.granted, [], '재클리어는 카드 없음');
+    assert.deepStrictEqual(r.data.run.cleared, ['ynu1'], '이번 입학 진행');
+    r = await user('POST', '/api/adventure/clear', { bossId: 'ynu1' }); assert.strictEqual(r.status, 400, '이번 입학에서 이미 깬 단계는 다시 못 깸');
     r = await user('POST', '/api/adventure/clear', { bossId: 'ynu2' }); assert.strictEqual(r.status, 200, '이제 2단계 기록 가능');
+    assert.strictEqual(r.data.graduated, true, '마지막 단계 → 졸업'); assert.strictEqual(r.data.run, null);
+    r = await user('GET', '/api/save'); assert.deepStrictEqual(r.data.adventure.runs, {}, '졸업하면 입학 기록 삭제');
+    // 다시 입학 → 지면 처음부터 / 자퇴
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck }); assert.strictEqual(r.status, 200, '졸업 후 재입학');
+    r = await user('POST', '/api/adventure/clear', { bossId: 'ynu1' }); assert.strictEqual(r.data.first, false); assert.deepStrictEqual(r.data.granted, [], '재클리어는 고정 보상 카드 없음');
+    r = await user('POST', '/api/adventure/lose', { bossId: 'ynu2' }); assert.strictEqual(r.data.ended, true, '지면 입학 끝');
+    r = await user('POST', '/api/adventure/clear', { bossId: 'ynu2' }); assert.strictEqual(r.status, 400, '입학이 끝나면 기록 불가');
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck }); r = await user('POST', '/api/adventure/drop', { chapter: 'ynu' });
+    r = await user('GET', '/api/save'); assert.deepStrictEqual(r.data.adventure.runs, {}, '자퇴');
+    r = await user('POST', '/api/adventure/lose', { bossId: 'free1' }); assert.strictEqual(r.data.ended, false, '자유 보스 패배는 상관없음');
     r = await user('POST', '/api/adventure/clear', { bossId: 'free1' }); assert.strictEqual(r.status, 200, '자유 보스는 잠금 없음');
 
     r = await user('PUT', '/api/deck', { deck: deckWith(ADV) }); assert.strictEqual(r.status, 400, '일반 덱엔 모험 카드 X');
@@ -95,6 +110,32 @@ const server = http.createServer(app).listen(0, async () => {
     r = await user('GET', '/api/save'); assert.strictEqual(r.data.deck, null, '조작된 일반 덱은 무시');
     assert.deepStrictEqual(loadDeck(uid), E.defaultDeckList(), '유저 대전에 모험 카드 덱 X');
     console.log('✔ 모험 덱 API · 클리어 순서 · 보상 카드 · 유저 대전 차단');
+    // v117 보상 묶음: 첫 클리어 때 3묶음 → 하나 고르기
+    r = await dev('PUT', '/api/bosses', { bosses: [
+      boss('ynu1', { chapter: 'ynu', stage: 1 }), boss('ynu2', { chapter: 'ynu', stage: 2 }),
+      boss('ynu3', { chapter: 'ynu', stage: 3, rewardChoice: [ADV, BOSS, '들쥐', '책벌레', '들쥐'] }) ] });
+    assert.deepStrictEqual(r.data.bosses[2].rewardChoice, [ADV, '들쥐', '책벌레'], '보스 전용·중복 제외');
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck }); assert.strictEqual(r.status, 200);
+    await user('POST', '/api/adventure/clear', { bossId: 'ynu1' }); await user('POST', '/api/adventure/clear', { bossId: 'ynu2' });
+    r = await user('POST', '/api/adventure/clear', { bossId: 'ynu3' });
+    assert.strictEqual(r.status, 200); assert(r.data.offer, '묶음 제안'); assert.strictEqual(r.data.offer.bundles.length, 3);
+    assert(r.data.offer.bundles.every(b => b.length === 2), '1종 × 2장씩'); const offer = r.data.offer;
+    r = await user('GET', '/api/save'); assert.strictEqual(r.data.adventure.offers.length, 1, '고르기 전까지 남아 있음');
+    r = await user('POST', '/api/adventure/pick', { bossId: 'ynu3', index: 9 }); assert.strictEqual(r.status, 400);
+    r = await user('POST', '/api/adventure/pick', { bossId: 'ynu3', index: 1 });
+    assert.strictEqual(r.status, 200); assert.deepStrictEqual(r.data.granted, offer.bundles[1]);
+    assert.strictEqual(r.data.run, null, 'ynu3 이 마지막 단계라 이미 졸업 → 덱에 더할 입학 없음');
+    r = await user('POST', '/api/adventure/pick', { bossId: 'ynu3', index: 0 }); assert.strictEqual(r.status, 409, '두 번 못 고름');
+    r = await user('GET', '/api/save'); assert.strictEqual(r.data.adventure.offers.length, 0);
+    // 입학 중에 고른 묶음은 잠긴 덱에 더해진다 (입학할 때마다 다시 묶음)
+    r = await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck }); await user('POST', '/api/adventure/clear', { bossId: 'ynu1' });
+    await dev('PUT', '/api/bosses', { bosses: [ boss('ynu1', { chapter: 'ynu', stage: 1, rewardChoice: ['들쥐', '책벌레', ADV] }), boss('ynu2', { chapter: 'ynu', stage: 2 }) ] });
+    await user('POST', '/api/adventure/drop', { chapter: 'ynu' }); await user('POST', '/api/adventure/enroll', { chapter: 'ynu', deck });
+    r = await user('POST', '/api/adventure/clear', { bossId: 'ynu1' }); assert(r.data.offer, '재입학해서 깨도 묶음 제안');
+    r = await user('POST', '/api/adventure/pick', { bossId: 'ynu1', index: 0 });
+    assert.strictEqual(r.data.run.deck.length, 32, '잠긴 덱 30 + 묶음 2장'); assert.deepStrictEqual(r.data.run.deck.slice(30), r.data.granted);
+    r = await user('POST', '/api/adventure/pick', { bossId: 'free1', index: 0 }); assert.strictEqual(r.status, 404);
+    console.log('✔ 보상 묶음 3개 중 하나 고르기 API');
     console.log('test-adventure: 모두 통과');
   } catch (e) { console.error(e); process.exitCode = 1; }
   server.close();

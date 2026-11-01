@@ -752,3 +752,30 @@ html,body{overscroll-behavior:none; -webkit-tap-highlight-color:transparent; tou
 .boss-btn .ic .boss-img{width:2.6rem; height:2.6rem; object-fit:cover; object-position:center 25%; border-radius:50%; border:2px solid var(--gold-d); display:block; margin:0 auto;}
 body.boss-portrait #aiAvatar{display:block;}
 body.boss-portrait #aiAvatar>span{background-size:cover; background-position:center 22%; background-repeat:no-repeat;}
+/* v117: 보상 카드 묶음 고르기 */
+.offer-modal{position:fixed; inset:0; z-index:5000; display:none; align-items:center; justify-content:center; background:rgba(5,4,14,.82); padding:1rem;}
+.offer-modal.show{display:flex;}
+.offer-panel{width:min(1100px,100%); max-height:94vh; overflow:auto; background:#1a1630; border:1px solid var(--gold); border-radius:12px; padding:1rem 1.1rem; display:flex; flex-direction:column; align-items:center; gap:.6rem; text-align:center;}
+.offer-panel h3{margin:0; color:var(--gold); font-family:var(--font-d);}
+.offer-bundles{display:flex; flex-direction:column; gap:.8rem; width:100%;}
+.offer-bundle{border:1px solid rgba(201,162,39,.45); border-radius:10px; padding:.6rem; background:#14112a; display:flex; flex-direction:column; align-items:center; gap:.5rem;}
+.offer-head{font-weight:800; color:var(--gold); font-size:.9rem;}
+.offer-cards{display:flex; flex-wrap:wrap; justify-content:center; gap:.5rem;}
+.offer-cards .card{cursor:default; position:relative;}
+.offer-bundle .menu-btn{max-width:260px;}
+.offer-after{display:flex; gap:.6rem; flex-wrap:wrap; justify-content:center;}
+/* v117: 보상 묶음 창 위에서도 카드 크게 보기(v83 미리보기)가 보이도록 */
+#cardPreview{z-index:8000;}
+.offer-cards .card{transition:transform .12s;} .offer-cards .card:hover{transform:translateY(-3px); outline:2px solid var(--gold); outline-offset:1px;}
+/* v117: 입학(런) */
+.run-box{margin-top:.55rem; padding:.55rem .6rem; border-radius:8px; background:#1d1838; border:1px dashed rgba(201,162,39,.55); text-align:center;}
+.run-box small{color:var(--parch-d);}
+.run-box .enroll{font:inherit; font-weight:800; font-size:1.05rem; padding:.55rem 1.4rem; border-radius:10px; border:none; background:var(--gold); color:var(--ink); cursor:pointer; margin-bottom:.35rem;}
+.run-btns{display:flex; gap:.5rem; justify-content:center; margin-top:.45rem;}
+.run-btns button{font:inherit; padding:.35rem .8rem; border-radius:8px; border:1px solid var(--gold-d); background:#14112a; color:var(--parch); cursor:pointer;}
+.run-btns .drop{border-color:#8a3a3a; color:#ffb4b4;}
+.boss-btn .clr.now{color:#7dffb0;}
+.boss-btn.passed{opacity:.75;}
+/* v117: 카드가 들어 있는 전투 기록 줄 — 마우스를 올리면 카드 미리보기 */
+#logList div.has-card{cursor:help;}
+#logList div.has-card:hover{color:var(--gold); background:rgba(201,162,39,.08);}

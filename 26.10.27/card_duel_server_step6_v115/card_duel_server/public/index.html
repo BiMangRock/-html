@@ -148,7 +148,9 @@
     <div class="adv-chdesc" id="advChapterDesc" style="display:none"></div>
     <div class="adv-tabs" id="advTabs"></div>
     <div class="boss-list" id="bossList"></div>
-    <button class="menu-btn" onclick="openAdvDeckEditor()">🎒 모험 덱 편집<span class="desc" id="advDeckDesc"></span></button>
+    <button class="menu-btn primary" id="advOfferBtn" style="display:none" onclick="showOffer(ServerStore.offers[0])"></button>
+    <button class="menu-btn" id="advDeckBtn" onclick="openAdvDeckEditor()">🎒 모험 덱 편집<span class="desc" id="advDeckDesc"></span></button>
+    <p class="sub" id="advFreeNote" style="display:none">자유 보스전은 '덱 편집'에서 만든 일반 덱으로 싸웁니다. (모험 전용 카드는 영남대 입학에서만 쓸 수 있어요)</p>
     <button class="menu-btn back" onclick="showScreen('mode')">뒤로</button>
   </div>
   <div class="screen" id="screen-bossedit">
@@ -156,7 +158,7 @@
     <p class="dev-warn">개발자 전용. 여기서 저장한 보스 목록은 서버에 저장되어 모든 유저에게 바로 적용됩니다.</p>
     <div class="boss-list" id="bossEditList"></div>
     <button class="menu-btn" onclick="bossAdd()">＋ 보스 추가</button>
-    <button class="menu-btn" onclick="bossAddTemplate('ynu')">🎓 영남대 10단계 틀 추가<span class="desc">수능 → 학년별 에피소드 8개 → 졸업, 보스 10개를 한 번에 추가 (수능은 전용 카드 덱까지 완성 · 이미 있는 단계는 건너뜀)</span></button>
+    <button class="menu-btn" onclick="bossAddTemplate('ynu')">🎓 영남대 틀 추가·맞추기<span class="desc">수능 → 1학년 → 2학년 → 3학년 → 4학년 → 졸업, 6단계 (예전 학년별 2단계 틀은 정리 · 직접 고친 덱은 그대로)</span></button>
     <p class="dev-warn" id="bossFileStat"></p>
     <button class="menu-btn" onclick="$('regFile').click()">🔢 번호표(card_registry.json) 불러오기<span class="desc" id="regDesc"></span></button>
     <input type="file" id="regFile" accept=".json" style="display:none" onchange="bossLoadRegistry(this.files[0]); this.value=''">
@@ -176,6 +178,8 @@
       <div id="bfStageRow"><label>단계 <span class="hint">(1부터. 낮은 단계를 모두 깨야 열립니다)</span></label><input id="bfStage" type="number" min="1" max="99" step="1"></div>
       <label>첫 클리어 보상 카드 <span class="hint">— 카드 이름을 쉼표로 구분. 2장 주려면 두 번 적기 (예: 새내기 OT 조장, 새내기 OT 조장)</span></label><input id="bfRewardCards">
       <div class="bf-stat" id="bfRewardStat"></div>
+      <label>첫 클리어 보상 카드 묶음 후보 <span class="hint">— 카드 이름을 쉼표로 구분. 첫 클리어 때 3묶음으로 나눠(종류마다 2장) 하나를 고르게 합니다</span></label><textarea id="bfRewardChoice" spellcheck="false" style="min-height:3.5rem;font-family:inherit"></textarea>
+      <div class="bf-stat" id="bfChoiceStat"></div>
       <label>보스 특성 (치트) <span class="hint">— 고른 개수만큼 난이도 등급이 오릅니다 (0개 중급/상급 · 1 브론즈 · 2 실버 · 3 골드 · 4 플래티넘 · 5 에메랄드 · 6 다이아몬드 · 7 마스터 · 8 그랜드마스터 · 9개 이상 챌린저)</span></label>
       <div class="bf-stat" id="bfRank"></div>
       <div class="cheat-grid" id="bfCheats"></div>
@@ -258,6 +262,18 @@
 <button type="button" id="logToggle" aria-label="전투 기록">📜</button>
 
 
+<div class="offer-modal" id="offerModal">
+  <div class="offer-panel">
+    <h3 id="offerTitle">🎁 클리어 보상</h3>
+    <p class="sub" id="offerMsg"></p>
+    <div class="offer-bundles" id="offerBundles"></div>
+    <div class="offer-after" id="offerAfter" style="display:none">
+      <button class="menu-btn primary" id="offerGoDeck" onclick="closeOffer(); openAdvDeckEditor()">🎒 모험 덱 편집하러 가기</button>
+      <button class="menu-btn" onclick="closeOffer()">닫기</button>
+    </div>
+    <button class="menu-btn back" id="offerLater" onclick="closeOffer()">닫기</button>
+  </div>
+</div>
 <script src="/js/auth.js"></script>
 <script src="/js/cards.js"></script>
 <script src="/js/engine.js"></script>
