@@ -1065,3 +1065,25 @@ body.pvp-spectate #endTurnBtn, body.pvp-spectate #surrenderBtn, body.pvp-spectat
 body.pvp-spectate #specLeaveBtn{display:inline-block;}
 .hand .card-back.spec-back{width:64px; height:90px; margin-left:-18px;}
 .hand .card-back.spec-back:first-child{margin-left:0;}
+
+/* ---------- v137 리플레이 ---------- */
+body.pvp-replay #endTurnBtn, body.pvp-replay #surrenderBtn, body.pvp-replay #specLeaveBtn{display:none !important;}
+#replayBar{position:fixed; left:50%; top:46px; transform:translateX(-50%); z-index:9500; width:min(46rem, 96vw); padding:.45rem .65rem .5rem; border-radius:12px;
+  border:1px solid var(--gold-d); background:rgba(20,17,34,.94); box-shadow:0 6px 20px #000b; color:var(--parch); font-size:.8rem; box-sizing:border-box;}
+#replayBar.warn{border-color:#c0392b;}
+#replayBar .rb-top{display:flex; gap:.6rem; align-items:baseline; justify-content:space-between; flex-wrap:wrap;}
+#replayBar .rb-title{color:var(--gold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:50%;}
+#replayBar .rb-step{color:var(--parch-d); text-align:right; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#replayBar .rb-range{width:100%; margin:.3rem 0; accent-color:var(--gold);}
+#replayBar .rb-btns{display:flex; gap:.3rem; flex-wrap:wrap; justify-content:center;}
+#replayBar button{background:rgba(42,36,68,.95); color:var(--parch); border:1px solid var(--gold-d); border-radius:8px; padding:.3rem .6rem; font-size:.78rem; cursor:pointer;}
+#replayBar button:hover{border-color:var(--gold);}
+#replayBar .rb-play{background:var(--gold); color:var(--ink); font-weight:700; min-width:5.5rem;}
+#replayBar .rb-exit{border-color:#a0443a;}
+#replayBar .rb-note{margin-top:.3rem; font-size:.7rem; color:var(--parch-d); text-align:center;}
+#replayBar.warn .rb-note{color:#e08a7f;}
+.ai-hand.open{height:auto; min-height:46px; gap:.2rem; align-items:center; flex-wrap:nowrap;}
+.ai-hand.open .card{zoom:.5; flex:0 0 auto; cursor:default;}
+.replay-panel{width:min(40rem, 96vw);}
+.rp-win{color:#8fd19e;} .rp-lose{color:#e08a7f;} .rp-draw{color:var(--parch-d);}
+.replay-panel .end-turn{padding:.25rem .6rem; font-size:.76rem;}

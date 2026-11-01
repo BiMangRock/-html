@@ -199,7 +199,7 @@ const PvpClient = (() => {
     game = { key: 'pvp', mode: 'pvp', spectate: !!m.spectate, friendly: !!m.friendly, bet: 0, tier: 0, cheats: [], pool: 0, settled: true, result: null, deckNames: Array.isArray(m.deck) ? m.deck.slice() : (m.spectate ? [] : DeckBook.get()), pvpTitle: '', pvpHTML: '' };
     view = m.view; syncShim(view);
     ui.selected = null; ui.pending = null; ui.busy = true; stopArrow(); closeDeck(); resetSurrenderBtn();
-    $('logList').innerHTML = ''; $('overlay').classList.remove('show'); $('overlayReward').innerHTML = ''; $('overlayArt').innerHTML = ''; el('pvpAgainBtn').style.display = 'none'; el('specLeaveBtn').style.display = m.spectate ? '' : 'none';
+    $('logList').innerHTML = ''; $('overlay').classList.remove('show'); $('overlayReward').innerHTML = ''; $('overlayArt').innerHTML = ''; el('pvpAgainBtn').style.display = 'none'; el('specLeaveBtn').style.display = m.spectate ? '' : 'none'; el('pvpReplayBtn').style.display = 'none';
     $('verBadge').textContent = VERSION;
     S.badgeBase = m.spectate ? `👁 관전 중 · ${m.me.name} vs ${m.opp.name}${m.friendly ? ' · 친구 대전' : m.ranked ? ' · 랭크전' : ''}`
       : m.friendly ? '👥 친구 대전 · 보상 없음' : `${m.ranked ? '🏆 랭크전' : '유저 대전 · 일반전'} · 승리 +${PVP.WIN_GOLD}G`;
@@ -324,6 +324,7 @@ const PvpClient = (() => {
     if (!r.void && !r.friendly) QStats.finish(!!r.youWon, 'pvp');          // v132 일일 퀘스트 기록 (v136 친구 대전은 빼고)
     game.pvpHTML = resultHTML(r);
     el('pvpAgainBtn').style.display = r.friendly ? 'none' : '';
+    S.replayId = r.void ? null : m.matchId; el('pvpReplayBtn').style.display = r.void ? 'none' : '';   // v137 방금 판 리플레이
     el('pvpTimer').style.display = 'none'; el('pvpRope').style.display = 'none'; banner(null);
     logLine(r.void ? '판이 취소되었습니다.' : r.draw ? '무승부' : r.youWon ? `승리!${r.reward > 0 ? ` +${fmt(r.reward)}골드` : ''}` : '패배...');
   }
@@ -332,7 +333,7 @@ const PvpClient = (() => {
     clearTimeout(S.waitTimer); hideMull(); el('pvpTimer').style.display = 'none'; el('pvpRope').style.display = 'none'; banner(null);
     document.body.classList.remove('pvp-mode', 'pvp-spectate'); document.querySelector('#playerHero .name').textContent = '나';
     { const lb = document.querySelectorAll('.board > .row .label'); if (lb.length >= 2) { lb[0].textContent = '상대 필드'; lb[1].textContent = '내 필드'; } }
-    el('pvpAgainBtn').style.display = 'none'; el('specLeaveBtn').style.display = 'none';
+    el('pvpAgainBtn').style.display = 'none'; el('specLeaveBtn').style.display = 'none'; el('pvpReplayBtn').style.display = 'none';
     const kind = S.lastKind; S.spectate = false; S.friendly = false; S.specCount = 0;
     if ((kind === 'friend' || kind === 'spectate') && typeof Friends !== 'undefined') { loadMe(); showMsg(''); Friends.open(); }   // v136 친구 대전·관전이 끝나면 친구 화면으로
     else openScreen();
@@ -352,6 +353,8 @@ const PvpClient = (() => {
     goToMenu();
   }
   el('specLeaveBtn').onclick = leaveSpectate;
+  el('pvpReplayBtn').onclick = () => { const id = S.replayId; goToMenu(); if (id && typeof Replay !== 'undefined') Replay.open(id); };   // v137
+  el('pvpReplaysBtn').onclick = () => { if (typeof Replay !== 'undefined') Replay.list(); };
   async function invite(friendId) {
     open();
     const saved = await ServerStore.waitSaved();

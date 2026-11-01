@@ -184,4 +184,22 @@ CREATE TABLE IF NOT EXISTS friend_requests (            -- 보낸 친구 요청 
 CREATE INDEX IF NOT EXISTS idx_friend_req_to ON friend_requests(to_id);
 `);
 
+// v137 리플레이: 판을 다시 만드는 데 필요한 것만 저장 (시드 · 양쪽 덱 · 영웅 능력 · 멀리건 · 행동 목록 → 한 판에 수 KB)
+//  replay_owners: 누구의 "지난 판" 목록에 있는지. 계정마다 최근 PVP.REPLAY_KEEP 판만 남기고, 아무도 안 가진 리플레이는 지운다
+db.exec(`
+CREATE INDEX IF NOT EXISTS idx_pvp_match_id ON pvp_matches(match_id);
+CREATE TABLE IF NOT EXISTS pvp_replays (
+  match_id    TEXT    PRIMARY KEY,
+  data_json   TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS replay_owners (
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  match_id    TEXT    NOT NULL REFERENCES pvp_replays(match_id) ON DELETE CASCADE,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (user_id, match_id)
+);
+CREATE INDEX IF NOT EXISTS idx_replay_owner_time ON replay_owners(user_id, created_at);
+`);
+
 module.exports = db;

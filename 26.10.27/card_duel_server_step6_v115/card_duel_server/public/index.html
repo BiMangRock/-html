@@ -58,7 +58,7 @@
 <div class="hand" id="hand"></div>
 </div>
 <aside id="logPanel"><h3>전투 기록</h3><div id="logList"></div></aside>
-<div id="overlay"><div id="overlayArt"></div><h2 id="overlayText"></h2><p id="overlayReward"></p><button class="end-turn" id="pvpAgainBtn" style="display:none">한 판 더</button><button class="end-turn" onclick="goToMenu()">처음 화면으로</button></div>
+<div id="overlay"><div id="overlayArt"></div><h2 id="overlayText"></h2><p id="overlayReward"></p><button class="end-turn" id="pvpAgainBtn" style="display:none">한 판 더</button><button class="end-turn sub" id="pvpReplayBtn" style="display:none">🎞 리플레이</button><button class="end-turn" onclick="goToMenu()">처음 화면으로</button></div>
 
 <div id="mulliganModal"><h3 id="mulliganTitle"></h3><p>바꾸고 싶은 카드를 클릭하면 ✕ 표시가 뜹니다. 다시 클릭하면 취소됩니다.</p><div id="mulliganGrid"></div><button class="end-turn" id="mulliganOk"></button></div>
 <div id="discoverModal"><div class="deck-panel"><div class="deck-head"><h3 id="discoverTitle">발견 — 한 장을 고르세요</h3></div><p class="note" id="discoverNote">고른 카드의 비용이 줄어든 채로 손패에 들어옵니다.</p><div class="deck-grid" id="discoverGrid"></div></div></div>
@@ -275,6 +275,7 @@
     <button class="menu-btn" id="pvpFallbackBtn" style="display:none">랭크전 상대가 없어요 — 일반전으로 바꾸기</button>
     <button class="menu-btn primary" id="pvpFindBtn" disabled><img id="pvpSpin" class="pvp-spin" src="/images/pvp/pvp_spinner.webp" alt="" style="display:none"><span id="pvpFindTxt">서버에 연결하는 중…</span></button>
     <p class="sub">저장된 내 덱으로 대전해요.</p>
+    <button class="menu-btn" id="pvpReplaysBtn">🎞 지난 판 다시 보기<span class="desc">최근 유저 대전 <span id="pvpReplayKeep">20</span>판 · 양쪽 손패까지 전부 보여요</span></button>
     <p class="notice" id="pvpRules"></p>
     <button class="menu-btn back" id="pvpBackBtn">뒤로</button>
   </div>
@@ -366,6 +367,7 @@
 <script src="/js/ui.js"></script>
 <script src="/js/pvpclient.js"></script>
 <script src="/js/friends.js"></script>
+<script src="/js/replay.js"></script>
 <script src="/js/mobile.js"></script>
 </body>
 </html>

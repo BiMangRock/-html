@@ -106,6 +106,13 @@ router.post('/pvp/invite/respond', h.inviteRespond);
 router.post('/pvp/invite/cancel', h.inviteCancel);
 router.post('/pvp/spectate', h.spectate);
 router.post('/pvp/spectate/leave', h.spectateLeave);
+// v137 리플레이: 내 지난 판 목록 · 하나 불러오기 (브라우저가 시드와 행동 목록으로 판을 다시 만들어 보여 준다)
+router.get('/pvp/replays', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ list: pvpdb.replayList(req.user.id) }); });
+router.get('/pvp/replays/:id', (req, res) => {
+  const r = /^[0-9a-f]{1,32}$/.test(req.params.id) ? pvpdb.replayGet(req.user.id, req.params.id) : null;
+  if (!r) return res.status(404).json({ error: '리플레이가 없어요. (계정마다 최근 판만 보관해요)' });
+  res.set('Cache-Control', 'private, max-age=3600'); res.json(r);
+});
 router.get('/pvp/ranking', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ ...pvpdb.ranking(100), board: pvpdb.publicBoard({ limit: 100 }), me: pvpdb.rankOut(req.user.id), myRow: pvpdb.myBoardRow(req.user.id) }); });   // v127 순위표 (v128 전체 순위 + 내 순위)
 // v128 공개 순위 (로그인 없이): GET /api/public/ranking?offset=0&limit=50&q=이름
 const publicRouter = express.Router();

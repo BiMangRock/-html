@@ -21,7 +21,7 @@ const path = require('path');
 const crypto = require('crypto');
 const JS = path.join(__dirname, '..', 'public', 'js');
 const E = require(path.join(JS, 'engine.js'));
-const { PVP } = require(path.join(JS, 'pvp.js'));
+const { PVP, pvpRng } = require(path.join(JS, 'pvp.js'));
 const { PROGRESS } = require(path.join(JS, 'progress.js'));   // v132 감정 표현 목록
 const EMOTE_IDS = PROGRESS.EMOTES.map(e => e.id);
 
@@ -188,13 +188,15 @@ function createPvp(opts = {}) {
     }
     for (const uid of order) { const u = users.get(uid); if (u) { if (u.queued) leaveQueue(u); stopSpectating(u); } for (const iv of invitesOf(uid)) dropInvite(iv, 'busy'); }   // v136 대기열·관전·다른 신청 정리
     const heroPowers = order.map(uid => { const u = users.get(uid); return (u && u.qpower) || E.randomHeroPower(rng); });   // v131
-    const state = E.newGame(rng, { decks, heroPowers });
+    const seed = 1 + Math.floor(rng() * 2147483645);                   // v137 리플레이용: 판 시작 난수를 시드로
+    const state = E.newGame(pvpRng(seed), { decks, heroPowers });
     const now = Date.now();
     const m = {
       id: crypto.randomBytes(8).toString('hex'), ranked: mode === 'rank', friendly: mode === 'friend', spectators: new Map(), uids: order, names: order.map(uid => users.get(uid).username),
       state, decks, seq: 0, phase: 'mulligan', over: false, startedAt: now,
       mull: [0, 1].map(s => ({ done: !(state.seats[s].startIds || []).length })), mullUntil: now + cfg.mulliganMs,
       deadline: null, timeouts: [0, 0], offline: [null, null], result: null,
+      log: { v: 1, engine: E.VERSION, seed, decks: decks.map(d => d.slice()), heroPowers: heroPowers.slice(), names: order.map(uid => users.get(uid).username), ranked: mode === 'rank', friendly: mode === 'friend', steps: [] },   // v137 리플레이 기록
     };
     matches.set(m.id, m);
     for (const uid of order) { const u = users.get(uid); u.matchId = m.id; u.queued = false; }
@@ -351,6 +353,7 @@ function createPvp(opts = {}) {
     return m;
   }
   function doMulligan(m, seat, ids) {
+    m.log.steps.push({ m: seat, ids: ids.slice() });                  // v137
     E.mulliganHand(m.state, seat, ids);
     m.mull[seat].done = true;
     if (m.mull[0].done && m.mull[1].done) beginPlay(m); else broadcast(m);
@@ -396,6 +399,7 @@ function createPvp(opts = {}) {
     }
     const r = safeApply(m.state, a, seat);
     if (!r.ok) return { ok: false, error: r.error };
+    m.log.steps.push({ s: seat, a });                   // v137 리플레이
     m.timeouts[seat] = 0;                               // 직접 행동했으면 "연속 시간 초과"는 처음부터
     commit(m, r.state, r.events, a.type === 'SURRENDER' ? { reason: 'surrender' } : null);
     return { ok: true, seq: m.seq };
@@ -405,7 +409,7 @@ function createPvp(opts = {}) {
     const prevTurn = m.state.turn;
     m.state = newState; m.seq++;
     if (!newState.over && newState.turnNo > cfg.maxTurns) {          // 끝나지 않는 판: 무승부로 마친다
-      newState.over = true; newState.winner = null;
+      newState.over = true; newState.winner = null; m.log.steps.push({ end: 'turnlimit', winner: null });
       events = events.concat([{ type: 'game_over', winner: null }]);
       return finish(m, null, 'turnlimit', events);
     }
@@ -416,8 +420,8 @@ function createPvp(opts = {}) {
   // 한쪽이 포기·시간 초과·접속 끊김으로 지는 경우: 엔진의 항복 처리를 그대로 써서 화면 연출도 같게 한다
   function forfeit(m, loserSeat, reason) {
     const r = safeApply(m.state, { type: 'SURRENDER' }, loserSeat);
-    if (r.ok) { m.state = r.state; m.seq++; return finish(m, r.state.winner, reason, r.events); }
-    m.state.over = true; m.state.winner = 1 - loserSeat;
+    if (r.ok) { m.log.steps.push({ s: loserSeat, a: { type: 'SURRENDER' } }); m.state = r.state; m.seq++; return finish(m, r.state.winner, reason, r.events); }
+    m.state.over = true; m.state.winner = 1 - loserSeat; m.log.steps.push({ end: 'forfeit', winner: 1 - loserSeat });
     return finish(m, 1 - loserSeat, reason, [{ type: 'game_over', winner: 1 - loserSeat }]);
   }
   function voidMatch(m, why) {
@@ -430,7 +434,8 @@ function createPvp(opts = {}) {
   function finish(m, winnerSeat, reason, events) {
     if (m.over) return;
     m.over = true; m.phase = 'over';
-    const settleArg = { matchId: m.id, ranked: !!m.ranked, friendly: !!m.friendly, uids: m.uids.slice(), winnerSeat, reason, turns: m.state.turnNo, startedAt: m.startedAt };
+    const settleArg = { matchId: m.id, ranked: !!m.ranked, friendly: !!m.friendly, uids: m.uids.slice(), winnerSeat, reason, turns: m.state.turnNo, startedAt: m.startedAt,
+      replay: reason === 'void' ? null : { ...m.log, reason, end: { turnNo: m.state.turnNo, winner: winnerSeat, hp: m.state.seats.map(x => x.hp) } } };   // v137 무효 판은 리플레이 없음
     let res = null;
     for (let i = 0; i < 2 && !res; i++) { try { res = settle(settleArg); } catch (e) { log('정산 실패', i, e && e.message); } }
     if (!res) res = [{ reward: 0, why: 'error' }, { reward: 0, why: 'error' }];      // 정산이 두 번 다 실패: 보상 없이 결과만 보여 준다 (기록·골드는 그대로 취소된 상태)
@@ -472,6 +477,7 @@ function createPvp(opts = {}) {
       const act = st.pending ? (E.viewFor(st, seat).legal[0] || { type: 'END_TURN' }) : { type: 'END_TURN' };   // legal 목록은 viewFor 가 같이 준다
       const r = safeApply(st, act, seat);
       if (!r.ok) break;
+      m.log.steps.push({ s: seat, a: act, auto: 1 });                  // v137 시간 초과로 자동 처리된 행동
       st = r.state; evs.push(...r.events);
     }
     if (!st.over && st.turn === seat) return voidMatch(m, '시간 초과 처리 실패');

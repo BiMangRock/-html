@@ -90,7 +90,7 @@ const heroLabel = seat => seat===MY ? '내 영웅' : '상대 영웅';
 const tLabel = (t,name) => t.kind==='hero' ? heroLabel(t.seat) : name;
 function eventText(ev){
   switch(ev.type){
-    case 'turn_start': if(game && game.spectate) return `${document.querySelector(ev.seat===MY?'#playerHero .name':'#aiHero .name').textContent}의 턴입니다.`;   // v136 관전: 이름으로
+    case 'turn_start': if(game && (game.spectate || game.replay)) return `${document.querySelector(ev.seat===MY?'#playerHero .name':'#aiHero .name').textContent}의 턴입니다.`;   // v136 관전: 이름으로
       return ev.seat===MY ? '당신의 턴입니다.' : '상대의 턴입니다.';
     case 'spell': return `${ev.tag?`(${ev.tag}) `:ev.chaos?'(혼돈) ':''}${ev.seat===MY?'당신이':'상대가'} 주문 「${ev.name}」 사용` + (ev.card.effect.type==='mana' ? `: 이번 턴 마나 +${ev.gain}` : '');
     case 'draw':
@@ -523,7 +523,7 @@ async function perform(seat, action){
   return r;
 }
 async function playerAction(action){
-  if(ui.busy || (game && game.spectate)) return;   // v136 관전자는 행동하지 않는다
+  if(ui.busy || (game && (game.spectate || game.replay))) return;   // v136 관전자 · v137 리플레이는 행동하지 않는다
   QStats.action(action);   // v132
   ui.busy=true; ui.selected=null; ui.pending=null; ui.place=null; stopArrow();
   if(game && game.mode==='pvp'){ await PvpClient.act(action); render(); return; }   // 유저 대전: 판은 서버가 진행한다 → 행동만 보내고, 결과·연출은 서버 메시지로 받는다
@@ -754,7 +754,7 @@ function showBubble(seat, text){
 }
 function toggleEmoteMenu(e){
   if(e){ e.stopPropagation(); e.preventDefault && e.preventDefault(); }
-  if(game && game.spectate) return;   // v136 관전자는 감정 표현을 보내지 않는다
+  if(game && (game.spectate || game.replay)) return;   // v136 관전자 · v137 리플레이는 감정 표현을 보내지 않는다
   const hero=$('playerHero'); let m=hero.querySelector('.emote-menu');
   if(m){ m.remove(); return; }
   if(!game || (view && view.over)) return;
@@ -1382,8 +1382,12 @@ function renderMana(textId, crystalsId, p){
   }
 }
 function renderOppHand(n){
-  const box=$('aiHand'); box.innerHTML='';
+  const box=$('aiHand'); box.innerHTML=''; box.classList.remove('open');
   for(let i=0;i<n;i++){ const b=document.createElement('div'); b.className='card-back'; box.appendChild(b); }   // 내용은 알 수 없으므로 뒷면만
+}
+function renderOppHandOpen(cards){
+  const box=$('aiHand'); box.innerHTML=''; box.classList.add('open');
+  cards.forEach(c=>box.appendChild(cardEl(c, {extra:'opp-open'})));
 }
 function renderCheats(){
   const box=$('aiCheats'); box.innerHTML='';
@@ -1403,6 +1407,7 @@ function render(){
       if(!dm.classList.contains('show')) fxSprite('discover',innerWidth/2,innerHeight/2,Math.min(innerWidth*.7,460),{dur:1100,z:70});   // v89
       dm.classList.add('show');
     } else dm.classList.remove('show'); }
+  if(game && game.replay && Array.isArray(op.hand)) renderOppHandOpen(op.hand); else   // v137 리플레이: 상대 손패도 앞면으로
   renderOppHand(op.handCount+(ui.drawGhosts[OPP]||0));
   $('playerHp').textContent=Math.max(0, me.hp); $('playerHp').classList.toggle('hurt', me.hp<(me.maxHp||CONFIG.HERO_HP));
   { const el=$('playerArmor'); el.textContent=me.armor||''; el.classList.toggle('show', me.armor>0); $('playerArmorNext').textContent=me.armorNext?`다음 턴 방어도 +${me.armorNext}`:''; }   // v37: 방어도가 있을 때만 방패 모양으로 표시
@@ -1478,7 +1483,7 @@ function render(){
   $('playerHero').onclick = myHeroTarget ? ()=>resolvePending(myHeroT) : (canHeroAtk ? ()=>selectHero() : (pending ? null : e=>toggleEmoteMenu(e)));   // v132 할 일이 없으면 감정 표현
   $('aiHero').onclick = pending ? (opHeroTarget ? ()=>resolvePending(opHeroT) : null) : ()=>attackTarget(opHeroT);
 
-  if(v.over){
+  if(v.over && !(game && game.replay)){   // v137 리플레이는 결과 창 대신 아래 조작 막대에 결과를 보여 준다
     if(!$('overlay').classList.contains('show') && v.winner!==null) fxSprite(v.winner===MY?'victory':'defeat',innerWidth/2,innerHeight*.26,Math.min(innerWidth*.8,520),{dur:3400,z:300,kf:fxPop});   // v89: 승리·패배 연출
     $('overlay').classList.add('show');
     $('overlayText').textContent = (game && game.mode==='pvp') ? game.pvpTitle : v.winner===null ? '무승부' : (v.winner===MY ? '승리했습니다!' : '패배했습니다...');
@@ -2075,6 +2080,7 @@ function goToMenu(){
   buildDifficultyButtons(); updateWallet();
   document.querySelector('#aiHero .name').textContent='상대';
   document.body.classList.remove('boss-portrait'); { const sp=$('aiAvatar')&&$('aiAvatar').firstElementChild; if(sp) sp.style.backgroundImage=''; }
+  if(game && game.replay){ Replay.exit(); $('menu').classList.remove('hidden'); return; }   // v137 리플레이를 닫으면 지난 판 목록으로
   if(game && game.mode==='pvp'){ PvpClient.afterMatch(); $('menu').classList.remove('hidden'); return; }   // 유저 대전이 끝나면 대전 화면으로
   if(game && game.mode==='adventure'){ if(game.devTest && !game.devFromAdv) openBossForm(game.bossIdx); else if(game.boss.chapter){ advView=game.boss.chapter; openAdventure(); } else openAdventure(bossRank(game.boss)); }
   else if(game && game.mode==='test') openTestScreen(); else showScreen('main');   // v54: 테스트 판이 끝나면 테스트 설정 화면으로

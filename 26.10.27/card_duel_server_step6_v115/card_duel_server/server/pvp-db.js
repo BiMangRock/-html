@@ -120,8 +120,43 @@ function settle(g) {
     });
     db.exec('COMMIT');
     boardCache = null;                                                                // v128 순위가 바뀌었을 수 있다
+    if (g.replay) { try { saveReplay(String(g.matchId), g.uids, g.replay, now); } catch (e) { console.error('[pvp] 리플레이 저장 실패', e && e.message); } }   // v137 (실패해도 보상·기록은 그대로)
     return out;
   } catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
+}
+
+// ---------- v137 리플레이 ----------
+function saveReplay(matchId, uids, replay, now = Date.now()) {
+  db.exec('BEGIN');
+  try {
+    db.prepare('INSERT OR REPLACE INTO pvp_replays(match_id,data_json,created_at) VALUES (?,?,?)').run(matchId, JSON.stringify(replay), now);
+    for (const uid of uids) {
+      db.prepare('INSERT OR IGNORE INTO replay_owners(user_id,match_id,created_at) VALUES (?,?,?)').run(uid, matchId, now);
+      db.prepare(`DELETE FROM replay_owners WHERE user_id=? AND match_id NOT IN
+                  (SELECT match_id FROM replay_owners WHERE user_id=? ORDER BY created_at DESC, rowid DESC LIMIT ?)`).run(uid, uid, PVP.REPLAY_KEEP);
+    }
+    db.exec('DELETE FROM pvp_replays WHERE match_id NOT IN (SELECT match_id FROM replay_owners)');
+    db.exec('COMMIT');
+  } catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
+}
+// 내 지난 판 목록 (최근 것부터)
+function replayList(uid) {
+  return db.prepare(`SELECT o.match_id, o.created_at, m.p0, m.p1, m.winner, m.reason, m.turns, m.ranked, m.friendly,
+      u0.username AS n0, u0.nickname AS k0, u1.username AS n1, u1.nickname AS k1
+    FROM replay_owners o JOIN pvp_matches m ON m.match_id=o.match_id
+    LEFT JOIN users u0 ON u0.id=m.p0 LEFT JOIN users u1 ON u1.id=m.p1
+    WHERE o.user_id=? ORDER BY o.created_at DESC, o.rowid DESC LIMIT ?`).all(uid, PVP.REPLAY_KEEP).map(r => {
+    const seat = r.p0 === uid ? 0 : 1, opp = seat === 0 ? (r.k1 || r.n1) : (r.k0 || r.n0);
+    return { matchId: r.match_id, at: r.created_at, oppName: opp || '(탈퇴한 사용자)', ranked: !!r.ranked, friendly: !!r.friendly, reason: r.reason, turns: r.turns,
+      result: r.winner === null ? 'draw' : r.winner === uid ? 'win' : 'lose' };
+  });
+}
+// 리플레이 하나 (내 목록에 있는 것만)
+function replayGet(uid, matchId) {
+  const row = db.prepare(`SELECT r.data_json, m.p0, m.p1 FROM replay_owners o JOIN pvp_replays r ON r.match_id=o.match_id
+                          LEFT JOIN pvp_matches m ON m.match_id=o.match_id WHERE o.user_id=? AND o.match_id=?`).get(uid, String(matchId));
+  if (!row) return null;
+  return { matchId: String(matchId), mySeat: row.p1 === uid ? 1 : 0, replay: JSON.parse(row.data_json) };
 }
 
 // 전적 (무효 판은 뺀다) + 오늘 거둔 승리 수(= 보상을 받은 판 수, 한도 없음)
@@ -135,4 +170,4 @@ function statsOf(uid) {
   return { record: { wins, losses, draws }, winGold: PVP.WIN_GOLD, rewardsToday: rewardsToday(uid, day), rank: rankOut(uid) };
 }
 
-module.exports = { loadDeck, settle, statsOf, rankOf, rankOut, ranking, legendPlace, fullBoard, publicBoard, myBoardRow, invalidateBoard };
+module.exports = { saveReplay, replayList, replayGet, loadDeck, settle, statsOf, rankOf, rankOut, ranking, legendPlace, fullBoard, publicBoard, myBoardRow, invalidateBoard };
