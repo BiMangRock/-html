@@ -296,8 +296,7 @@ const fxV = a => Array.isArray(a) ? a[Math.floor(Math.random()*a.length)] : a;  
 const FX_HM = {holy_beam:1.9, bolt_strike:1.9, lightning:2.6, bolt_big:2.3, fireboom:2.2, ice:2.1, ice_burst:2.0, goldburst:2.1, poison:2.1};   // 명중 이미지 크기 배율
 const FX_UP = {lightning:0, fireboom:0, ice:0, goldburst:0, poison:0, ice_burst:0, bolt_big:.3};                                              // 명중 이미지를 위로 올리는 비율 (신규 이미지별)
 const FX_PB = {fireball:200};                                                                                                                   // 투사체 크기
-(function(){ try{ for(const n in FX_ANIM){ const i=new Image(); i.src='images/fx_a_'+n+'.png'; }
-  for(const n of FX_STATIC_NEW){ const i=new Image(); i.src='images/fx_'+n+'.png'; } }catch(e){} })();   // 미리 불러오기
+// v138: 이펙트 그림 미리 불러오기는 preload.js (Preload) 가 카드 그림과 함께 한다
 function fxAnim(name, x, y, box, o={}){              // 프레임 스트립 재생. o.from/o.to = 프레임 구간, o.bw/bh = 가로·세로 직접 지정
   const m=FX_ANIM[name]; if(!m) return null;
   const from=o.from||0, to=(o.to==null?m.n-1:o.to), cnt=to-from+1;
@@ -1797,7 +1796,8 @@ function openTestScreen(){ if(!isDev()) return; testCfg=TestBook.get(); $('tHp')
 function openTestDeckEditor(){ if(!isDev()) return; readTestCfg(); refreshTestUI(); ed.test=true; ed.boss=false; ed.adv=false; ed.slot=null; $('edClear').style.display=''; ed.counts=countsOf(testCfg.deck); renderDeckEditor(); $('deckEditor').classList.add('show'); }
 $('tHp').addEventListener('change', ()=>{ readTestCfg(); refreshTestUI(); });
 $('tMana').addEventListener('change', ()=>{ readTestCfg(); refreshTestUI(); });
-function startTest(){
+async function startTest(){
+  await Preload.ensure();                                          // v138
   const cfg=readTestCfg(), d=DIFFICULTY.normal2;
   game={key:'test', mode:'test', bet:0, tier:0, cheats:[], pool:0, settled:false, result:null, deckNames:cfg.deck.slice()};
   Bot=d.bot;
@@ -1954,7 +1954,9 @@ function renderPowerScreen(){                     // v131 메뉴 → 영웅 능�
 }
 function updatePowerMenuDesc(){ const el=$('powerMenuDesc'); if(!el) return; const v=HeroPowerPref.get(), h=HERO_POWERS[v];
   el.textContent = h ? `지금: ${h.icon} ${h.name} — ${h.text} (비용 ${HP_COST}, 턴마다 한 번)` : '지금: 🎲 판마다 무작위 (비용 1, 턴마다 한 번)'; }
+const PRELOAD_SCREENS=new Set(['mode','difficulty','playmode','bet','adventure','pvp','friends','test']);   // v138 대전을 고르는 화면에 오면 뒤에서 미리 받기 시작
 function showScreen(name){
+  if(PRELOAD_SCREENS.has(name) && typeof Preload!=='undefined') Preload.warmup();
   if(name==='power') renderPowerScreen();
   if(name==='main') updatePowerMenuDesc();
   document.querySelectorAll('#menu .screen').forEach(el=>el.classList.toggle('show', el.id==='screen-'+name));
@@ -2049,6 +2051,7 @@ function confirmBet(){
 function startGame(key, opts={}){
   const d=DIFFICULTY[key];
   if(!d || !d.bot) return;
+  if(!opts.preloaded){ Preload.ensure().then(()=>startGame(key, {...opts, preloaded:true})); return; }   // v138 그림을 전부 받은 뒤 시작
   const mode=opts.mode||'normal', sv=Economy.get();
   const tier = mode==='bet' ? (opts.tier||ECON.BET_DEFAULT) : 0;
   const roll = mode==='bet' ? rollCheats(tier) : {mods:{}, list:[]};
@@ -2498,6 +2501,7 @@ async function startBoss(idx, opts={}){
   if(!opts.devTest && bossLocked(boss, all)) return;                       // v117: 입학 중 + 이번 입학의 다음 단계만
   if(!opts.devTest && boss.chapter){ const po=ServerStore.offers.find(o=>{ const ob=all.find(x=>x.id===o.bossId); return ob && ob.chapter===boss.chapter; });
     if(po){ showOffer(po); return; } }                                                // 고르지 않은 보상 묶음이 있으면 먼저 고르게 (잠긴 덱에 더해야 하므로)
+  await Preload.ensure();                                          // v138 보스 초상화·카드 그림을 전부 받은 뒤 시작
   const r=await resolveBossBot(boss);
   const d=DIFFICULTY.normal2;
   game={key:'adventure', mode:'adventure', boss, bossIdx:idx, devTest:!!opts.devTest, devFromAdv:!!opts.fromAdv, bet:0, tier:0, cheats:[], pool:0, settled:false, result:null, deckNames:boss.chapter?(runOf(boss.chapter)?runOf(boss.chapter).deck.slice():AdvDeckBook.get()):DeckBook.get()};   // v117: 도장깨기 챕터(영남대 입학)만 모험 덱, 자유 보스전은 일반 덱 (모험 전용 카드는 챕터에서만)

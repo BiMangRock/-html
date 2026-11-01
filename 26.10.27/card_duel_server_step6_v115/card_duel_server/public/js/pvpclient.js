@@ -140,6 +140,7 @@ const PvpClient = (() => {
     showMsg(''); const b = el('pvpFindBtn'); b.disabled = true;
     const saved = await ServerStore.waitSaved();                       // 대전은 서버에 저장된 내 덱으로 한다 → 방금 고친 덱이 저장될 때까지 기다린다
     if (!saved) { showMsg('저장이 아직 끝나지 않았어요. 잠시 뒤 다시 눌러 주세요.'); renderScreen(); return; }
+    if (!Preload.isReady()) { showMsg(''); await Preload.ensure(); }         // v138 대기열에 들어가기 전에 그림을 전부 받아 둔다 (잡히면 바로 판이 시작되므로)
     const r = await post('/api/pvp/queue', { mode: S.mode, heroPower: HeroPowerPref.get() });   // v131
     if (!r.ok) showMsg(r.data.error || '대기열에 들어가지 못했어요.');
     renderScreen();
@@ -219,7 +220,7 @@ const PvpClient = (() => {
     render();
   }
   async function handleMatch(m) {
-    if (m.matchId !== S.matchId) beginMatchUi(m);
+    if (m.matchId !== S.matchId) { await Preload.ensure(); beginMatchUi(m); }   // v138 보통은 이미 받아 둔 상태 (새로고침해서 판에 다시 들어올 때만 로딩 화면)
     S.phase = m.phase; S.turnSeat = m.turnSeat; S.timeouts = m.timeouts; S.maxTimeouts = m.maxTimeouts;
     S.oppOffAt = m.opp.online ? 0 : Date.now() - (m.oppOfflineMs || 0);
     S.deadline = m.remainMs > 0 ? Date.now() + m.remainMs : 0;
@@ -343,6 +344,7 @@ const PvpClient = (() => {
   // v136 관전 시작 · 그만두기 · 친구 대전 신청
   async function spectate(friendId) {
     open();
+    await Preload.ensure();                                                // v138
     const r = await post('/api/pvp/spectate', { friendId });
     if (!r.ok) return r.data.error || '관전하지 못했어요.';
     return null;
@@ -359,11 +361,12 @@ const PvpClient = (() => {
     open();
     const saved = await ServerStore.waitSaved();
     if (!saved) return '저장이 아직 끝나지 않았어요. 잠시 뒤 다시 해 주세요.';
+    await Preload.ensure();                                                // v138 친구가 수락하면 바로 판이 시작되므로 먼저 받아 둔다
     const r = await post('/api/pvp/invite', { to: friendId, heroPower: HeroPowerPref.get() });
     return r.ok ? null : (r.data.error || '대전을 신청하지 못했어요.');
   }
   async function respondInvite(id, accept) {
-    if (accept) { const saved = await ServerStore.waitSaved(); if (!saved) return '저장이 아직 끝나지 않았어요. 잠시 뒤 다시 해 주세요.'; }
+    if (accept) { const saved = await ServerStore.waitSaved(); if (!saved) return '저장이 아직 끝나지 않았어요. 잠시 뒤 다시 해 주세요.'; await Preload.ensure(); }   // v138
     const r = await post('/api/pvp/invite/respond', { id, accept: !!accept, heroPower: HeroPowerPref.get() });
     return r.ok ? null : (r.data.error || '처리하지 못했어요.');
   }

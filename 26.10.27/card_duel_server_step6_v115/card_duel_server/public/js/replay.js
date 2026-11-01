@@ -146,6 +146,7 @@ const Replay = (() => {
       if (r.status === 401) { location.replace('/login.html'); return; }
       data = await r.json(); if (!r.ok) { alertMsg(data.error || '리플레이를 불러오지 못했어요.'); return; }
     } catch (_) { alertMsg('서버에 연결할 수 없어요.'); return; }
+    await Preload.ensure();                                                // v138
     const rep = data.replay;
     R.rep = rep; R.matchId = matchId; R.mySeat = data.mySeat; R.seat = data.mySeat; R.names = (rep.names || ['플레이어 1', '플레이어 2']).slice();
     let b; try { b = build(rep); } catch (e) { console.error('[replay]', e); alertMsg('이 리플레이를 다시 만들지 못했어요. (그 판 이후 카드·규칙이 바뀌었을 수 있어요)'); return; }
