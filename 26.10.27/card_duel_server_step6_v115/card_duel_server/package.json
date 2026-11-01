@@ -11,7 +11,7 @@
     "grant": "node server/grant.js",
     "make-admin": "node server/make-admin.js",
     "seed": "node server/seed-samples.js",
-    "test": "node server/test-engine.js && node server/test-auth.js && node server/test-saves.js && node server/test-shop.js && node server/test-pvp-db.js && node server/test-pvp.js && node server/test-bosses.js && node server/test-adventure.js && node server/test-suneung.js && node server/test-reward1.js && node server/test-ynu1.js && node server/test-ynu2.js && node server/test-reward2.js && node server/test-ynu3.js && node server/test-cardtext.js && node server/test-reward3.js"
+    "test": "node server/test-engine.js && node server/test-auth.js && node server/test-saves.js && node server/test-shop.js && node server/test-pvp-db.js && node server/test-pvp.js && node server/test-bosses.js && node server/test-adventure.js && node server/test-suneung.js && node server/test-reward1.js && node server/test-ynu1.js && node server/test-ynu2.js && node server/test-reward2.js && node server/test-ynu3.js && node server/test-cardtext.js && node server/test-reward3.js && node server/test-dev.js"
   },
   "dependencies": {
     "express": "^4.21.0"

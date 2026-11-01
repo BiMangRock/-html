@@ -1520,10 +1520,11 @@ const YNU2_GADGETS=[                                                            
   {type:'spell', name:'선배 찬스 (커피 기프티콘)', cost:1, effect:{type:'seniorChance', value:2}, flavor:'"공부하느라 고생 많다. 커피 한잔 마시면서 해라."',
     desc:'이번 턴에만 쓸 수 있는 마나 1개를 얻고(동전 효과), 내 영웅의 생명력을 2 회복합니다.'},
 ];
+YNU2_GADGETS.forEach(g=>{ g.school=['2학년']; });   // v122 학년 표시
 const gadgetCard=name=>structuredClone(YNU2_GADGETS.find(x=>x.name===name));
-const eggrollCard=()=>({type:'spell', name:'서비스 계란말이', cost:0, effect:{type:'eggroll', value:3}, flavor:'"이건 서비스다. 남기면 혼난다, 이 웬수야!"',
+const eggrollCard=()=>({type:'spell', name:'서비스 계란말이', cost:0, school:['2학년'], effect:{type:'eggroll', value:3}, flavor:'"이건 서비스다. 남기면 혼난다, 이 웬수야!"',
   desc:'하수인 하나에게 생명력 +3을 부여합니다. (최대 생명력도 함께 늘어납니다)'});
-const allClearCard=()=>({type:'spell', name:'올클리어', cost:0, effect:{type:'allClear', draw:2, value:2}, flavor:'대기열을 뚫고 들어간 순간, 장바구니 과목이 전부 담겼다.',
+const allClearCard=()=>({type:'spell', name:'올클리어', cost:0, school:['2학년'], effect:{type:'allClear', draw:2, value:2}, flavor:'대기열을 뚫고 들어간 순간, 장바구니 과목이 전부 담겼다.',
   desc:'카드를 2장 뽑고, 마나 수정 2개를 즉시 회복합니다. (이번 턴 최대 마나까지)'});
 const LAB_DESC='석박통합 연구원: 내 턴이 끝날 때마다 내 영웅의 생명력을 3 회복하고, 무작위 주문 카드 1장을 내 손으로 가져옵니다. (원래 능력은 모두 사라지고 공격력·생명력은 그대로)';
 function giveGadget(s, seat, ev, src){ const c=YNU2_GADGETS[Math.floor(nextRand(s)*YNU2_GADGETS.length)]; giveCards(s, seat, [structuredClone(c)], ev, src); }
@@ -1677,11 +1678,12 @@ const ABS_GRADE=[                                                               
   {type:'spell', name:'전원 A+ 확정', cost:3, effect:{type:'allAPlus', atk:1, hp:2}, flavor:'"수강생 여러분 모두 고생 많으셨으니 전원 최고 학점 드립니다." (교수평가 5.0 만점)',
     desc:'내 전장의 모든 하수인에게 +1/+2를 부여하고, 모든 아군 하수인의 생명력을 완전히 회복시킵니다.'},
 ];
+ABS_GRADE.forEach(g=>{ g.school=['3학년']; });   // v122 학년 표시
 function tempDiscount(c, n){ const d=Math.min(c.cost, n); if(d>0){ c.cost-=d; c.tempDisc=(c.tempDisc||0)+d; } }   // 이번 턴만 비용 감소 (내 턴이 끝나면 되돌림)
 const HACK_GOOD=[['도발', m=>{ m.taunt=true; }], ['보호막', m=>{ m.shield=true; }], ['공격력 +2', m=>{ m.atk+=2; }], ['생명력 +2', m=>{ m.hp+=2; m.maxHp+=2; }],
   ['돌진', m=>{ m.charge=true; }], ['생명력 흡수', m=>{ m.lifesteal=true; }], ['독성', m=>{ m.poison=true; }], ['질풍', m=>{ m.windfury=true; }]];
 const HACK_BAD=[['빙결', m=>{ m.frozen=true; }], ['번아웃', m=>{ m.burnout=true; }], ['내부분열', m=>{ m.mutiny=true; }], ['경고장 3', m=>{ m.probation=3; }], ['기절', m=>{ m.stunned=true; }]];
-const DEV_TOKEN={name:'밤샘 개발자', atk:1, hp:1, rush:false, extra:{tribe:'기계'}};
+const DEV_TOKEN={name:'밤샘 개발자', atk:1, hp:1, rush:false, extra:{tribe:'3학년 / 기계'}};
 Object.assign(SPELL_FX, {
   firstLove:{ text:()=>`하수인 하나 소심함 (공격력 1, 받는 피해 +1)`, needsTarget:true, rank:1,
             targets:(s,seat)=>[...minsOf(s, other(seat)), ...minsOf(s, seat)],
@@ -2667,7 +2669,7 @@ function battlecry(s, seat, m, target, ev){
     const art=t.art || ((CARD_POOL.find(x=>x.name===t.name)||{}).art), was=t.name;
     O.board=O.board.filter(x=>x!==t); stripAbilities(t); clearNegatives(t);
     for(const k of ['effect','tribe','school','overload','flavor','quote','scope','dmgCapOne','timidBy']) delete t[k];
-    Object.assign(t, {name:'석박통합 연구원', origName:was, endLab:3, summoned:true, attacked:false, frozen:false, desc:LAB_DESC, flavor:`(원래: ${was}) "교수님, 이번 주말도 출근인가요?"`}); if(art) t.art=art;
+    Object.assign(t, {name:'석박통합 연구원', origName:was, tribe:'2학년', endLab:3, summoned:true, attacked:false, frozen:false, desc:LAB_DESC, flavor:`(원래: ${was}) "교수님, 이번 주말도 출근인가요?"`}); if(art) t.art=art;
     delete t.infect; delete t.knightBy; P.board.push(t);
     ev.push({type:'summon', seat, id:t.id, name:t.name, src});
     logNote(ev, seat, src, `"자네, 대학원 생각 없나?" ${was}을(를) 석박통합 연구원으로 데려왔습니다`); return; }
@@ -2801,7 +2803,7 @@ function battlecry(s, seat, m, target, ev){
 // 피해·회복·드로우는 전투의 함성과 같은 처리를 쓰고(이름만 주문 이름), 침묵·보호막 부여는 여기서 직접 처리한다.
 function castSpell(s, seat, c, target, ev){
   const fx=SPELL_FX[c.effect.type];
-  if(!c.sub && c.effect.type!=='mana'){ const P0=s.seats[seat]; for(const sc of (c.school||[])) if(!(P0.schoolsCast=P0.schoolsCast||[]).includes(sc)) P0.schoolsCast.push(sc); }   // v106 시프: 시전한 주문의 속성 종류
+  if(!c.sub && c.effect.type!=='mana'){ const P0=s.seats[seat]; for(const sc of (c.school||[])) if(SCHOOLS.includes(sc) && !(P0.schoolsCast=P0.schoolsCast||[]).includes(sc)) P0.schoolsCast.push(sc); }   // v122 '1학년' 같은 학년 표시는 속성 종류로 세지 않음   // v106 시프: 시전한 주문의 속성 종류
   if(fx && fx.cast) fx.cast(s, seat, c, target, ev, {seat, name:c.name, spell:true, school:c.school});   // v105: spell 표시 → 성게 가시(독성) 판정
   if(c.overload){ const P=s.seats[seat]; P.overloadNext=(P.overloadNext||0)+c.overload; ev.push({type:'overload', seat, name:c.name, amount:c.overload}); }   // v29 과부하: 다음 턴 마나 수정 N개가 잠긴다
   if(c.twin) twinCopy(s, seat, c, ev); spellTrigger(s, seat, c, ev); spellburstFire(s, seat, c, ev); weaverTrigger(s, seat, c, target, ev);          // v28 이중 주문: 시전될 때마다(손에서 낸 것·혼돈·일식의 두 번째 시전 모두) 이중 주문이 없는 사본이 손패에 들어온다. 손패가 가득이면 소각

@@ -23,13 +23,15 @@ router.use(requireAuth);
 // 지갑 조회·생성은 wallet.js (유저 대전 정산도 같이 씀)
 
 // 덱 검사 (공통): 30장·같은 카드 2장 · 내가 가진 카드만 · 사용 범위(일반 덱엔 모험 카드 X, 보스 전용은 어디에도 X). 문제 없으면 null
-function deckProblem(list, collection, mode) {
+//  v122: 개발자(is_admin)는 30장·같은 카드 2장 규칙만 검사 (모험·보스 전용 카드 포함 모든 카드, 보유 여부 무관) — 테스트용
+function deckProblem(list, collection, mode, admin) {
+  if (admin) return validateDeckList(list);
   return validateDeckList(list) || validateDeckOwned(list, collection) || validateDeckScope(list, CARD_POOL, mode);
 }
-function storedDeck(table, uid, collection, mode) {
+function storedDeck(table, uid, collection, mode, admin) {
   const d = db.prepare(`SELECT deck_json FROM ${table} WHERE user_id=?`).get(uid);
   if (!d) return null;
-  try { const l = JSON.parse(d.deck_json); return deckProblem(l, collection, mode) ? null : l; } catch (_) { return null; }
+  try { const l = JSON.parse(d.deck_json); return deckProblem(l, collection, mode, admin) ? null : l; } catch (_) { return null; }
 }
 function saveDeck(table, mode) {
   return (req, res) => {
@@ -37,7 +39,7 @@ function saveDeck(table, mode) {
     const bad = validateDeckList(list);
     if (bad) return res.status(400).json({ error: bad });
     ensureCollection(req.user.id);
-    const prob = deckProblem(list, collectionOf(req.user.id), mode);      // 가진 카드로만 · 사용 범위 (서버가 최종 검사)
+    const prob = deckProblem(list, collectionOf(req.user.id), mode, !!req.user.isAdmin);      // 가진 카드로만 · 사용 범위 (서버가 최종 검사)
     if (prob) return res.status(400).json({ error: prob });
     db.prepare(`INSERT INTO ${table}(user_id,deck_json,updated_at) VALUES (?,?,?)
                 ON CONFLICT(user_id) DO UPDATE SET deck_json=excluded.deck_json, updated_at=excluded.updated_at`)
@@ -83,8 +85,8 @@ router.get('/save', (req, res) => {
     if (adv.length) db.prepare(`DELETE FROM collection WHERE user_id=? AND card_name IN (${adv.map(() => '?').join(',')})`).run(uid, ...adv); }
   const collection = collectionOf(uid);
   // 저장된 덱이 규칙·보유 카드·사용 범위에 안 맞으면 null → 클라이언트가 추천 덱(모험 덱은 일반 덱)을 쓴다
-  const deck = storedDeck('decks', uid, collection, 'normal');
-  const advDeck = storedDeck('adventure_decks', uid, collection, 'normal');   // v117: 입학 때 들고 가는 덱 = 일반 카드만 (모험 전용 카드는 입학 중 보상으로만)
+  const deck = storedDeck('decks', uid, collection, 'normal', !!req.user.isAdmin);
+  const advDeck = storedDeck('adventure_decks', uid, collection, 'normal', !!req.user.isAdmin);   // v117: 입학 때 들고 가는 덱 = 일반 카드만 (모험 전용 카드는 입학 중 보상으로만)
   const cleared = {};
   for (const r of db.prepare('SELECT boss_id, cleared_at FROM adventure_progress WHERE user_id=?').all(uid)) cleared[r.boss_id] = r.cleared_at;
   res.set('Cache-Control', 'no-store');
@@ -162,7 +164,7 @@ router.post('/adventure/enroll', (req, res) => {
   if (runRow(uid, chapter)) return res.status(409).json({ error: '이미 입학했어요.', run: runOut(runRow(uid, chapter)) });
   const bad = validateDeckList(deck); if (bad) return res.status(400).json({ error: bad });
   ensureCollection(uid);
-  const prob = deckProblem(deck, collectionOf(uid), 'normal'); if (prob) return res.status(400).json({ error: prob });   // 처음 입학할 때는 모험 전용 카드를 못 들고 간다
+  const prob = deckProblem(deck, collectionOf(uid), 'normal', !!req.user.isAdmin); if (prob) return res.status(400).json({ error: prob });   // (v122 개발자는 제한 없음) 처음 입학할 때는 모험 전용 카드를 못 들고 간다
   db.prepare('INSERT INTO adventure_runs(user_id,chapter,deck_json,cleared_json,started_at) VALUES (?,?,?,?,?)').run(uid, chapter, JSON.stringify(deck), '[]', Date.now());
   res.json({ ok: true, run: runOut(runRow(uid, chapter)) });
 });

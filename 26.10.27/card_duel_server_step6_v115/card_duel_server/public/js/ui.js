@@ -1194,7 +1194,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDeck(); clo
 
 // ---------- 내 덱 저장소 (서버, 내 계정에 저장 — serverstore.js) ----------
 // 덱 검사: 규칙(30장·2장) · 보유 카드 · 사용 범위(v117: 일반 덱엔 모험 전용 X, 보스 전용은 어디에도 X). 문제 없으면 null
-const userDeckError=(list, mode)=>validateDeckList(list) || validateDeckOwned(list, ServerStore.collection) || validateDeckScope(list, CARD_POOL, mode);
+const userDeckError=(list, mode)=>validateDeckList(list) || (isDev() ? null : (validateDeckOwned(list, ServerStore.collection) || validateDeckScope(list, CARD_POOL, mode)));   // v122 개발자: 30장·2장 규칙만 (모든 카드 · 보유 무관)
 const DeckBook = {                                   // 일반 덱: AI 대전 · 유저 대전
   get(){ const raw=ServerStore.getDeck(); return (raw && !userDeckError(raw,'normal')) ? raw.slice() : defaultDeckList(); },   // 없거나 규칙·보유 카드에 안 맞으면 추천 덱
   set(list){ if(userDeckError(list,'normal')) return false; ServerStore.setDeck(list.slice()); return true; },
@@ -1212,9 +1212,9 @@ function listOf(counts){ const out=[]; CARD_POOL.forEach(c=>{ for(let k=0;k<(cou
 const edTotal = () => Object.values(ed.counts).reduce((a,b)=>a+b,0);
 const TEST_COPIES=10, TEST_MAX_DECK=60;                 // v54 테스트 덱: 같은 카드 최대 10장, 전체 최대 60장, 최소 1장
 // 한 카드를 덱에 넣을 수 있는 최대 장수. 일반 덱은 "가진 장수"까지만 (4단계), 테스트·보스 덱은 전체 카드풀을 그대로 쓴다.
-const edOwnedMode = () => !ed.test && !ed.boss;
+const edOwnedMode = () => !ed.test && !ed.boss && !isDev();   // v122 개발자는 가진 장수와 상관없이
 // v117: 이 편집 화면에 보여 줄 카드 — 일반 덱: 일반 카드만 / 모험 덱: 일반 + 모험 전용 / 보스·테스트 덱: 전부
-const edPoolOk = c => { const sc=cardScope(c); return ed.boss || ed.test ? true : sc==='normal'; };   // 일반 덱·모험 덱은 일반 카드만
+const edPoolOk = c => { const sc=cardScope(c); return ed.boss || ed.test || isDev() ? true : sc==='normal'; };   // v122 개발자: 모험·보스 전용 카드도   // 일반 덱·모험 덱은 일반 카드만
 const edCap = name => ed.test ? TEST_COPIES : edOwnedMode() ? Math.min(CONFIG.COPIES, ServerStore.owned(name)) : CONFIG.COPIES;
 function edAdjust(name, d){
   const n=(ed.counts[name]||0)+d;
@@ -1271,8 +1271,9 @@ function renderDeckEditor(){
   const groupOf=c=>c.type==='spell' ? schoolOf(c) : tribeOf(c);
   const groupIdx=c=>{ const o=c.type==='spell'?schoolOrder:tribeOrder, i=o.indexOf(groupOf(c)); return i<0?99:i; };
   const TABS=[['all','전체'],['minion','하수인'],['spell','주문'],['tribe:야수','야수'],['tribe:언데드','언데드'],['tribe:악마','악마'],['tribe:용족','용족'],['tribe:정령','정령'],['tribe:해적','해적'],['tribe:토템','토템'],['tribe:기계','기계'],['rune:부정','부정 룬'],['rune:냉기','냉기 룬'],['rune:혈기','혈기 룬'],['rar:일반','일반'],['rar:희귀','희귀'],['rar:특급','특급'],['rar:전설','전설'],
-    ...((ed.boss||ed.test)?[['scope:adventure','🎒 모험 전용']]:[]), ...((ed.boss||ed.test)?[['scope:boss','👹 보스 전용']]:[])];   // v117 사용 범위 필터
-  const tabOk=(c,t)=> t==='all' || (t.startsWith('scope:') ? cardScope(c)===t.slice(6) : null) || (!t.startsWith('scope:') && (t==='minion'||t==='spell' ? c.type===t : t.startsWith('tribe:') ? (c.type==='minion' && (c.tribe||'').includes(t.slice(6))) : t.startsWith('rar:') ? c.rarity===t.slice(4) : runeOf(c).includes(t.slice(5))));
+    ...((ed.boss||ed.test||isDev())?[['scope:adventure','🎒 모험 전용']]:[]), ...((ed.boss||ed.test||isDev())?[['scope:boss','👹 보스 전용']]:[]),   // v117 사용 범위 필터 (v122 개발자도)
+    ...((ed.boss||ed.test||isDev())?['수능','1학년','2학년','3학년','4학년'].map(g=>['grade:'+g,'🎓 '+g]):[])];   // v122 학년 필터 (종족·주문 속성에 적힌 학년)
+  const tabOk=(c,t)=> t.startsWith('grade:') ? ((c.tribe||'').includes(t.slice(6)) || (c.school||[]).includes(t.slice(6))) : t==='all' || (t.startsWith('scope:') ? cardScope(c)===t.slice(6) : null) || (!t.startsWith('scope:') && (t==='minion'||t==='spell' ? c.type===t : t.startsWith('tribe:') ? (c.type==='minion' && (c.tribe||'').includes(t.slice(6))) : t.startsWith('rar:') ? c.rarity===t.slice(4) : runeOf(c).includes(t.slice(5))));
   if(!ed.tab || !TABS.some(([k])=>k===ed.tab)) ed.tab='all';   // 모드가 바뀌어 없는 탭이면 전체로
   $('edTabs').innerHTML=TABS.map(([k,l])=>`<button data-tab="${k}" class="${ed.tab===k?'on':''}">${l}<span class="n">${CARD_POOL.filter(c=>edPoolOk(c) && tabOk(c,k)).length}</span></button>`).join('');
   $('edTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ed.tab=b.dataset.tab; edScrollTop(); renderDeckEditor(); });
@@ -1634,7 +1635,7 @@ function goToMenu(){
   document.querySelector('#aiHero .name').textContent='상대';
   document.body.classList.remove('boss-portrait'); { const sp=$('aiAvatar')&&$('aiAvatar').firstElementChild; if(sp) sp.style.backgroundImage=''; }
   if(game && game.mode==='pvp'){ PvpClient.afterMatch(); $('menu').classList.remove('hidden'); return; }   // 유저 대전이 끝나면 대전 화면으로
-  if(game && game.mode==='adventure'){ if(game.devTest) openBossForm(game.bossIdx); else if(game.boss.chapter){ advView=game.boss.chapter; openAdventure(); } else openAdventure(bossRank(game.boss)); }
+  if(game && game.mode==='adventure'){ if(game.devTest && !game.devFromAdv) openBossForm(game.bossIdx); else if(game.boss.chapter){ advView=game.boss.chapter; openAdventure(); } else openAdventure(bossRank(game.boss)); }
   else if(game && game.mode==='test') openTestScreen(); else showScreen('main');   // v54: 테스트 판이 끝나면 테스트 설정 화면으로
   $('menu').classList.remove('hidden');
 }
@@ -1949,7 +1950,7 @@ const bossIconHTML=b=>advIsImgIcon(b.icon) ? `<img class="boss-img" src="${escHt
 // v117 입학(런): 챕터 보스는 입학 중일 때 '이번 입학의 다음 단계'만 도전할 수 있다
 const runOf=ch=>ServerStore.runs[ch]||null;
 function bossLocked(b, all){                       // 잠겨 있으면 {why} , 열려 있으면 null
-  if(!b.chapter) return null;
+  if(!b.chapter || isDev()) return null;                // v122 개발자: 영남대 모든 단계 바로 도전 (기록·보상 없는 시험 대전)
   const run=runOf(b.chapter); if(!run) return {why:'입학하기를 눌러야 도전할 수 있어요'};
   if((run.cleared||[]).includes(b.id)) return {why:'이번 입학에서 통과했어요', passed:true};
   const next=advRunNext(all, b.chapter, run); if(next && next.id===b.id) return null;
@@ -2006,6 +2007,7 @@ function openAdventure(rank){
       (run ? `<div class="run-box"><b>📖 재학 중</b> · 잠긴 덱 ${run.deck.length}장${next?` · 다음 상대: ${escHtml(next.name)}`:''}<br><small>보스에게 지면 입학이 끝나고 처음부터 다시 시작해요. 고른 보상 카드는 이 덱에 바로 더해져요.</small>`+
              `<div class="run-btns"><button type="button" onclick="showRunDeck('${advView}')">🗒 잠긴 덱 보기</button><button type="button" class="drop" onclick="dropRun('${advView}')">자퇴하기</button></div></div>`
            : `<div class="run-box"><button type="button" class="enroll" onclick="enrollRun('${advView}')">🎓 입학하기</button><br><small>${AdvDeckBook.has()?'모험 덱':'일반 덱'} 30장(일반 카드만)으로 입학해요. <b>입학하면 덱을 바꿀 수 없어요.</b> 모험 전용 카드는 단계를 깰 때마다 보상으로 덱에 더해지고, 입학이 끝나면 사라져요. 보스에게 지면 처음부터 다시.</small></div>`);
+    if(isDev()) $('advChapterDesc').insertAdjacentHTML('beforeend', `<div class="run-box"><small>🛠 <b>개발자 모드</b>: 모든 단계를 바로 도전할 수 있어요. ${runOf(advView)?'잠긴 덱':'모험 덱'}(모든 카드 가능)으로 싸우고, 클리어 기록·보상·입학 진행은 남지 않아요.</small></div>`);   // v122
     list.forEach(b=>box.appendChild(bossButton(b, all.indexOf(b), all, {chapter:true})));
   }
   { const n=ServerStore.offers.length, ob=$('advOfferBtn'); ob.style.display=n?'':'none'; if(n) ob.innerHTML=`🎁 받지 않은 보상이 있어요 (${n})<span class="desc">${escHtml(ServerStore.offers[0].bossName)} 클리어 보상 — 눌러서 카드 묶음을 고르세요</span>`; }   // v117
@@ -2038,12 +2040,13 @@ function showRunDeck(ch){
 }
 async function startBoss(idx, opts={}){
   const all=BossBook.get(), boss=all[idx]; if(!boss || BossBook.deckError(boss)) return;
+  if(isDev() && boss.chapter && !opts.devTest) opts={...opts, devTest:true, fromAdv:true};   // v122 개발자의 영남대 대전 = 시험 대전 (클리어 기록·보상·입학 진행 없음)
   if(!opts.devTest && bossLocked(boss, all)) return;                       // v117: 입학 중 + 이번 입학의 다음 단계만
   if(!opts.devTest && boss.chapter){ const po=ServerStore.offers.find(o=>{ const ob=all.find(x=>x.id===o.bossId); return ob && ob.chapter===boss.chapter; });
     if(po){ showOffer(po); return; } }                                                // 고르지 않은 보상 묶음이 있으면 먼저 고르게 (잠긴 덱에 더해야 하므로)
   const r=await resolveBossBot(boss);
   const d=DIFFICULTY.normal2;
-  game={key:'adventure', mode:'adventure', boss, bossIdx:idx, devTest:!!opts.devTest, bet:0, tier:0, cheats:[], pool:0, settled:false, result:null, deckNames:boss.chapter?(runOf(boss.chapter)?runOf(boss.chapter).deck.slice():AdvDeckBook.get()):DeckBook.get()};   // v117: 도장깨기 챕터(영남대 입학)만 모험 덱, 자유 보스전은 일반 덱 (모험 전용 카드는 챕터에서만)
+  game={key:'adventure', mode:'adventure', boss, bossIdx:idx, devTest:!!opts.devTest, devFromAdv:!!opts.fromAdv, bet:0, tier:0, cheats:[], pool:0, settled:false, result:null, deckNames:boss.chapter?(runOf(boss.chapter)?runOf(boss.chapter).deck.slice():AdvDeckBook.get()):DeckBook.get()};   // v117: 도장깨기 챕터(영남대 입학)만 모험 덱, 자유 보스전은 일반 덱 (모험 전용 카드는 챕터에서만)
   Bot=r.bot;
   Host.startBoss(boss, game.deckNames, !!(boss.chapter && runOf(boss.chapter)));
   view=Host.view(MY);
