@@ -141,4 +141,22 @@ CREATE TABLE IF NOT EXISTS adventure_runs (
 );
 `);
 
+// v127 랭크전: 계정별 랭크 상태 (rank.js 규칙). 판 기록에는 랭크전 여부
+db.exec(`
+CREATE TABLE IF NOT EXISTS rank_state (
+  user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  tier         INTEGER NOT NULL DEFAULT 0,               -- 0 브론즈 · 1 실버 · 2 골드 · 3 플래티넘 · 4 다이아 · 5 전설
+  div          INTEGER NOT NULL DEFAULT 3,               -- 단계 3 → 2 → 1 (전설은 0)
+  stars        INTEGER NOT NULL DEFAULT 0,
+  streak       INTEGER NOT NULL DEFAULT 0,               -- 랭크전 연승
+  floor        INTEGER NOT NULL DEFAULT 0,               -- 강등 방지선 (오른 적 있는 가장 높은 등급)
+  legend_wins  INTEGER NOT NULL DEFAULT 0,               -- 전설에서 거둔 승수 (순위 기준)
+  legend_at    INTEGER,                                  -- 전설 도착 시각 (같은 승수면 먼저 온 사람이 위)
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rank_legend ON rank_state(tier, legend_wins DESC, legend_at);
+`);
+if (!db.prepare('PRAGMA table_info(pvp_matches)').all().some(c => c.name === 'ranked'))
+  db.exec('ALTER TABLE pvp_matches ADD COLUMN ranked INTEGER NOT NULL DEFAULT 0');
+
 module.exports = db;

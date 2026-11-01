@@ -45,7 +45,7 @@ function makeHandlers(pvp) {
     // GET /pvp/status — 페이지를 새로 열었을 때 진행 중인 판이 있는지 (있으면 화면이 스트림을 열어 이어서 한다)
     status(req, res) { res.set('Cache-Control', 'no-store'); res.json({ state: pvp.stateOf(req.user.id) }); },
     // POST /pvp/queue · /pvp/cancel
-    queue(req, res) { if (!queueOk(req.user.id)) return tooMany(res); const r = pvp.queueJoin(req.user.id); res.status(r.ok ? 200 : 400).json(r); },
+    queue(req, res) { if (!queueOk(req.user.id)) return tooMany(res); const r = pvp.queueJoin(req.user.id, (req.body || {}).mode); res.status(r.ok ? 200 : 400).json(r); },   // v127 {mode:'normal'|'rank'}
     cancel(req, res) { const r = pvp.queueCancel(req.user.id); res.status(r.ok ? 200 : 400).json(r); },
     // POST /pvp/mulligan {matchId, ids}
     mulligan(req, res) {
@@ -72,5 +72,6 @@ router.post('/pvp/queue', h.queue);
 router.post('/pvp/cancel', h.cancel);
 router.post('/pvp/mulligan', h.mulligan);
 router.post('/pvp/action', h.action);
+router.get('/pvp/ranking', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ ...pvpdb.ranking(100), me: pvpdb.rankOut(req.user.id) }); });   // v127 순위표
 
 module.exports = { router, core, makeHandlers };

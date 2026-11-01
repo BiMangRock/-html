@@ -209,6 +209,13 @@
   <div class="screen" id="screen-pvp">
     <img class="pvp-banner" src="/images/pvp/pvp_banner.webp" alt="">
     <h3>유저 대전</h3>
+    <div class="pvp-modes" id="pvpModes"><button type="button" data-mode="normal" class="on">⚔️ 일반전</button><button type="button" data-mode="rank">🏆 랭크전</button></div>
+    <div class="pvp-rank" id="pvpRankBox" style="display:none">
+      <div class="rk-badge" id="pvpRankBadge">-</div>
+      <div class="rk-sub" id="pvpRankSub"></div>
+      <div class="rk-bar"><i id="pvpRankBar"></i></div>
+      <button type="button" class="rk-board" id="pvpRankBoardBtn">🏆 순위표</button>
+    </div>
     <div class="pvp-record" title="내 전적">
       <div class="rec"><img src="/images/pvp/badge_win.webp" alt="승"><b id="pvpWins">0</b></div>
       <div class="rec"><img src="/images/pvp/badge_lose.webp" alt="패"><b id="pvpLosses">0</b></div>
@@ -222,6 +229,7 @@
       <div class="row2"><span>대기 중인 사람</span><b id="pvpWaiting">-</b></div>
     </div>
     <p class="notice warn" id="pvpMsg" style="display:none"></p>
+    <button class="menu-btn" id="pvpFallbackBtn" style="display:none">랭크전 상대가 없어요 — 일반전으로 바꾸기</button>
     <button class="menu-btn primary" id="pvpFindBtn" disabled><img id="pvpSpin" class="pvp-spin" src="/images/pvp/pvp_spinner.webp" alt="" style="display:none"><span id="pvpFindTxt">서버에 연결하는 중…</span></button>
     <p class="sub">저장된 내 덱으로 대전해요.</p>
     <p class="notice" id="pvpRules"></p>
@@ -283,6 +291,7 @@
 <script src="/js/adventure.js"></script>
 <script src="/js/shop.js"></script>
 <script src="/js/pvp.js"></script>
+<script src="/js/rank.js"></script>
 <script src="/js/serverstore.js"></script>
 <script src="/js/cardtext.js"></script>
 <script src="/js/ui.js"></script>

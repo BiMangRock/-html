@@ -12,7 +12,7 @@ const PvpClient = (() => {
     matchId: null, lastSeq: -1, over: false,              // 지금 화면에 그리고 있는 판
     chain: Promise.resolve(),                             // 서버 메시지는 순서대로 하나씩 처리한다 (연출이 끝난 뒤 다음 것)
     phase: null, deadline: 0, mullDeadline: 0, turnSeat: 0, timeouts: 0, maxTimeouts: 3,
-    oppOffAt: 0, reconnectMs: PVP.RECONNECT_MS, waitTimer: null, queuedAt: 0, msg: '', retry: null,
+    oppOffAt: 0, reconnectMs: PVP.RECONNECT_MS, waitTimer: null, queuedAt: 0, msg: '', retry: null, mode: 'normal', ranked: false,   // v127 일반전 / 랭크전
   };
   const sec = ms => Math.max(0, Math.ceil(ms / 1000));
   const cfgOf = () => ({ turnMs: PVP.TURN_MS, mulliganMs: PVP.MULLIGAN_MS, reconnectMs: PVP.RECONNECT_MS, maxTimeouts: PVP.MAX_TIMEOUTS, ...(S.cfg || {}) });
@@ -78,6 +78,7 @@ const PvpClient = (() => {
     if (m.t === 'status') {
       S.status = m; if (m.cfg) S.cfg = m.cfg;
       if (m.state === 'queue' && !S.queuedAt) S.queuedAt = Date.now();
+      if (m.state === 'queue' && m.mode && m.mode !== S.mode) { S.mode = m.mode; S.queuedAt = Date.now(); }   // v127 대기 중인 대기열에 맞춘다
       if (m.state !== 'queue') S.queuedAt = 0;
       renderScreen();
     } else if (m.t === 'match') {
@@ -100,12 +101,18 @@ const PvpClient = (() => {
       el('pvpWins').textContent = r.wins; el('pvpLosses').textContent = r.losses; el('pvpDraws').textContent = r.draws;
       el('pvpToday').textContent = st.rewardsToday || 0;
       setGauge(st.rewardsToday || 0);
-      el('pvpWaiting').textContent = st.state === 'queue' ? `${st.waiting}명 (나 포함)` : `${st.waiting || 0}명`;
+      const w = S.mode === 'rank' ? (st.waitingRank || 0) : (st.waiting || 0);
+      el('pvpWaiting').textContent = st.state === 'queue' ? `${w}명 (나 포함)` : `${w}명`;
+      renderRank(st.rank);
     }
+    document.querySelectorAll('#pvpModes button').forEach(x => { x.classList.toggle('on', x.dataset.mode === S.mode); x.disabled = !!(st && st.state === 'queue'); });
+    el('pvpRankBox').style.display = S.mode === 'rank' ? '' : 'none';
+    { const fb = el('pvpFallbackBtn'), long = st && st.state === 'queue' && S.mode === 'rank' && S.queuedAt && Date.now() - S.queuedAt > RANK.FALLBACK_MS;   // v127 랭크전 상대가 안 잡히면
+      fb.style.display = long ? '' : 'none'; }
     const b = el('pvpFindBtn'), q = st && st.state === 'queue';
     b.disabled = !S.esOpen || !st;
     b.classList.toggle('waiting', !!q);
-    el('pvpFindTxt').textContent = !S.esOpen ? '서버에 연결하는 중…' : q ? `상대를 찾는 중… ${sec(Date.now() - S.queuedAt)}초 (누르면 취소)` : '대전 상대 찾기';
+    el('pvpFindTxt').textContent = !S.esOpen ? '서버에 연결하는 중…' : q ? `${S.mode === 'rank' ? '랭크전' : '일반전'} 상대를 찾는 중… ${sec(Date.now() - S.queuedAt)}초 (누르면 취소)` : (S.mode === 'rank' ? '🏆 랭크전 상대 찾기' : '⚔️ 일반전 상대 찾기');
     el('pvpSpin').style.display = q ? '' : 'none';
     el('pvpRules').textContent = `한 턴 ${sec(c.turnMs)}초 · 멀리건 ${sec(c.mulliganMs)}초 · 시간이 지나면 턴이 자동으로 넘어가고, 연속 ${c.maxTimeouts}번 넘기면 패배해요. 연결이 끊기면 ${sec(c.reconnectMs)}초 안에 돌아와야 해요.`;
     document.querySelectorAll('.pvpWinGold').forEach(x => { x.textContent = PVP.WIN_GOLD; });
@@ -127,11 +134,36 @@ const PvpClient = (() => {
     showMsg(''); const b = el('pvpFindBtn'); b.disabled = true;
     const saved = await ServerStore.waitSaved();                       // 대전은 서버에 저장된 내 덱으로 한다 → 방금 고친 덱이 저장될 때까지 기다린다
     if (!saved) { showMsg('저장이 아직 끝나지 않았어요. 잠시 뒤 다시 눌러 주세요.'); renderScreen(); return; }
-    const r = await post('/api/pvp/queue');
+    const r = await post('/api/pvp/queue', { mode: S.mode });
     if (!r.ok) showMsg(r.data.error || '대기열에 들어가지 못했어요.');
     renderScreen();
   }
   el('pvpFindBtn').onclick = toggleQueue;
+  // ---------- v127 랭크전: 모드 탭 · 등급 배지 · 순위표 · 일반전 전환 ----------
+  document.querySelectorAll('#pvpModes button').forEach(b => b.onclick = () => { if (S.status && S.status.state === 'queue') return; S.mode = b.dataset.mode; showMsg(''); renderScreen(); });
+  el('pvpFallbackBtn').onclick = async () => { S.mode = 'normal'; S.queuedAt = Date.now(); const r = await post('/api/pvp/queue', { mode: 'normal' }); if (!r.ok) showMsg(r.data.error || '일반전으로 바꾸지 못했어요.'); renderScreen(); };
+  const rankLine = rk => !rk ? '-' : rk.tier >= RANK.LEGEND ? `${ladderLabel(rk)}${rk.place ? ` · ${rk.place}위` : ''}` : `${ladderLabel(rk)} <span class="stars">${ladderStars(rk)}</span>`;
+  function renderRank(rk) {
+    if (!rk) return;
+    el('pvpRankBadge').innerHTML = rankLine(rk);
+    el('pvpRankSub').textContent = rk.tier >= RANK.LEGEND ? `전설 승수 ${rk.legendWins}승 · 승수가 많을수록 순위가 올라가요` :
+      `이기면 별 +1${rk.streak >= RANK.STREAK_BONUS_FROM - 1 ? ' (연승 중! 다음 승리는 별 +2)' : ''} · 지면 별 -1${rk.tier === 0 ? ' (브론즈는 안 줄어요)' : ''}${rk.streak ? ` · ${rk.streak}연승` : ''}`;
+    el('pvpRankBar').style.width = Math.round(ladderIndex(rk) / ladderIndex({ tier: RANK.LEGEND }) * 100) + '%';
+  }
+  async function openBoard() {
+    let box = el('rankModal');
+    if (!box) { box = document.createElement('div'); box.id = 'rankModal'; box.className = 'rank-modal'; box.onclick = e => { if (e.target === box) box.classList.remove('show'); }; document.body.appendChild(box); }
+    box.innerHTML = '<div class="rank-panel"><h3>🏆 순위표</h3><p class="sub">불러오는 중…</p></div>'; box.classList.add('show');
+    const r = await fetch('/api/pvp/ranking', { credentials: 'same-origin' }).then(x => x.json()).catch(() => null);
+    if (!r) { box.querySelector('.sub').textContent = '순위표를 불러오지 못했어요.'; return; }
+    const rows = r.legends.length ? r.legends.map(x => `<tr${r.me && r.me.place === x.place ? ' class="me"' : ''}><td>${x.place}</td><td>${escHtml(x.name)}</td><td>${x.wins}승</td></tr>`).join('') : '<tr><td colspan="3">아직 전설이 없어요. 첫 번째 전설이 되어 보세요!</td></tr>';
+    const counts = RANK.TIERS.map((t, i) => `<span>${RANK.ICONS[i]} ${t} <b>${r.counts[i] || 0}</b></span>`).join('');
+    box.innerHTML = `<div class="rank-panel"><h3>🏆 순위표</h3><p class="sub">내 등급: ${rankLine(r.me)}</p>
+      <h4>👑 전설 순위 (전설에서 거둔 승수)</h4><table class="rank-table"><tr><th>순위</th><th>이름</th><th>전설 승수</th></tr>${rows}</table>
+      <h4>등급별 인원</h4><div class="rank-counts">${counts}</div><button type="button" class="menu-btn back">닫기</button></div>`;
+    box.querySelector('button').onclick = () => box.classList.remove('show');
+  }
+  el('pvpRankBoardBtn').onclick = openBoard;
   el('pvpBackBtn').onclick = async () => {
     if (S.status && S.status.state === 'queue') await post('/api/pvp/cancel');
     close(); S.status = null; showScreen('mode');
@@ -148,13 +180,13 @@ const PvpClient = (() => {
     Host.state = st;
   }
   function beginMatchUi(m) {
-    S.matchId = m.matchId; S.lastSeq = -1; S.over = false; S.phase = null; clearTimeout(S.waitTimer);
+    S.matchId = m.matchId; S.lastSeq = -1; S.over = false; S.phase = null; clearTimeout(S.waitTimer); S.ranked = !!m.ranked; S.mode = m.ranked ? 'rank' : 'normal';
     MY = m.seat; OPP = 1 - m.seat;
     game = { key: 'pvp', mode: 'pvp', bet: 0, tier: 0, cheats: [], pool: 0, settled: true, result: null, deckNames: Array.isArray(m.deck) ? m.deck.slice() : DeckBook.get(), pvpTitle: '', pvpHTML: '' };
     view = m.view; syncShim(view);
     ui.selected = null; ui.pending = null; ui.busy = true; stopArrow(); closeDeck(); resetSurrenderBtn();
     $('logList').innerHTML = ''; $('overlay').classList.remove('show'); $('overlayReward').innerHTML = ''; $('overlayArt').innerHTML = ''; el('pvpAgainBtn').style.display = 'none';
-    $('verBadge').textContent = VERSION; $('diffBadge').textContent = `유저 대전 · 승리 +${PVP.WIN_GOLD}G`;
+    $('verBadge').textContent = VERSION; $('diffBadge').textContent = `${m.ranked ? '🏆 랭크전' : '유저 대전 · 일반전'} · 승리 +${PVP.WIN_GOLD}G`;
     $('menu').classList.add('hidden'); updateWallet();
     document.querySelector('#aiHero .name').textContent = m.opp.name;
     document.body.classList.add('pvp-mode'); setAvatar('aiAvatar', m.opp.name); setAvatar('playerAvatar', S.meName || '나');
@@ -237,7 +269,11 @@ const PvpClient = (() => {
     if (r.reward > 0) { top = sign(r.reward); sub = r.rewardsToday > 0 ? `오늘 ${r.rewardsToday}번째 승리` : ''; }
     else if (r.youWon) { top = '<span>획득 골드 없음</span>'; sub = why; }
     else if (r.draw || r.void) top = '<span>골드 변동 없음</span>';
-    return `<span class="sub2">${r.oppName ? 'vs ' + escHtml(r.oppName) : ''}${reasonText ? ' · ' + reasonText : ''}</span>${top}${sub ? `<span class="sub2">${sub}</span>` : ''}<span class="sub2">보유 골드 ${fmt(Economy.get().gold)}</span>`;
+    let rk = '';                                                              // v127 랭크전: 별 변화
+    if (r.ranked && r.rank) { const a = r.rank.after, g = r.rank.gained;
+      const what = a.tier >= RANK.LEGEND && !r.rank.toLegend ? (g > 0 ? `전설 승수 +1 (${a.legendWins}승)` : '전설 승수 그대로') : g > 0 ? `별 +${g}` : g < 0 ? '별 -1' : '별 변화 없음';
+      rk = `<span class="sub2 rank-line">🏆 ${rankLine({ ...a, place: r.rank.place })} · ${what}${r.rank.toLegend ? ' · 👑 전설 달성!' : r.rank.promoted ? ' · ⬆ 승급!' : r.rank.demoted ? ' · ⬇ 강등' : ''}</span>`; }
+    return `<span class="sub2">${r.ranked ? '🏆 랭크전 · ' : ''}${r.oppName ? 'vs ' + escHtml(r.oppName) : ''}${reasonText ? ' · ' + reasonText : ''}</span>${top}${rk}${sub ? `<span class="sub2">${sub}</span>` : ''}<span class="sub2">보유 골드 ${fmt(Economy.get().gold)}</span>`;
   }
   function finishUi(m) {
     const r = m.result; S.over = true; clearTimeout(S.waitTimer);

@@ -30,12 +30,12 @@ const play = (s, seat, c, target) => ok(E.apply(s, { type: 'PLAY_CARD', cardId: 
 const end = (s, seat) => ok(E.apply(s, { type: 'END_TURN' }, seat));
 const caps = (s, seat) => s.seats[seat].hand.filter(c => c.name === '학사모');
 
-// 학사모: 무작위 효과 (비용+1)번 · 1장 뽑기 · 상대에게 비용 +1 → 상대가 들고 턴을 끝내면 2 피해 → 되던지면 다시 +1
+// 학사모: 무작위 효과 (비용+1)번 · 1장 뽑기 · 상대에게 비용 +1 → 들고 턴을 끝내도 피해 없음 (v126) → 되던지면 다시 +1
 { let s = setup(); const a = put(s, 0, { name: 'a', atk: 1, hp: 5 }); put(s, 1, { name: 'e', atk: 5, hp: 9 });
   const c0 = give(s, 0, '학사모'), h0 = s.seats[0].hand.length; s = play(s, 0, c0);
   assert.strictEqual(s.seats[0].hand.length, h0, '쓴 1장 빠지고 1장 뽑음'); assert.strictEqual(caps(s, 1).length, 1); assert.strictEqual(caps(s, 1)[0].cost, 1);
   assert.strictEqual(s.seats[0].capsPlayed, 1);
-  s = end(s, 0); const hp = s.seats[1].hp; s.seats[1].mana = 0; s = end(s, 1); assert.strictEqual(s.seats[1].hp, hp - 2, '들고 있으면 2 피해');
+  s = end(s, 0); const hp = s.seats[1].hp; s.seats[1].mana = 0; s = end(s, 1); assert.strictEqual(s.seats[1].hp, hp, '들고 있어도 피해 없음');
   s = end(s, 0); s.seats[1].mana = 10; s = play(s, 1, caps(s, 1)[0]); assert.strictEqual(caps(s, 0).length, 1); assert.strictEqual(caps(s, 0)[0].cost, 2, '되던지면 비용 2'); }
 { let s = setup(); const c = give(s, 0, '학사모'); c.capLv = 10; c.cost = 10; s = play(s, 0, c); assert.strictEqual(caps(s, 1)[0].cost, 10, '최대 10'); }
 { for (let k = 1; k <= 10; k++) { let s = setup(k); put(s, 0, { name: 'a', atk: 3, hp: 5 }); put(s, 1, { name: 'e', atk: 5, hp: 50 });

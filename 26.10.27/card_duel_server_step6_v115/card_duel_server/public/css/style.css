@@ -801,3 +801,25 @@ body.boss-portrait #aiAvatar>span{background-size:cover; background-position:cen
 #cardDetail .cd-flavor{margin-top:.5rem; color:var(--parch-d); font-style:italic; font-size:.76rem;}
 #cardDetail .cd-kw{margin-top:.55rem; padding-top:.45rem; border-top:1px solid rgba(138,111,28,.45); display:flex; flex-direction:column; gap:.25rem; font-size:.74rem; color:var(--parch-d);}
 #cardDetail .cd-kw b{color:var(--gold);}
+
+/* v127 유저 대전: 일반전 / 랭크전 */
+.pvp-modes{display:flex; gap:.5rem; justify-content:center; margin:.4rem 0 .6rem;}
+.pvp-modes button{flex:1; max-width:11rem; padding:.55rem .8rem; border-radius:10px; border:1px solid var(--gold-d); background:rgba(28,25,48,.85); color:var(--parch-d); font-weight:700; cursor:pointer;}
+.pvp-modes button.on{background:linear-gradient(180deg,#c9a227,#8a6f1c); color:#1c1608; box-shadow:0 0 12px rgba(201,162,39,.45);}
+.pvp-modes button:disabled{opacity:.55; cursor:default;}
+.pvp-rank{margin:.2rem auto .7rem; max-width:22rem; padding:.7rem .9rem; border:1px solid var(--gold-d); border-radius:12px; background:rgba(18,15,38,.85); text-align:center;}
+.pvp-rank .rk-badge{font-size:1.15rem; font-weight:800; color:var(--gold);}
+.pvp-rank .rk-badge .stars{color:#ffd86b; letter-spacing:.1em; margin-left:.3rem;}
+.pvp-rank .rk-sub{font-size:.78rem; color:var(--parch-d); margin:.25rem 0 .45rem;}
+.pvp-rank .rk-bar{height:6px; border-radius:3px; background:rgba(255,255,255,.08); overflow:hidden;}
+.pvp-rank .rk-bar i{display:block; height:100%; background:linear-gradient(90deg,#b87333,#c0c0c0,#ffd700,#7fd4ff,#b9f2ff,#ff9be0);}
+.pvp-rank .rk-board{margin-top:.55rem; padding:.3rem .8rem; border-radius:8px; border:1px solid var(--gold-d); background:transparent; color:var(--gold); cursor:pointer;}
+.rank-line{color:#ffd86b !important;}
+.rank-modal{position:fixed; inset:0; z-index:9000; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6);}
+.rank-modal.show{display:flex;}
+.rank-panel{width:min(26rem, 94vw); max-height:88vh; overflow:auto; padding:1rem 1.1rem; border-radius:14px; border:1px solid var(--gold-d); background:linear-gradient(180deg,#241f38,#181428); color:var(--parch); text-align:center;}
+.rank-panel h4{margin:.8rem 0 .35rem; color:var(--gold);}
+.rank-table{width:100%; border-collapse:collapse; font-size:.85rem;}
+.rank-table th,.rank-table td{padding:.3rem .4rem; border-bottom:1px solid rgba(138,111,28,.35);}
+.rank-table tr.me td{color:#ffd86b; font-weight:700;}
+.rank-counts{display:flex; flex-wrap:wrap; gap:.4rem .8rem; justify-content:center; font-size:.85rem;}

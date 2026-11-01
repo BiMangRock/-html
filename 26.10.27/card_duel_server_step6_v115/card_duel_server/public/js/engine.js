@@ -1810,7 +1810,7 @@ Object.assign(SPELL_FX, {
             cast:(s,seat,c,target,ev,src)=>gainLife(s, seat, c.effect.value, ev, src), spellWorth:(c,view)=> view.me.hp<(view.me.maxHp||30) ? 2 : 0.5 },
 });
 // ---- v124 학사모 (일반 카드 — 모든 모드): 졸업 사정회 · 학사모 · 수석 졸업생 발굽 · 학위수여식의 총장님 -----------------------------
-//  학사모: 쓰면 (비용+1)번 무작위로 아군 강화 / 적 약화 → 1장 뽑기 → 상대 손에 비용이 1 오른 학사모(최대 10). 손에 든 채 내 턴이 끝나면 1장당 내 영웅 2 피해
+//  학사모: 쓰면 (비용+1)번 무작위로 아군 강화 / 적 약화 → 1장 뽑기 → 상대 손에 비용이 1 오른 학사모(최대 10)
 //  학사모 카드 자체는 영남대 4학년 첫 클리어 보상으로만 얻는다 (cards.js 의 unlock — 상점·스타터·무작위 생성에서 안 나옴)
 //  v125: 학사모 효과 풀 = 게임의 긍정 효과 전부(아군) / 부정 효과 전부(적). [이름, 이미 가졌는지, 적용(m, s, seat, P)]
 const CAP_GOOD=[
@@ -3266,8 +3266,7 @@ function apply(state, a, actor){
     ev.push({type:'game_over', winner:s.winner});
   } else if(a.type==='END_TURN'){
     ev.push({type:'turn_end', seat:actor});
-    { const caps=P.hand.filter(isCap); if(caps.length){ const src={seat:actor, name:'학사모'};              // v124 학사모: 손에 든 채 턴이 끝나면 1장당 2 피해
-        hurtHero(s, actor, caps.reduce((a,c)=>a+(c.effect.dmg||2),0), ev, 'battlecry', src); logNote(ev, actor, src, `학사모를 못 던졌다… (${caps.length}장)`); } }
+    // v126: 학사모를 손에 든 채 턴이 끝나도 피해는 없음 (예전의 '1장당 2 피해' 삭제)
     if(P.gradQuests && P.gradQuests.length && P.mana>0){ const src={seat:actor, name:'졸업 사정회'};        // v124 졸업 사정회: 마나를 남긴 채 턴을 끝내면 진행 (단계마다 필요 횟수 +1, 계속)
       for(const q of P.gradQuests){ q.prog++; if(q.prog>=q.stage){ giveCards(s, actor, [capCard(0)], ev, src); logNote(ev, actor, src, `${q.stage}단계 통과! 학사모 획득 (다음: 0/${q.stage+1})`); q.stage++; q.prog=0; }
         else logNote(ev, actor, src, `졸업 사정 중… ${q.prog}/${q.stage}`); } }

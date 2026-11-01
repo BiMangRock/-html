@@ -7,7 +7,7 @@
 //   - 시간·승패·보상은 전부 서버가 정한다.
 //
 //  클라이언트로 가는 메시지 (conn.send):
-//    {t:'status', state:'idle'|'queue'|'match', waiting, record, winGold, rewardsToday, cfg}
+//    {t:'status', state:'idle'|'queue'|'match', mode:'normal'|'rank', waiting, waitingRank, record, winGold, rewardsToday, rank, cfg}   (v127 랭크전: 대기열이 따로)
 //    {t:'match', matchId, seat, phase:'mulligan'|'play'|'over', seq, opp:{name,online}, mulligan:{...}, view, events, remainMs, turnMs, result?}
 //    {t:'presence', matchId, oppOnline, oppOfflineMs}     상대 연결 상태가 바뀜
 //    {t:'error', error}
@@ -73,7 +73,7 @@ function createPvp(opts = {}) {
   // ---------- 사용자 ----------
   function getUser(uid, username) {
     let u = users.get(uid);
-    if (!u) { u = { uid, username: username || ('user' + uid), conns: new Set(), matchId: null, queued: false, queuedAt: 0, goneAt: null, unseen: null }; users.set(uid, u); }
+    if (!u) { u = { uid, username: username || ('user' + uid), conns: new Set(), matchId: null, queued: false, qmode: 'normal', queuedAt: 0, goneAt: null, unseen: null }; users.set(uid, u); }
     else if (username) u.username = username;
     return u;
   }
@@ -84,7 +84,8 @@ function createPvp(opts = {}) {
   }
   function statusMsg(u) {
     let st = {}; try { st = statsOf(u.uid) || {}; } catch (e) { log('statsOf 실패', e && e.message); }
-    return { t: 'status', state: stateOf(u.uid), waiting: queue.length, ...st,
+    const waitingOf = md => queue.filter(id => { const x = users.get(id); return x && x.qmode === md; }).length;
+    return { t: 'status', state: stateOf(u.uid), mode: u.qmode, waiting: waitingOf('normal'), waitingRank: waitingOf('rank'), ...st,
       cfg: { turnMs: cfg.turnMs, mulliganMs: cfg.mulliganMs, reconnectMs: cfg.reconnectMs, maxTimeouts: cfg.maxTimeouts } };
   }
   const pushStatus = u => sendTo(u, statusMsg(u));
@@ -123,12 +124,13 @@ function createPvp(opts = {}) {
   }
 
   // ---------- 대기열 ----------
-  function queueJoin(uid) {
-    const u = users.get(uid);
+  function queueJoin(uid, mode) {
+    const u = users.get(uid); const md = mode === 'rank' ? 'rank' : 'normal';   // v127 일반전 / 랭크전
     if (!u || !u.conns.size) return { ok: false, error: '서버와 연결되어 있지 않아요. 화면을 새로고침해 주세요.' };
     if (u.matchId) return { ok: false, error: '이미 대전 중이에요.' };
-    if (u.queued) return { ok: true, already: true };
-    u.queued = true; u.queuedAt = Date.now(); queue.push(uid);
+    if (u.queued && u.qmode === md) return { ok: true, already: true };
+    if (u.queued) leaveQueue(u);                                   // 다른 대기열에 있었으면 옮긴다 (랭크전 → 일반전 전환)
+    u.queued = true; u.qmode = md; u.queuedAt = Date.now(); queue.push(uid);
     pump();
     pushAllQueued();
     return { ok: true };
@@ -144,16 +146,20 @@ function createPvp(opts = {}) {
   function pump() {
     for (;;) {
       queue = queue.filter(uid => { const u = users.get(uid); return u && u.queued && !u.matchId; });
-      const ready = queue.filter(uid => users.get(uid).conns.size > 0);
-      if (ready.length < 2) return;
-      const [a, b] = ready;
+      let pair = null;
+      for (const md of ['normal', 'rank']) {                        // v127 같은 대기열끼리만 (랭크전은 등급·승률 상관없이 먼저 온 순서)
+        const ready = queue.filter(uid => { const x = users.get(uid); return x.conns.size > 0 && x.qmode === md; });
+        if (ready.length >= 2) { pair = [ready[0], ready[1], md]; break; }
+      }
+      if (!pair) return;
+      const [a, b, md] = pair;
       leaveQueue(users.get(a)); leaveQueue(users.get(b));
-      startMatch(a, b);
+      startMatch(a, b, md);
     }
   }
 
   // ---------- 판 시작 ----------
-  function startMatch(a, b) {
+  function startMatch(a, b, mode) {
     const order = rng() < 0.5 ? [a, b] : [b, a];            // 좌석 배정 (선공은 엔진이 따로 무작위로 정한다)
     let decks;
     try { decks = order.map(uid => loadDeck(uid)); }
@@ -165,14 +171,14 @@ function createPvp(opts = {}) {
     const state = E.newGame(rng, { decks });
     const now = Date.now();
     const m = {
-      id: crypto.randomBytes(8).toString('hex'), uids: order, names: order.map(uid => users.get(uid).username),
+      id: crypto.randomBytes(8).toString('hex'), ranked: mode === 'rank', uids: order, names: order.map(uid => users.get(uid).username),
       state, decks, seq: 0, phase: 'mulligan', over: false, startedAt: now,
       mull: [0, 1].map(s => ({ done: !(state.seats[s].startIds || []).length })), mullUntil: now + cfg.mulliganMs,
       deadline: null, timeouts: [0, 0], offline: [null, null], result: null,
     };
     matches.set(m.id, m);
     for (const uid of order) { const u = users.get(uid); u.matchId = m.id; u.queued = false; }
-    log('판 시작', m.id, m.names.join(' vs '));
+    log('판 시작', m.id, m.ranked ? '[랭크]' : '[일반]', m.names.join(' vs '));
     if (m.mull[0].done && m.mull[1].done) beginPlay(m); else broadcast(m);
   }
   function beginPlay(m) {
@@ -184,7 +190,7 @@ function createPvp(opts = {}) {
   function matchMsg(m, seat, extra) {
     const opp = 1 - seat, st = m.state, now = Date.now();
     return {
-      t: 'match', matchId: m.id, seat, phase: m.over ? 'over' : m.phase, seq: m.seq,
+      t: 'match', matchId: m.id, seat, ranked: !!m.ranked, phase: m.over ? 'over' : m.phase, seq: m.seq,
       opp: { name: m.names[opp], online: m.offline[opp] == null }, oppOfflineMs: m.offline[opp] == null ? 0 : now - m.offline[opp],
       mulligan: { done: m.mull[seat].done, oppDone: m.mull[opp].done, startIds: m.mull[seat].done ? [] : (st.seats[seat].startIds || []), remainMs: m.phase === 'mulligan' ? Math.max(0, m.mullUntil - now) : 0 },
       turnMs: cfg.turnMs, remainMs: (m.phase === 'play' && !m.over) ? Math.max(0, m.deadline - now) : 0, turnSeat: st.turn,
@@ -273,7 +279,7 @@ function createPvp(opts = {}) {
   function finish(m, winnerSeat, reason, events) {
     if (m.over) return;
     m.over = true; m.phase = 'over';
-    const settleArg = { matchId: m.id, uids: m.uids.slice(), winnerSeat, reason, turns: m.state.turnNo, startedAt: m.startedAt };
+    const settleArg = { matchId: m.id, ranked: !!m.ranked, uids: m.uids.slice(), winnerSeat, reason, turns: m.state.turnNo, startedAt: m.startedAt };
     let res = null;
     for (let i = 0; i < 2 && !res; i++) { try { res = settle(settleArg); } catch (e) { log('정산 실패', i, e && e.message); } }
     if (!res) res = [{ reward: 0, why: 'error' }, { reward: 0, why: 'error' }];      // 정산이 두 번 다 실패: 보상 없이 결과만 보여 준다 (기록·골드는 그대로 취소된 상태)
@@ -284,7 +290,7 @@ function createPvp(opts = {}) {
       const u = users.get(m.uids[seat]); if (!u) continue;
       const rs = res[seat] || {};
       const result = {
-        youWon: winnerSeat === seat, draw: winnerSeat === null && reason !== 'void', void: reason === 'void',
+        youWon: winnerSeat === seat, draw: winnerSeat === null && reason !== 'void', void: reason === 'void', ranked: !!m.ranked,
         reason, turns: m.state.turnNo, oppName: m.names[1 - seat], ...rs,
       };
       const msg = matchMsg(m, seat, { events: scrubEvents(events || [], seat), result });
