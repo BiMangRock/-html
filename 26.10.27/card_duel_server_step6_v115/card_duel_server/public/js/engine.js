@@ -6,7 +6,7 @@
 if (typeof module !== 'undefined' && typeof require === 'function') { globalThis.CARD_POOL = require('./cards.js').CARD_POOL; }
 // v117: 무작위 생성·발견·변신·추천 덱용 카드풀 = 일반 카드만. 모험 전용·보스 전용(cards.js 의 scope)은 여기서 빠진다.
 //   이름으로 카드를 찾을 때(CARD_POOL.find)는 그대로 전체 CARD_POOL 을 쓴다 (보스 덱 카드도 찾아야 하므로).
-const GEN_POOL = CARD_POOL.filter(c=>!c.scope || c.scope==='normal');
+const GEN_POOL = CARD_POOL.filter(c=>(!c.scope || c.scope==='normal') && !c.unlock);   // v124 unlock(학사모처럼 보상으로만 얻는 카드)도 무작위 생성에서 뺀다
 // [분리 작업] 룬 헬퍼는 원래 화면 코드(ui)에 있었지만 엔진이 쓰므로 여기로 옮겼다.
 const RUNE_NAME={unholy:'부정', frost:'냉기', blood:'혈기'};
 const RUNE_ORDER=['부정','냉기','혈기'];
@@ -23,6 +23,8 @@ const CONFIG = {HERO_HP:30, MAX_MANA:10, MAX_HAND:10, MAX_BOARD:7, START_HAND:3,
 // 측정(같은 봇끼리, 선공 승률 / 초급·중급·중급2): 손패+1·동전+1 → 51 / 50 / 62%,  손패+1·동전+2 → 50 / 46 / 52% (채택),  손패+2·동전+1 → 44 / 40 / 50%
 
 const EFFECT_TEXT = {
+  valedictorian: v=>`전투의 함성: 낸 학사모 1장당 적 영웅 ${v} 피해`,   // v124 수석 졸업생 발굽
+  capFill: ()=>`전투의 함성: 손을 무작위 비용 학사모로 채움`,             // v124 학위수여식의 총장님
   rushAllyCry: ()=>`전투의 함성: 다른 아군 모두 속공`,                      // v123 노련한 4학년 조장
   manaOne: ()=>`전투의 함성: 두 영웅의 마나 수정을 1개로`,                   // v123 판다렌 선배
   rookieCry: (v,e)=>`전투의 함성: 손에 ${e.min}코+가 있으면 +${v}/+${v}·돌진`,   // v123 사회 초년생
@@ -248,7 +250,7 @@ const ABILITY_KEYS=['confusedPerm','endHeroHurt','guardAll','dmgCapOne','deathKi
 ABILITY_KEYS.push('statusAura','endRandHp','deathGadget','vetArmor','endLab','airpods');   // v118 2학년 클리어 보상 카드 능력 (침묵이 지운다)
 ABILITY_KEYS.push('burnout','mutiny','stunned','caffeineOD','probation','bingeEnd','deadlineDmg','deathSelfFace','midtermEnd','licenseEnd','shortsCurse','wanderAura');   // v119 3학년 보스 능력·상태이상 (침묵이 지운다)
 ABILITY_KEYS.push('timidVuln','trashAura');   // v121 첫 연애(받는 피해 +1) · 쓰레기 산
-ABILITY_KEYS.push('deferGrad','locNap','locBlossom','kiki','deathCards','deathHeroHeal','immuneTurn');   // v123 4학년 보스
+ABILITY_KEYS.push('immuneUntil','deferGrad','locNap','locBlossom','kiki','deathCards','deathHeroHeal','immuneTurn');   // v123 4학년 보스
 const hasAbility=m=>ABILITY_KEYS.some(k=>m[k]);
 function stripAbilities(m){ for(const k of ABILITY_KEYS) delete m[k]; delete m.shieldHits; if(m.tempAtk) m.tempAtk=0; }
 function checkGlide(s, ev){                                    // 공중활강: 그 턴에 소환한 하수인이 모두 죽으면 같은 수만큼 한 번 더 소환
@@ -1807,6 +1809,52 @@ Object.assign(SPELL_FX, {
   drinkHeal:{ text:v=>`내 영웅 생명력 ${v} 회복`, rank:-1,
             cast:(s,seat,c,target,ev,src)=>gainLife(s, seat, c.effect.value, ev, src), spellWorth:(c,view)=> view.me.hp<(view.me.maxHp||30) ? 2 : 0.5 },
 });
+// ---- v124 학사모 (일반 카드 — 모든 모드): 졸업 사정회 · 학사모 · 수석 졸업생 발굽 · 학위수여식의 총장님 -----------------------------
+//  학사모: 쓰면 (비용+1)번 무작위로 아군 강화 / 적 약화 → 1장 뽑기 → 상대 손에 비용이 1 오른 학사모(최대 10). 손에 든 채 내 턴이 끝나면 1장당 내 영웅 2 피해
+//  학사모 카드 자체는 영남대 4학년 첫 클리어 보상으로만 얻는다 (cards.js 의 unlock — 상점·스타터·무작위 생성에서 안 나옴)
+//  v125: 학사모 효과 풀 = 게임의 긍정 효과 전부(아군) / 부정 효과 전부(적). [이름, 이미 가졌는지, 적용(m, s, seat, P)]
+const CAP_GOOD=[
+  ['도발', m=>m.taunt, m=>{ m.taunt=true; }], ['돌진', m=>m.charge, m=>{ m.charge=true; }], ['속공', m=>m.rush||m.charge, m=>{ m.rush=true; }],
+  ['질풍', m=>m.windfury, m=>{ m.windfury=true; }], ['보호막', m=>m.shield, m=>{ m.shield=true; }], ['은신', m=>m.stealth, m=>{ m.stealth=true; }],
+  ['독성', m=>m.poison, m=>{ m.poison=true; }], ['생명력 흡수', m=>m.lifesteal, m=>{ m.lifesteal=true; }],
+  ['면역(다음 내 턴까지)', m=>m.immuneUntil!=null, (m,s)=>{ m.immuneUntil=s.turnNo+1; }],
+  ['영웅 방어도 +2', ()=>false, (m,s,seat,P)=>{ P.armor=(P.armor||0)+2; }],
+  ['흑기사', m=>false, (m,s,seat,P)=>{ const o=P.board.filter(y=>y!==m && y.hp>0 && !isPlace(y) && !y.knightBy); if(o.length) o[Math.floor(nextRand(s)*o.length)].knightBy=m.id; }],
+  ['주문 공격력 +1', ()=>false, m=>{ m.spellDmg=(m.spellDmg||0)+1; }], ['환생', m=>m.revive, m=>{ m.revive=true; }], ['모면', m=>m.elusive, m=>{ m.elusive=true; }],
+  ['내일로 버프', ()=>false, (m,s)=>{ NAEILRO_BUFFS[Math.floor(nextRand(s)*NAEILRO_BUFFS.length)][1](m); }],
+];
+const CAP_BAD=[
+  ['빙결', m=>m.frozen, m=>{ m.frozen=true; }], ['겁먹음', m=>m.freezeNext, m=>{ m.freezeNext=true; }], ['기절', m=>m.stunned, m=>{ m.stunned=true; }],
+  ['혼란', m=>m.confused, m=>{ m.confused=true; }], ['영구 혼란', m=>m.confusedPerm, m=>{ m.confused=true; m.confusedPerm=true; }], ['내부분열', m=>m.mutiny, m=>{ m.mutiny=true; }],
+  ['멘붕', m=>m.resting, m=>{ m.resting=true; }], ['침묵', ()=>false, m=>{ stripAbilities(m); }],
+  ['소심함', m=>m.atk<=1, (m,s,fo,P,ev,src)=>{ setTimid(s, fo, m, ev, src, true); }], ['번아웃', m=>m.burnout, m=>{ m.burnout=true; }],
+  ['비만', m=>m.obese, m=>{ m.obese=true; m.hp*=2; m.maxHp*=2; m.atk=Math.floor(m.atk/2); m.tempAtk=0; }], ['경고장 3', m=>m.probation, m=>{ m.probation=3; }],
+  ['카페인 쇼크', m=>m.caffeineDoom, m=>{ m.caffeineDoom=true; }], ['카페인 과다복용', m=>m.caffeineOD, m=>{ m.atk+=3; m.caffeineOD=true; }],
+];
+const pickFx=(s, list, m)=>{ const fresh=list.filter(f=>!f[1](m)); const L=fresh.length?fresh:list; return L[Math.floor(nextRand(s)*L.length)]; };   // 이미 가진 효과는 되도록 피한다
+function capCard(lv){ const b=CARD_POOL.find(x=>x.name==='학사모'); const c=structuredClone(b); delete c.unlock; c.capLv=Math.max(0, Math.min(10, lv)); c.cost=c.capLv; return c; }
+const isCap=c=> c && c.effect && c.effect.type==='mortarboard';
+Object.assign(SPELL_FX, {
+  mortarboard:{ text:()=>`무작위 효과×(비용+1), 1장 뽑기, 상대에게 넘김`, rank:-2,
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], fo=other(seat), lv=c.capLv||0, log=[];
+              for(let i=0;i<=lv;i++){
+                const al=allyUnits(P, null), en=s.seats[fo].board.filter(x=>x.hp>0);
+                if(!al.length && !en.length) break;
+                const good = !en.length || (al.length && nextRand(s)<0.5);
+                if(good){ const y=al[Math.floor(nextRand(s)*al.length)], g=pickFx(s, CAP_GOOD, y); g[2](y, s, seat, P, ev, src); log.push(`${y.name} ${g[0]}`); }
+                else { const y=en[Math.floor(nextRand(s)*en.length)], b=pickFx(s, CAP_BAD, y);
+                  if(curse(s, fo, y, ev, src, b[0], z=>b[2](z, s, fo, s.seats[fo], ev, src))) log.push(`${y.name} ${b[0]}`); }
+              }
+              sweepDead(s, ev);
+              if(log.length) logNote(ev, seat, src, `학사모 효과 ${lv+1}번: ${log.join(' · ')}`);
+              drawCards(s, seat, 1, ev, src);
+              P.capsPlayed=(P.capsPlayed||0)+1;
+              giveCards(s, fo, [capCard(lv+1)], ev, src); logNote(ev, seat, src, `"네가 먼저 졸업해라!!" 상대 손에 학사모(${Math.min(10, lv+1)})`); },
+            spellWorth:()=> 8 },
+  gradReview:{ text:()=>`부속 퀘스트: 마나 남기고 턴 종료 → 학사모 (계속)`, rank:-1,
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat]; (P.gradQuests=P.gradQuests||[]).push({stage:1, prog:0}); logNote(ev, seat, src, '졸업 사정회 시작! (1단계: 마나를 남긴 채 턴 1번 종료)'); },
+            spellWorth:()=> 3 },
+});
 // 동전: 덱(CARD_POOL)에는 들어가지 않고, 후공이 시작할 때 손패로 받는다. (그 밖의 주문은 CARD_POOL 에 있어 덱에 넣을 수 있다)
 function makeCoin(){ return {type:'spell', name:'동전', cost:0, effect:{type:'mana', value:CONFIG.COIN_MANA}}; }
 // ---- v40 카드 문구: 길게 풀어 쓰지 않고 짧게. 상세 규칙은 설명 txt 에 있다. (이 표가 위 정의의 text 를 덮어쓴다) ----
@@ -1844,7 +1892,7 @@ for(const k in SPELL_TEXT) SPELL_FX[k].text = SPELL_TEXT[k];
 function effectText0(c){ const runeText=''; if(!c.effect){ if(c.deferGrad) return `영웅이 죽을 피해를 받으면 1 남김, 최대 생명력 -${c.deferGrad}`; if(c.locNap) return `장소. 턴 종료: 아군에게 은신·흡혈·${c.locNap} 회복`; if(c.locBlossom) return '장소. 턴 종료: 아군 둘 +1/+1, 6/6 소환'; if(c.kiki) return `혼자면 도발·보호막·턴 끝 ${c.kiki} 회복. 비만`; if(c.deathCards) return `죽음의 메아리: ${[...new Set(c.deathCards)].map(n=>{ const k=c.deathCards.filter(x=>x===n).length; const b=CARD_POOL.find(x=>x.name===n); return (b?`${b.atk}/${b.hp} `:'')+n+(k>1?` ${k}`:''); }).join(', ')}`; if(c.deathHeroHeal && !c.effect) return `죽음의 메아리: 내 영웅 ${c.deathHeroHeal} 회복`; if(c.trashAura) return `매 턴 종료: 다른 모든 캐릭터 ${c.trashAura} 피해`; if(c.midtermEnd) return '공격 불가. 내 턴 종료: 무작위 학업 재앙'; if(c.licenseEnd) return '내 턴 종료: 상대 전장에 두꺼운 수험서 소환'; if(c.shortsCurse) return '상대 턴 시작: 상대가 3초만 더 보기 시전'; if(c.wanderAura) return `모든 주문: 주문 공격력 +${c.wanderAura}, 비용 +1`; if(c.bingeEnd) return '내 턴 종료: 양옆 하수인 비만'; if(c.deadlineDmg) return `내 턴 종료: 내 영웅 피해 ${c.deadlineDmg} (매 턴 +1)`; if(c.deathSelfFace) return `죽음의 메아리: 내 영웅 피해 ${c.deathSelfFace}`; if(c.statusAura) return '아군 하수인 상태이상 면역'; if(c.endRandHp) return `내 턴 종료: 무작위 아군 생명력 +${c.endRandHp}`; if(c.vetArmor) return '적을 처치하면 남은 공격력만큼 영웅 방어도'; if(c.endLab) return `석박통합 연구원. 내 턴 종료: 영웅 생명력 ${c.endLab} 회복, 무작위 주문 1장`; if(c.guardAll) return `독박. 죽음의 메아리: 무작위 아군 하수인 처치`; if(c.freshBuffEnd) return `${c.overload?`과부하 ${c.overload}. `:''}내 턴 종료: 아군 1학년 하수인 +${c.freshBuffEnd}/+${c.freshBuffEnd}, 자신 생명력 -${c.endSelfHpLoss||1}`; if(c.freshScare) return '아군 1학년 하수인이 소환되면 공격력 0'; if(c.deathHandMinion) return '죽음의 메아리: 내 손의 무작위 하수인 제거'; if(c.endHeroHurt) return `내 턴 종료: 내 영웅에게 피해 ${c.endHeroHurt}`; if(c.ghostLeech) return `매 턴 종료: 다른 아군에게 피해 ${c.ghostLeech}, 그만큼 회복. 죽음의 메아리: 상대 영웅 피해 ${c.deathFace}`; if(c.onHurtHeal) return `피해를 입을 때마다 내 영웅 생명력 ${c.onHurtHeal} 회복`; if(c.startSelfHurt) return `내 턴 시작: 자신에게 피해 ${c.startSelfHurt}. 죽음의 메아리: 카페인 충전 획득`; if(c.hideGrow) return `아군이 소환될 때마다 공격력 +${c.hideGrow}, 은신`; if(c.startCafe) return '내 턴 시작: 반반 확률로 동전 2개 또는 내 영웅 피해 3'; if(c.onHurtDrunk) return '피해를 입을 때마다 상대 전장에 만취한 손님 소환'; if(c.guitarLeft) return `${c.guitarLeft}턴 뒤 파괴. 당근마켓 정산금 2장 획득`; if(c.killRefresh) return '적 하수인을 처치하면 다시 공격 가능'; if(c.adjAtkAura<0) return `공격 불가. 양옆 하수인 공격력 ${c.adjAtkAura}`; if(c.onAttackPing) return `공격할 때마다 무작위 적에게 피해 ${c.onAttackPing}`; if(c.endSniff) return `내 턴 종료: 모든 적 하수인에게 화상 ${c.endSniff}`; if(c.cardLimit) return `상대는 턴당 카드 ${c.cardLimit}장만`; if(c.deathPoisonShot) return `죽음의 메아리: 무작위 적 하수인에게 독성 피해 ${c.deathPoisonShot}`; if(c.deathLunch) return '죽음의 메아리: 상대에게 식곤증'; if(c.cantAttack) return '공격 불가'; if(c.eggChicken) return '죽음의 메아리: 3/3 언데드 닭을 소환합니다. 내 턴이 끝날 때마다 닭이 +1/+1'+(c.eggBonus?` (현재 +${c.eggBonus})`:''); if(c.deathProto) return '죽음의 메아리: 하수인을 뽑습니다. 내 손에 있는 모든 하수인에게 +1/+1을 부여합니다'; if(c.endSword) return '내 턴이 끝날 때, 다른 무작위 아군 하수인 둘에게 공격력을 +1 부여합니다'; if(c.endDeckSummon) return '내 턴이 끝날 때, 내 덱에서 하수인을 소환합니다'; if(c.trogg) return '상대편이 주문을 시전한 후에, 다른 깊은무쇠 트로그를 소환합니다'; if(c.crowley) return `이 하수인은 공격하여 다른 하수인을 처치한 후에 +${c.crowley}/+${c.crowley}를 얻습니다`; if(c.endArmorSummon) return '내 턴이 끝날 때, 내 방어도와 같은 비용의 무작위 하수인을 소환합니다. (최대 10)'; if(c.tortola) return '이 하수인이 피해를 받은 후 방어도를 1 얻고, 이 하수인에게 공격력을 +1 부여합니다'; if(c.endBully) return '내 턴이 끝날 때, 무작위 적을 공격하는 3/3 불량배를 둘 소환합니다'; if(c.gally) return '상대편이 주문을 시전할 때마다 동일한 주문을 내 손으로 가져오고 상대편에게 동전을 줍니다'; if(c.sonya) return '내가 비용이 (1)인 하수인이나 주문을 낸 후에, 그 카드를 비용이 (0)인 카드로 복사하여 얻습니다'; if(c.endSpellGain) return `내 턴이 끝날 때, 무작위 ${c.endSpellGain.school} 주문을 얻습니다.${c.endSpellGain.discount?` 그 주문의 비용이 (${c.endSpellGain.discount}) 감소합니다.`:''}`; if(c.endHandBuff) return `내 턴이 끝날 때, 내 손에 있는 무작위 하수인에게 +${c.endHandBuff}/+${c.endHandBuff}을 부여합니다`; if(c.endSelfHp) return `내 턴이 끝날 때, 생명력을 +${c.endSelfHp} 얻습니다`; if(c.overload) return `과부하: (${c.overload})`; if(c.endTotemBuff) return `내 턴이 끝날 때, 내 손, 덱, 전장에 있는 다른 모든 토템에게 +${c.endTotemBuff}/+${c.endTotemBuff}을 부여합니다`; if(c.adjAtkAura) return `양옆의 하수인들이 공격력을 +${c.adjAtkAura} 얻습니다`; if(c.endAdjBuff) return `내 턴이 끝날 때, 양옆의 하수인들에게 +${c.endAdjBuff}/+${c.endAdjBuff}을 부여합니다`; if(c.onSpellBeast) return `내가 주문을 시전한 후에, 비용이 (${c.onSpellBeast}) 이하인 야수를 소환합니다`; if(c.deathBeast) return '죽음의 메아리: 무작위 야수를 얻습니다'; if(c.pteroEgg) return `죽음의 메아리: 2/1 새끼 비명익룡을 ${['','하나','둘','셋','넷'][c.deathPtero]||c.deathPtero+'기'} 소환합니다. 내 턴이 끝날 때마다 알이 깨지는 시간이 줄어들고(${c.hatchLeft ?? c.pteroEgg}턴 남음), 깨지면 내 전장을 4/4 다 자란 비명익룡으로 가득 채웁니다`; if(c.copyLow) return `내가 비용이 (${c.copyLow}) 이하인 하수인을 낸 후에, 그 하수인을 복사하여 소환합니다`; if(c.lordGrow) return `내 하수인이 소환된 후에, 이 하수인이 생명력을 +${c.lordGrow} 얻습니다`; if(c.deathAoe) return `죽음의 메아리: 모든 캐릭터에게 피해를 ${c.deathAoe} 줍니다`; if(c.deathKill) return '죽음의 메아리: 무작위 적 하수인을 처치합니다'; if(c.endDeckCopy) return '내 턴이 끝날 때, 내 덱에서 하수인을 복사하여 5/5 하수인으로 소환합니다'; if(c.deathMachines) return `죽음의 메아리: 도발과 보호막 능력이 있는 1/2 기계를 ${['','하나','둘','셋'][c.deathMachines]||c.deathMachines} 소환합니다`; if(c.spellWeave) return '내가 하수인에게 주문을 시전한 후에, 하수인을 대상으로 지정할 수 있는 주문을 내 손으로 가져옵니다'; if(c.shieldAura) return `내 보호막들이 ${['','한','두','세'][c.shieldAura]||c.shieldAura} 번 피해를 받아야 부서집니다`; if(c.beastDouble) return '아군 야수들이 주는 피해가 2배 증가합니다'; if(c.reviveFull) return '이 하수인은 최대 체력으로 환생합니다'; if(c.ignoreTaunt) return '내 캐릭터들의 공격이 도발을 무시합니다'; if(c.needArmor) return `내 방어도가 ${c.needArmor} 이상일 때에만 공격할 수 있습니다`; if(c.endLotus) return '턴 종료 시 피어오르는 연꽃을 소환합니다'; if(c.endViper) return '내 턴이 끝날 때, 속공·은신·독성 능력이 있는 1/1 치명적인 독사를 1마리 소환합니다'; if(c.startHeal) return `내 턴이 시작될 때, 피해를 입은 아군 1명을 무작위로 ${c.startHeal} 회복합니다`; if(c.endRaise) return '내 턴이 끝날 때, 시체를 1개 소모해 도발 능력이 있는 1/3 되살아난 보병을 소환합니다'; if(c.endCopy) return `내 턴이 끝날 때, 시체를 ${c.endCopy.corpses}개 소모해 이 하수인을 복사하여 소환합니다`; if(c.endScatter==='atk') return '내 턴이 끝날 때, 적들에게 이 하수인의 공격력만큼의 피해를 무작위로 나누어 입힙니다'; if(c.deathBuffAll) return `죽음의 메아리: 내 손과 덱에 있는 모든 하수인에게 +${c.deathBuffAll}/+${c.deathBuffAll}을 부여합니다`; if(c.deathGrave) return '죽음의 메아리: 이번 게임에서 죽은 내 도발 하수인들을 소환합니다'; if(c.costOne) return '내 하수인들의 비용이 (1)이 됩니다'; if(c.spellburst) return `이번 턴에 내 영웅에게 공격력을 +${c.spellburst.heroAtk} 부여하고 방어도를 ${c.spellburst.armor} 얻습니다`; if(c.endScatter) return `내 턴이 끝날 때, 모든 적에게 ${c.endScatter}의 피해를 무작위로 나누어 입힙니다`; if(c.endBait) return '내 턴이 끝날 때, 모든 적 하수인이 이 하수인을 공격하게 만듭니다'; if(c.spellAura) return `상대편이 시전하는 주문의 비용이 (${c.spellAura}) 증가합니다`; if(c.endSteal) return '내 턴이 끝날 때, 모든 적 하수인으로부터 공격력과 생명력을 1씩 가져옵니다'; if(c.endCorpses) return `내 턴이 끝날 때, 시체를 ${c.endCorpses}개 얻습니다. 내 턴이 시작될 때, 시체를 ${c.startSpend.corpses}개 소모해 내 영웅에게 생명력을 +${c.startSpend.life} 부여합니다`; if(c.endAttack) return '내 턴이 끝날 때, 생명력이 가장 낮은 적을 공격합니다'; if(c.endDrain) return '내 턴이 끝날 때 생명력이 가장 낮은 적에게서 생명력을 1 가져옵니다'; if(c.deathCopy) return '죽음의 메아리: 손패에서 비용이 가장 높은 주문 1장을 복사합니다'; if(c.deathGain) return '죽음의 메아리: 무작위 암흑 주문 1장과 무작위 신성 주문 1장을 손패로 가져옵니다'; if(c.onAttackCopy) return '이 하수인이 공격할 때마다, 이 하수인의 복사본을 내 손으로 가져옵니다(강화효과 유지)'; if(c.endRecast) return '내 턴이 끝날 때, 이번 턴에 내가 시전한 주문 중 하나를 시전합니다. (대상은 무작위로 선택)'; if(c.onSpellScatter) return `내가 주문을 시전한 후에, 모든 적에게 ${c.onSpellScatter}의 피해를 무작위로 나누어 입힙니다`; if(c.onAttackBeast) return '이 하수인은 공격할 때마다 야수를 뽑고 그 능력치를 얻습니다'; if(c.onSpellDraw) return '내가 주문을 시전할 때마다 카드를 뽑습니다'; if(c.dynCost==='cast') return '이번 게임에서 내가 시전한 주문 1개당 이 카드의 비용이 1 감소합니다'; if(c.onSpellFireball) return '내가 주문을 시전할 때마다 「화염구」 주문을 내 손으로 가져옵니다'; if(c.endCastMin) return `내 턴이 끝날 때 비용이 (${c.endCastMin}) 이상인 무작위 주문을 시전합니다. (대상은 무작위로 선택)`; if(c.spellDmgSchools) return '주문 공격력 +1 (이번 게임에서 내가 시전한 주문의 속성 종류만큼 강화됩니다)'; if(c.endCast) return `내 턴이 끝날 때, 비용이 ${c.endCast} 이하인 무작위 주문을 시전합니다`; } return c.effect ? runeText + (c.fireImmune ? '화염 주문에 면역입니다. ' : '') + (c.echo && c.type==='spell' ? '잔상. ' : '') + (c.twin ? '이중 주문. ' : '') + (c.lifeCost ? `생명력 ${c.cost} 지불. ` : '') + (c.overload ? `과부하: (${c.overload}). ` : '') + (c.type==='spell' ? SPELL_FX[c.effect.type].text : EFFECT_TEXT[c.effect.type])(c.effect.value, c.effect) + (c.infuse && c.id!==undefined ? (c.infused ? ' [주입됨]' : ` [${c.infuseN||0}/${c.infuse}]`) : '') : ''; }
 function effectText(c){ let t=effectText0(c); if(c.effect && c.endHeroHurt) t+=`. 내 턴 종료: 내 영웅 피해 ${c.endHeroHurt}`; if(c.effect && c.crowley) t+=`. 이 하수인이 적 하수인을 처치하면 +${c.crowley}/+${c.crowley}를 얻습니다`; if(c.effect && c.fishHeal) t+='. 이 하수인이 공격한 뒤 하수인을 처치하면 생명력을 모두 회복합니다'; return t; }   // 효과가 있는 카드에도 크롤리 계열 문구를 덧붙임
 const needsTarget = c => c.type==='spell' && !!(SPELL_FX[c.effect.type] && SPELL_FX[c.effect.type].needsTarget);   // 대상이 하나도 없으면 낼 수 없는 주문
-const NO_TARGET_FX=['rushAllyCry','manaOne','rookieCry','exchangeCry','snsEnvy','bcSilenceAdj','bcBlackKnight','bcGameBore','bcWipeOthers','bcSeniority','bcPeek','bcCrystal','lotto','natureCast','crystalBuff','peaceDraw','armorCry','draw','sweep','scatter','gainMana','recastLog','yogg','seedDeck','recycle','manastorm','spellTax','revealSummon','leechSummon','bloodDiscover','bloodDrain','yodel','malakor','valtora','repeatLast','parrot','spellHunt','drawSpellArmor','frostWarden','doubleHand','alana','tarim','edric','mindCopy','benedictus','faceCollector','comboDraw','tauntDiscoverBc','copyDragons','repeatAll','avalancheFreeze','discoverCost','snitch','deathwing','pyroar','selfHurt','deckBuff','adjBuffCry','machinesCry','spiritsCry','hatchCry','wormCry','shieldCry','decalCry','bubbleCry','stoneCry','stormCry'];   // 대상을 고르지 않는 전투의 함성
+const NO_TARGET_FX=['valedictorian','capFill','rushAllyCry','manaOne','rookieCry','exchangeCry','snsEnvy','bcSilenceAdj','bcBlackKnight','bcGameBore','bcWipeOthers','bcSeniority','bcPeek','bcCrystal','lotto','natureCast','crystalBuff','peaceDraw','armorCry','draw','sweep','scatter','gainMana','recastLog','yogg','seedDeck','recycle','manastorm','spellTax','revealSummon','leechSummon','bloodDiscover','bloodDrain','yodel','malakor','valtora','repeatLast','parrot','spellHunt','drawSpellArmor','frostWarden','doubleHand','alana','tarim','edric','mindCopy','benedictus','faceCollector','comboDraw','tauntDiscoverBc','copyDragons','repeatAll','avalancheFreeze','discoverCost','snitch','deathwing','pyroar','selfHurt','deckBuff','adjBuffCry','machinesCry','spiritsCry','hatchCry','wormCry','shieldCry','decalCry','bubbleCry','stoneCry','stormCry'];   // 대상을 고르지 않는 전투의 함성
 
 // ---- 덱 목록: 카드 이름의 배열 (같은 카드는 이름이 여러 번 나온다). 서버에서도 같은 검증을 쓴다 ----
 function validateDeckList(names){
@@ -2073,7 +2121,7 @@ function hurtMinion(s, seat, m, amount, ev, cause, src, by){
     const P=s.seats[seat], kn=m.knightBy ? P.board.find(x=>x.id===m.knightBy && x.hp>0 && x!==m) : null, g=kn || P.board.find(x=>x.guardAll && x.hp>0 && x!==m);
     if(g) m=g; }
   const target=minionT(seat, m.id);
-  if(m.immuneTurn===s.turnNo && amount>0){ ev.push({type:'note', seat, text:`${m.name}: 면역! (최종 면접 올패스)`, src:{seat, name:'최종 면접 올패스'}}); return; }   // v123
+  if((m.immuneTurn===s.turnNo || (m.immuneUntil!=null && s.turnNo<=m.immuneUntil)) && amount>0){ ev.push({type:'note', seat, text:`${m.name}: 면역! 피해를 받지 않습니다`, src:{seat, name:m.name}}); return; }   // v123
   if(m.fireImmune && src && src.spell && (src.school||[]).includes('화염')){ ev.push({type:'damage', target, name:m.name, amount:0, absorbed:false, immune:true, cause, src}); return; }   // v112 광염의 피락: 화염 주문 면역
   if(m.shield){
     const need=shieldNeed(s, seat); m.shieldHits=(m.shieldHits||0)+1;     // 피해를 받을 때마다 1회 소모 (피해량과 무관), 토레스가 사라지면 남은 횟수와 상관없이 다음 피해에 부서진다
@@ -2749,6 +2797,11 @@ function battlecry(s, seat, m, target, ev){
   if(e.type==='rookieCry'){ const P=s.seats[seat];                                                       // v123 어엿한 사회 초년생
     if(P.hand.some(c=>c.cost>=e.min)){ m.atk+=e.value; m.hp+=e.value; m.maxHp+=e.value; m.charge=true; ev.push({type:'buff', target:minionT(seat, m.id), name:m.name, value:e.value, hpValue:e.value, src}); logNote(ev, seat, src, '준비된 신입사원의 패기! +2/+2·돌진'); }
     return; }
+  if(e.type==='valedictorian'){ const n=(s.seats[seat].capsPlayed||0)*e.value;                            // v124 수석 졸업생 발굽
+    if(n>0) hurtHero(s, other(seat), n, ev, 'battlecry', src); logNote(ev, seat, src, `수석 졸업! 이번 게임에 던진 학사모 ${s.seats[seat].capsPlayed||0}장 → ${n} 피해`); return; }
+  if(e.type==='capFill'){ const P=s.seats[seat], n=Math.max(0, handMax(P)-P.hand.length), got=[];          // v124 학위수여식의 총장님
+    for(let i=0;i<n;i++) got.push(capCard(Math.floor(nextRand(s)*11)));
+    if(got.length) giveCards(s, seat, got, ev, src); logNote(ev, seat, src, `학위 수여! 학사모 ${got.length}장`); return; }
   if(e.type==='bcSilenceAdj'){ const P=s.seats[seat], i=P.board.indexOf(m); let n=0;                  // v117 전공 필수에서 마주친 전 CC
     for(const x of [P.board[i-1], P.board[i+1]]) if(x && x.hp>0){ stripAbilities(x); n++; ev.push({type:'silence', target:minionT(seat, x.id), name:x.name, src}); }
     if(!n) ev.push({type:'ignored', seat, src}); return; }
@@ -3213,6 +3266,11 @@ function apply(state, a, actor){
     ev.push({type:'game_over', winner:s.winner});
   } else if(a.type==='END_TURN'){
     ev.push({type:'turn_end', seat:actor});
+    { const caps=P.hand.filter(isCap); if(caps.length){ const src={seat:actor, name:'학사모'};              // v124 학사모: 손에 든 채 턴이 끝나면 1장당 2 피해
+        hurtHero(s, actor, caps.reduce((a,c)=>a+(c.effect.dmg||2),0), ev, 'battlecry', src); logNote(ev, actor, src, `학사모를 못 던졌다… (${caps.length}장)`); } }
+    if(P.gradQuests && P.gradQuests.length && P.mana>0){ const src={seat:actor, name:'졸업 사정회'};        // v124 졸업 사정회: 마나를 남긴 채 턴을 끝내면 진행 (단계마다 필요 횟수 +1, 계속)
+      for(const q of P.gradQuests){ q.prog++; if(q.prog>=q.stage){ giveCards(s, actor, [capCard(0)], ev, src); logNote(ev, actor, src, `${q.stage}단계 통과! 학사모 획득 (다음: 0/${q.stage+1})`); q.stage++; q.prog=0; }
+        else logNote(ev, actor, src, `졸업 사정 중… ${q.prog}/${q.stage}`); } }
     if(P.goldenSch && P.mana>0){ const n=Math.min(20, P.mana*P.goldenSch), src={seat:actor, name:'황금 시간표'}; let k=0;   // v123 황금 시간표: 남긴 마나만큼 아군 +1/+1
       for(let i=0;i<n;i++){ const c=allyUnits(P, null); if(!c.length) break; const y=c[Math.floor(nextRand(s)*c.length)]; y.atk+=1; y.hp+=1; y.maxHp+=1; k++; }
       if(k) logNote(ev, actor, src, `공강의 여유! 남긴 마나 ${P.mana} → 아군에게 +1/+1 ${k}번`); }

@@ -543,6 +543,20 @@ const CARD_POOL = [
   {type:'minion', name:"어엿한 사회 초년생", cost:5, rarity:'희귀', atk:5, hp:5, tribe:'4학년 / 타우렌', effect:{type:'rookieCry', min:6, value:2}, scope:'boss', art:'images/ynu/ynu_4_rookie.jpg',
     flavor:'"학생증 반납 완료. 이제 진짜 필드로 출근합니다!"',
     desc:'전투의 함성: 내 손에 비용이 6 이상인 카드가 있다면, +2/+2와 돌진을 얻습니다. (준비된 신입사원의 패기)'},
+  // ======== v124 학사모 카드 (일반 카드 — 모든 모드에서 사용) ========
+  //  학사모는 unlock:'ynu_4' → 상점 팩·스타터·무작위 생성에서 안 나오고, 영남대 4학년 첫 클리어 보상(2장)으로만 컬렉션에 들어온다
+  {type:'spell', name:"학사모", cost:0, rarity:'특급', effect:{type:'mortarboard', dmg:2}, capLv:0, unlock:'ynu_4', art:'images/ynu/ynu_cap_mortarboard.jpg',
+    flavor:'"사회 진출? 취업 절벽? 난 아직 준비가 안 됐어! 네가 먼저 졸업해라!!"',
+    desc:'(비용 + 1)번 반복: 매번 무작위로 아군 하수인 하나에게 긍정 효과를 주거나, 적 하수인 하나에게 부정 효과를 겁니다 (이미 가진 효과는 되도록 피함).\n긍정: 도발 · 돌진 · 속공 · 질풍 · 보호막 · 은신 · 독성 · 생명력 흡수 · 면역(다음 내 턴까지) · 영웅 방어도 +2 · 흑기사 · 주문 공격력 +1 · 환생 · 모면 · 내일로 버프\n부정: 빙결 · 겁먹음 · 기절 · 혼란 · 영구 혼란 · 내부분열 · 멘붕 · 침묵 · 소심함 · 번아웃 · 비만 · 경고장(3턴) · 카페인 쇼크 · 카페인 과다복용\n 그리고 카드를 1장 뽑고, 상대편의 손에 비용이 (1) 증가한 학사모를 1장 추가합니다(최대 10).\n내 턴이 끝날 때 이 카드가 내 손에 있으면, 1장당 내 영웅에게 피해를 2 줍니다.\n(영남대 4학년 첫 클리어 보상으로만 얻을 수 있습니다)'},
+  {type:'spell', name:"졸업 사정회", cost:1, rarity:'희귀', effect:{type:'gradReview'}, art:'images/ynu/ynu_cap_review.jpg',
+    flavor:'"졸업 요건은 모두 채웠습니다. 이제 저 무시무시한 모자를 쓸 사람만 정하면 됩니다."',
+    desc:'부속 퀘스트(계속): 마나를 남긴 채로 내 턴을 끝내면 진행됩니다.\n1단계 0/1 → 학사모 획득 → 2단계 0/2 → 학사모 획득 → 3단계 0/3 … 단계를 깰 때마다 비용 0인 학사모를 내 손으로 가져오고, 퀘스트는 게임이 끝날 때까지 계속됩니다.'},
+  {type:'minion', name:"수석 졸업생 발굽", cost:4, rarity:'전설', atk:4, hp:4, tribe:'타우렌', effect:{type:'valedictorian', value:1}, art:'images/ynu/ynu_cap_valedictorian.jpg',
+    flavor:'"학사모는 던지라고 있는 겁니다. 제가 제일 많이 던졌죠."',
+    desc:'전투의 함성: 이번 게임에서 내가 낸 학사모 1장당 적 영웅에게 피해를 1 줍니다.'},
+  {type:'minion', name:"학위수여식의 총장님", cost:8, rarity:'전설', atk:5, hp:5, effect:{type:'capFill'}, art:'images/ynu/ynu_cap_president.jpg',
+    flavor:'"졸업생 여러분, 모자를 하늘 높이!"',
+    desc:'전투의 함성: 내 손을 무작위 비용(0~10)의 학사모로 가득 채웁니다.\n⚠ 학사모는 손에 든 채 내 턴이 끝나면 1장당 내 영웅에게 피해 2를 줍니다. 상대에게 던져서 처리하세요.'},
 ];
 
 if (typeof module !== 'undefined') { module.exports = { CARD_POOL }; }

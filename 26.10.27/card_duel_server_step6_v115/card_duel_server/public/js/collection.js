@@ -21,7 +21,7 @@ function validateDeckScope(names, pool, deckMode) {
 // 새 계정이 받는 카드: { 카드이름: 장수 }  (일반 카드만)
 function starterCollection(pool, deckList) {
   const col = {};
-  pool.forEach(c => { if (c.rarity === '일반' && cardScope(c) === 'normal') col[c.name] = STARTER_COMMON_COPIES; });
+  pool.forEach(c => { if (c.rarity === '일반' && cardScope(c) === 'normal' && !c.unlock) col[c.name] = STARTER_COMMON_COPIES; });
   const need = {}; deckList.forEach(n => { need[n] = (need[n] || 0) + 1; });
   for (const n of Object.keys(need)) col[n] = Math.max(col[n] || 0, need[n]);
   return col;

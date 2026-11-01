@@ -27,7 +27,7 @@ function shopPickRarity(rng, minRarity) {
 }
 
 // 카드 풀을 등급별로 나눈다. 모험 전용·보스 전용(scope 가 있는 카드)은 팩에서 나오지 않는다.
-const shopCardOk = c => !c.scope || c.scope === 'normal';
+const shopCardOk = c => (!c.scope || c.scope === 'normal') && !c.unlock;   // v124 unlock 카드(학사모)는 보상으로만
 function shopPoolsByRarity(pool) {
   const by = {}; SHOP_RARITIES.forEach(r => { by[r] = []; });
   pool.forEach(c => { if (by[c.rarity] && shopCardOk(c)) by[c.rarity].push(c); });

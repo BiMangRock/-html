@@ -134,11 +134,12 @@ router.post('/adventure/clear', (req, res) => {
   try {
     const ins = db.prepare('INSERT OR IGNORE INTO adventure_progress(user_id,boss_id,cleared_at) VALUES (?,?,?)').run(uid, id, Date.now());   // 첫 클리어 기록 (골드 보상 기준, 지워지지 않음)
     // 고정 보상 카드: 챕터 보스는 이번 입학의 잠긴 덱에만(매 입학), 자유 보스는 첫 클리어 때 컬렉션에
+    const lastStage = !!(run && !advRunNext(list, boss.chapter, { ...run, cleared: run.cleared.concat([id]) }));
+    //  v124: 챕터의 마지막 단계(영남대 4학년) 보상 카드는 잠긴 덱이 아니라 컬렉션으로 (첫 클리어 때 한 번) — 예: 학사모
     if (boss && boss.rewardCards && boss.rewardCards.length) {
-      if (run) { run.deck = run.deck.concat(boss.rewardCards); granted = boss.rewardCards.slice(); }
+      if (run && !lastStage) { run.deck = run.deck.concat(boss.rewardCards); granted = boss.rewardCards.slice(); }
       else if (ins.changes) granted = grantCards(uid, boss.rewardCards);
     }
-    const lastStage = !!(run && !advRunNext(list, boss.chapter, { ...run, cleared: run.cleared.concat([id]) }));
     const offerNow = boss && boss.rewardChoice && boss.rewardChoice.length && (boss.chapter ? !lastStage : ins.changes);   // 챕터 보스는 입학할 때마다(졸업 단계 제외), 자유 보스는 첫 클리어 때만
     if (offerNow) {
       const bundles = advMakeBundles(boss.rewardChoice, n => crypto.randomInt(n));

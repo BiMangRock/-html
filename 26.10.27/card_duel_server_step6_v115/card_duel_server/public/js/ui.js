@@ -1065,7 +1065,7 @@ function cardEl(c, opts={}){
 // 마나 표시 (내 쪽·상대 쪽 공통). '매 턴 마나 +N' 치트가 있으면 그 추가분까지 총량에 포함한다.
 function renderMana(textId, crystalsId, p){
   const total=Math.max(1, p.maxMana+((p.mods&&p.mods.manaBonus)||0));
-  $(textId).textContent=`마나 ${p.mana} / ${total}`+(p.locked?` · 과부하 ${p.locked}`:'')+(p.overloadNext?` · 다음 턴 과부하 ${p.overloadNext}`:'')+(p.nextMana?` · 다음 턴 마나 +${p.nextMana}`:'')+(p.ascendNext?` · 다음 턴 최대 마나 +${p.ascendNext}`:'')+(p.spellTax?` · 주문 비용 +${p.spellTax}`:'')+(p.taxNext?` · 다음 턴 주문 비용 +${p.taxNext}`:'')+(p.noSpell?' · ✈ 주문 금지':'')+(p.heroFrozen?' · 🧊 영웅 행동 불가':'')+(p.heroImmune?' · 🛌 휴학 (영웅 면역)':'')+(p.spellDisc?` · 다음 주문 -${p.spellDisc}`:'')+(p.hangover?' · 🍺 숙취(카드 비용만큼 피해)':'')+((p.dormant&&p.dormant.length)?' · 💤 '+p.dormant.map(d=>`${d.name} ${d.left}턴`).join(', '):'')+(p.playLimit!=null?` · 👀 카드 ${p.plays||0}/${p.playLimit}장`:'');
+  $(textId).textContent=`마나 ${p.mana} / ${total}`+(p.locked?` · 과부하 ${p.locked}`:'')+(p.overloadNext?` · 다음 턴 과부하 ${p.overloadNext}`:'')+(p.nextMana?` · 다음 턴 마나 +${p.nextMana}`:'')+(p.ascendNext?` · 다음 턴 최대 마나 +${p.ascendNext}`:'')+(p.spellTax?` · 주문 비용 +${p.spellTax}`:'')+(p.taxNext?` · 다음 턴 주문 비용 +${p.taxNext}`:'')+(p.noSpell?' · ✈ 주문 금지':'')+(p.heroFrozen?' · 🧊 영웅 행동 불가':'')+(p.heroImmune?' · 🛌 휴학 (영웅 면역)':'')+((p.gradQuests&&p.gradQuests.length)?' · 🎓 사정회 '+p.gradQuests.map(q=>`${q.prog}/${q.stage}`).join(', '):'')+(p.spellDisc?` · 다음 주문 -${p.spellDisc}`:'')+(p.hangover?' · 🍺 숙취(카드 비용만큼 피해)':'')+((p.dormant&&p.dormant.length)?' · 💤 '+p.dormant.map(d=>`${d.name} ${d.left}턴`).join(', '):'')+(p.playLimit!=null?` · 👀 카드 ${p.plays||0}/${p.playLimit}장`:'');
   const cz=$(crystalsId); cz.innerHTML='';
   for(let i=0;i<Math.max(total, p.mana);i++){     // 동전 등으로 최대치를 넘긴 마나도 수정으로 보여준다
     const d=document.createElement('div'); d.className='crystal'+(i<p.mana?'':' empty'); cz.appendChild(d);
@@ -1761,7 +1761,7 @@ const PolicyNet = (() => {
     const effId = new Map(reg.effs.map((t, i) => [t, i + 1]));
     const kws = reg.kws, struct = new Set(reg.struct || []), kwSet = new Set(kws);
     const idOfName = n => nameId.get(aliases[n] || n) || 0;
-    const miss = new Set(), META_KEYS = new Set(['scope', 'art', 'flavor']);     // v117: 사용 범위·그림·설명은 게임 상태가 아닌 관리용 정보라 번호표에 없어도 된다
+    const miss = new Set(), META_KEYS = new Set(['scope', 'art', 'flavor', 'desc', 'quote', 'unlock']);   // v124 설명·등장 대사·보상 전용 표시도 관리용     // v117: 사용 범위·그림·설명은 게임 상태가 아닌 관리용 정보라 번호표에 없어도 된다
     for (const c of CARD_POOL) {
       if (c.scope) continue;                       // v117: 모험·보스 전용 카드는 번호표에 없어도 된다 (모델에게는 '모르는 카드'로 보임) → 새 보스 카드를 추가해도 기존 학습 모델 보스가 멈추지 않는다
       if (!aliases[c.name] && !nameId.has(c.name)) miss.add(c.name);
@@ -2110,6 +2110,7 @@ function bossAddTemplate(chapter){
   for(const b of list){ const k=tpl.findIndex(x=>x[0]===b.id); if(k<0) continue; const t=tpl[k], ch=[];
     if(b.stage!==k+1 || b.chapter!==chapter) ch.push(()=>{ b.stage=k+1; b.chapter=chapter; });
     if(ADV_TEMPLATE_REWARDS[b.id] && !(b.rewardChoice||[]).length) ch.push(()=>{ b.rewardChoice=ADV_TEMPLATE_REWARDS[b.id].slice(); });
+    if(ADV_TEMPLATE_REWARD_CARDS[b.id] && !(b.rewardCards||[]).length) ch.push(()=>{ b.rewardCards=ADV_TEMPLATE_REWARD_CARDS[b.id].slice(); });   // v124 4학년 첫 클리어: 학사모 2장
     if(t[4] && JSON.stringify(b.deck)===dflt) ch.push(()=>{ b.deck=t[4].slice(); b.icon=t[2]; b.desc=t[3]; b.name=t[1]; });
     else if(t[4] && JSON.stringify(b.deck)!==JSON.stringify(t[4]) && (ADV_OLD_TEMPLATE_DECKS[b.id]||[]).some(d=>JSON.stringify(d)===JSON.stringify(b.deck))) ch.push(()=>{ b.deck=t[4].slice(); b.icon=t[2]; b.desc=t[3]; });   // 예전 틀의 임시 덱 → 새 덱 (v119: 아이콘·소개도 새 틀로)
     if(ch.length) fill.push({b, ch}); }
@@ -2400,6 +2401,9 @@ const KEYWORD_HELP = [
   ['영구 혼란','혼란과 같지만, 공격한 뒤에도 풀리지 않습니다.'],
   ['혼란','주인이 조종할 수 없습니다. 주인의 턴이 끝날 때 무작위 대상(양쪽 하수인·영웅)을 한 번 공격하고 풀립니다.'],
   ['흑기사','정해진 아군 하수인이 받을 피해를 대신 받습니다.'],
+  ['환생','처음 죽으면 생명력 1로 한 번 되살아납니다.'],
+  ['모면','주문의 대상이 되지 않습니다.'],
+  ['잔상','낸 턴에 같은 카드를 한 번 더 낼 수 있는 복사본이 손에 들어옵니다 (턴이 끝나면 사라짐).'],
   ['독박','아군 하수인이 피해를 입을 때 대신 맞습니다. 한 번에 받는 피해는 1로 고정됩니다.'],
   ['휴면','전장에서 잠시 사라졌다가, 정해진 턴이 지나면 돌아옵니다.'],
   ['근육통','내 턴이 시작될 때 아군 하수인이 전부 빙결되고, 영웅도 공격할 수 없습니다.'],
@@ -2440,6 +2444,8 @@ const KEYWORD_HELP = [
   ['응원 주문','과방 만물상이 주는 1코스트 주문 9종 (타이레놀·에어팟·비타민C·메가커피·포스트잇·보조배터리·A4 요약본·1+1 쿠폰·선배 찬스).'],
   ['대기열','빙결 + 행동 불가: 다음 내 턴까지 적 하수인과 적 영웅이 공격할 수 없습니다.'],
   ['방어도','영웅이 받는 피해를 생명력보다 먼저 흡수합니다.'],
+  ['학사모','0코스트로 시작하는 폭탄 돌리기 주문. 쓰면 (비용+1)번 무작위 강화/약화, 1장 뽑기, 상대에게 비용 +1로 넘김. 손에 든 채 턴이 끝나면 1장당 영웅 2 피해.'],
+  ['부속 퀘스트','조건을 채우면 보상을 주는 주문. 졸업 사정회는 단계를 깰 때마다 학사모를 주고 계속 이어집니다.'],
   ['축하 음료','밤샘 종강 총회가 주는 0코스트 주문 (축하 맥주·숙취해소제·샴페인 한 잔).'],
   ['절대평가','꿀교양 줍줍이 주는 주문 5종 (단순 출석 체크·오픈북 테스트·교수님의 너그러운 자비·P/F·전원 A+ 확정).'],
   ['면역','피해를 받지 않습니다.'],
