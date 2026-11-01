@@ -212,7 +212,7 @@ const PvpClient = (() => {
     if (m.seq < S.lastSeq) return;                                       // 낡은 메시지
     const evs = (S.lastSeq >= 0 && m.seq > S.lastSeq) ? m.events : [];   // 처음 받는 상태(재접속 포함)는 연출 없이 바로 그린다
     syncShim(m.view);                                                    // 연출 중에 "지금 전장"을 읽는 코드가 새 상태를 보게
-    ui.selected = null; ui.pending = null; stopArrow();
+    ui.selected = null; ui.pending = null; ui.place = null; stopArrow();
     if (evs.length) { ui.busy = true; render(); try { await playEvents(evs); } catch (e) { console.error('[pvp] 연출 오류', e); } }
     view = m.view; S.lastSeq = m.seq; syncShim(view);
     if (m.timeoutSeat !== undefined) logLine(m.timeoutSeat === MY ? `⏱ 시간 초과! 턴이 자동으로 넘어갔습니다. (연속 ${m.timeouts}/${m.maxTimeouts}, 다 차면 패배)` : '⏱ 상대가 시간 초과로 턴이 넘어갔습니다.');

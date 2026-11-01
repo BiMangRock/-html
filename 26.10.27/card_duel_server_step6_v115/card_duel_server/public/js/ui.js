@@ -42,7 +42,7 @@ let betTier = ECON.BET_DEFAULT;    // 배팅 화면에서 고른 배당(%)
 const fmt = n => Number(n).toLocaleString('ko-KR');
 
 let view=null;
-const ui={selected:null, pending:null, busy:false};
+const ui={selected:null, pending:null, busy:false, place:null, drawGhosts:[0,0], handSeen:null, handSeenGame:null};   // v129 place: 하수인 자리 고르는 중 / drawGhosts: 덱에서 날아와 손에 막 들어온(아직 화면 갱신 전) 카드 수
 const sleep = ms => new Promise(r=>setTimeout(r, ms));
 const $ = id => document.getElementById(id);
 
@@ -436,7 +436,8 @@ function fxAura(ov, card){                            // 주문 시전 카드 �
   });
 }
 { const _render=render; render=function(){ const r=_render.apply(this,arguments); try{ fxFlush(); }catch(e){} return r; }; }   // 화면이 다시 그려질 때마다 대기 중인 소환 연출 재생
-async function playEvents(evs){
+async function playEvents(evs){ try{ return await playEvents0(evs); } finally { ui.drawGhosts=[0,0]; } }   // v129 끝나면 임시 뒷면 카드는 치운다 (곧 새 화면으로 그린다)
+async function playEvents0(evs){
   let spellSeen=false, dv=null, fxc=null;   // v88: fxc = 지금 시전 중인 주문의 이펙트 정보     // v30: 주문으로 소환된 하수인은 그 시전 직후 전장에 바로 나타나게 한다 (혼돈의 주문서 안에서도 시전 즉시)
   for(let i=0;i<evs.length;i++){
     const ev=evs[i];
@@ -493,6 +494,7 @@ async function playEvents(evs){
       continue;
     }
     const t=eventText(ev); if(t) logLine(t);
+    if(ev.type==='draw' && ev.count>0) await flyDraw(ev.seat, ev.count);   // v129 하스스톤처럼: 덱(왼쪽)에서 손패로 날아온다
     await fxPlay(ev, fxc);          // v88
     showEffect(ev);
     for(const bc of burnedOf(ev)) await showBurn(bc, ev.seat);   // v60 소멸 연출
@@ -511,7 +513,7 @@ async function perform(seat, action){
 }
 async function playerAction(action){
   if(ui.busy) return;
-  ui.busy=true; ui.selected=null; ui.pending=null; stopArrow();
+  ui.busy=true; ui.selected=null; ui.pending=null; ui.place=null; stopArrow();
   if(game && game.mode==='pvp'){ await PvpClient.act(action); render(); return; }   // 유저 대전: 판은 서버가 진행한다 → 행동만 보내고, 결과·연출은 서버 메시지로 받는다
   const r=await perform(MY, action);
   if(!r.ok){ logLine('⚠ '+r.error); ui.busy=false; render(); return; }
@@ -591,7 +593,12 @@ function playCard(c){
     logLine(c.lifeCost ? (view.me.hp<=c.cost ? '체력이 부족합니다.' : '지금은 낼 수 없는 카드입니다.') : c.cost>view.me.mana ? '마나가 부족합니다.' : c.type==='spell' ? '이 주문을 쓸 대상이 없습니다.' : view.me.board.length>=CONFIG.MAX_BOARD ? '전장이 가득 찼습니다.' : '지금은 낼 수 없는 카드입니다.');
     return;
   }
-  ui.selected=null; stopArrow();
+  ui.selected=null; ui.place=null; stopArrow();
+  if(c.type!=='spell' && view.me.board.length>0){          // v129 하수인: 먼저 놓을 자리(하수인 사이)를 고른다
+    ui.pending=null; ui.place={cardId:c.id, card:c, entries, pos:view.me.board.length};
+    logLine('하수인을 놓을 자리를 고르세요. (마우스를 올리거나 눌러서 자리를 옮기고, 같은 자리를 한 번 더 누르면 냅니다)');
+    render(); return;
+  }
   if(entries.length===1 && !entries[0].target){ playerAction(entries[0]); return; }   // 대상이 없는 카드만 바로 낸다. 대상이 있으면 (후보가 하나뿐이어도) 직접 지정
   ui.pending={cardId:c.id, entries};
   logLine('대상을 선택하세요.');
@@ -600,14 +607,85 @@ function playCard(c){
 function isPendingTarget(t){ return !!ui.pending && ui.pending.entries.some(a=>tkey(a.target)===tkey(t)); }
 function resolvePending(t){
   if(!isPendingTarget(t)) return;
-  playerAction(ui.pending.entries.find(a=>tkey(a.target)===tkey(t)));
+  const a=ui.pending.entries.find(x=>tkey(x.target)===tkey(t));
+  playerAction(Number.isInteger(ui.pending.pos) ? {...a, pos:ui.pending.pos} : a);   // v129 자리를 고른 하수인이면 그 자리로
 }
-function cancelPending(){ ui.pending=null; render(); }
+function cancelPending(){ ui.pending=null; ui.place=null; render(); }
 document.addEventListener('click', e=>{
+  if(ui.place && !(e.target.closest && (e.target.closest('#playerZone') || e.target.closest('.hand .card')))){ ui.place=null; render(); return; }   // v129 전장 밖을 누르면 자리 고르기 취소
   if(!ui.pending) return;
   if(e.target.closest && (e.target.closest('.card')||e.target.closest('.hero'))) return;
   ui.pending=null; render();
 }, true);
+
+// ---------- v129 하수인 자리 고르기 ----------
+function placeIndexAt(x){                       // 화면 x 좌표 → 놓을 자리 (내 하수인들의 가운데를 기준으로)
+  const cards=[...zoneEl(MY).querySelectorAll('.card:not(.place-ghost)')];
+  for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(x < r.left+r.width/2) return i; }
+  return cards.length;
+}
+function moveGhost(pos){                        // 다시 그리지 않고 미리보기 카드만 옮긴다
+  const pz=zoneEl(MY), g=pz.querySelector('.place-ghost'); if(!g) return;
+  const cards=[...pz.querySelectorAll('.card:not(.place-ghost)')];
+  pz.insertBefore(g, cards[pos] || null);
+}
+function placeAt(pos){
+  const p=ui.place; if(!p) return;
+  ui.place=null;
+  if(p.entries.length===1 && !p.entries[0].target){ playerAction({...p.entries[0], pos}); return; }
+  ui.pending={cardId:p.cardId, entries:p.entries, pos, card:p.card};   // 전투의 함성 대상은 자리를 고른 뒤에 지정
+  logLine('대상을 선택하세요.');
+  render();
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && (ui.place || ui.pending)){ ui.place=null; ui.pending=null; render(); } });
+document.addEventListener('pointerdown', e=>{ ui.lastPtr=e.pointerType||'mouse'; }, true);   // 마우스인지 터치인지 기억 (터치는 두 번 눌러 놓기)
+function zonePlaceMove(e){
+  if(!ui.place || ui.busy || (e.pointerType && e.pointerType!=='mouse')) return;   // 터치가 만드는 이동 이벤트는 무시
+  const pos=placeIndexAt(e.clientX);
+  if(pos!==ui.place.pos){ ui.place.pos=pos; moveGhost(pos); }
+}
+function zonePlaceClick(e){
+  if(!ui.place || ui.busy) return;
+  e.stopPropagation();
+  const pos=placeIndexAt(e.clientX);
+  const touch=ui.lastPtr && ui.lastPtr!=='mouse';
+  if(pos===ui.place.pos && (!touch || ui.place.touched)) placeAt(pos);   // 마우스: 올린 곳이 곧 미리보기 자리라 한 번에 놓인다
+  else { ui.place.pos=pos; ui.place.touched=true; moveGhost(pos); }        // 터치: 처음 누르면 자리만 옮기고, 같은 자리를 한 번 더 누르면 놓는다
+}
+
+// ---------- v129 카드 뽑기 연출: 덱(왼쪽)에서 손패로 날아온다 ----------
+async function flyDraw(seat, n){
+  const reduce=window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const mine=seat===MY;
+  for(let k=0;k<n;k++){
+    ui.drawGhosts[seat]=(ui.drawGhosts[seat]||0)+1;
+    let target;                                                       // 손패 맨 끝에 자리(보이지 않는 뒷면)를 먼저 만들어 도착 위치를 잰다
+    if(mine){ target=document.createElement('div'); target.className='card draw-ghost'; target.style.visibility='hidden'; $('hand').appendChild(target); }
+    else { target=document.createElement('div'); target.className='card-back draw-ghost'; target.style.visibility='hidden'; $('aiHand').appendChild(target); }
+    const to=target.getBoundingClientRect();
+    let from;
+    if(mine){ const pile=$('myDeckPile'); const r=pile && pile.getBoundingClientRect();
+      from = r && r.width ? {x:r.left+r.width*.5, y:r.top+r.height*.32} : {x:to.left-200, y:to.top+to.height/2};
+      const cnt=$('myDeckPileCnt'); if(cnt && /^\d+$/.test(cnt.textContent)) cnt.textContent=Math.max(0, +cnt.textContent-1);
+    } else { const r=$('aiHand').getBoundingClientRect(); from={x:r.left-30, y:r.top+r.height/2}; }
+    const fly=document.createElement('div'); fly.className='fly-card'+(mine?'':' small');
+    fly.style.width=to.width+'px'; fly.style.height=to.height+'px';
+    document.body.appendChild(fly);
+    const tx=to.left, ty=to.top, fx=from.x-to.width/2, fy=from.y-to.height/2;
+    const midX=(fx+tx)/2, midY=Math.min(fy,ty)-(mine?70:20);
+    const dur=reduce?120:(mine?560:420);
+    try{
+      await fly.animate([
+        {transform:`translate(${fx}px,${fy}px) scale(.45) rotate(-28deg)`, opacity:.0},
+        {transform:`translate(${fx}px,${fy}px) scale(.55) rotate(-24deg)`, opacity:1, offset:.08},
+        {transform:`translate(${midX}px,${midY}px) scale(${mine?1.18:1}) rotate(-8deg)`, offset:.55},
+        {transform:`translate(${tx}px,${ty}px) scale(1) rotate(0deg)`, opacity:1}
+      ], {duration:dur, easing:'cubic-bezier(.3,.7,.3,1)', fill:'forwards'}).finished;
+    }catch(e){}
+    fly.remove(); target.style.visibility='';
+    if(n>1 && !reduce) await sleep(60);
+  }
+}
 
 function selectMinion(m, canAttack){
   if(ui.busy) return;
@@ -632,7 +710,7 @@ function attackTarget(t){
   if(!a){ logLine(view.opp.board.some(m=>m.taunt) ? '상대 도발 하수인을 먼저 공격해야 합니다.' : '공격할 수 없습니다.'); return; }
   playerAction(a);
 }
-$('endTurnBtn').onclick=()=>{ if(!ui.busy && view.turn===MY && !view.over && !ui.pending) playerAction({type:'END_TURN'}); };
+$('endTurnBtn').onclick=()=>{ if(!ui.busy && view.turn===MY && !view.over && !ui.pending){ ui.place=null; playerAction({type:'END_TURN'}); } };
 
 // 항복: 실수 방지를 위해 두 번 눌러야 한다 (첫 클릭 → 3초간 "정말 항복?" → 한 번 더 누르면 항복)
 let surrenderTimer=null;
@@ -1002,6 +1080,42 @@ const CARD_ART = {
   "은빛 성기사단 신병": "images/art113_141.png",
   "고대정령": "images/art113_142.png"
 };
+// ---------- v130 필드 하수인: 하스스톤처럼 타원 초상화 + 공격력(칼)·체력(핏방울)만. 설명은 마우스를 올리거나(터치는 꾹 누르기) 보면 된다 ----------
+//  카드 자체는 cardEl 그대로 만들고(미리보기·상세 창이 전체 카드를 쓰도록), 필드에서는 CSS(.zone .card)로 앞면 글을 숨긴다.
+//  여기서는 스탯 색(강화 초록 · 피해 빨강)과 작은 키워드 아이콘만 붙인다.
+const BOARD_TRIGGER_RE=/(턴이 끝날|턴이 시작|턴 종료|턴 시작|할 때마다|한 후에|된 후에|받은 후|입을 때마다|받을 때마다|소환될 때마다|소환되면|소환된 후|공격할 때마다|처치하면|처치한 후|시전할 때마다|시전한 후|낸 후에|낼 때마다|주문폭주)/;
+function boardDecor(el, m){
+  const base=cardByName(m.name)||{};
+  if(base.rarity==='전설') el.classList.add('r-legend');
+  const a=el.querySelector('.stats .atk'), l=el.querySelector('.stats .life');
+  if(a && typeof base.atk==='number'){ a.classList.toggle('buffed', m.atk>base.atk); a.classList.toggle('nerfed', m.atk<base.atk); }
+  if(l){ const mx=m.maxHp ?? m.hp; l.classList.toggle('hurt', m.hp<mx); l.classList.toggle('buffed', m.hp>=mx && typeof base.hp==='number' && mx>base.hp); }
+  const eff=el.querySelector('.effect'), txt=(eff ? eff.textContent : '')+' '+(effectText(m)||''), ic=[];
+  const add=(i,t)=>{ if(!ic.some(x=>x[1]===t)) ic.push([i,t]); };
+  if(/죽음의 메아리/.test(txt)) add('💀','죽음의 메아리');
+  if(BOARD_TRIGGER_RE.test(effectText(m)||'') || m.spellburst) add('⚡','발동 효과');
+  if(m.poison) add('☠','독성');
+  if(m.lifesteal) add('🩸','생명력 흡수');
+  if(m.windfury) add('≋','질풍');
+  if(m.revive) add('♻','환생');
+  if(m.elusive) add('✧','모면');
+  if(m.cantAttack) add('⛔','공격 불가');
+  if(m.confused) add('🌀', (m.confusedPerm?'영구 ':'')+'혼란');
+  if(m.stunned) add('💫','기절');
+  if(m.resting) add('💤','휴식');
+  if(m.burnout) add('🔥','번아웃');
+  if(m.mutiny) add('⚔','내부분열');
+  if(m.probation) add('📜','경고장 '+m.probation);
+  if(m.timidTemp||m.timidPerm) add('😳','소심함');
+  if(m.freezeNext) add('😨','겁먹음');
+  if(m.knightBy) add('🛡','흑기사');
+  if(m.airpods) add('🎧','노이즈 캔슬링');
+  if(m.obese) add('🍗','비만');
+  if(ic.length){ const k=document.createElement('div'); k.className='kw';
+    k.innerHTML=ic.slice(0,5).map(([i,t])=>`<span title="${t}">${i}</span>`).join('')+(ic.length>5?`<span title="${ic.slice(5).map(x=>x[1]).join(', ')}">+${ic.length-5}</span>`:'');
+    el.appendChild(k); }
+  return el;
+}
 function cardEl(c, opts={}){
   const el=document.createElement('div');
   el.className='card'+(opts.extra?(' '+opts.extra):'');
@@ -1093,7 +1207,7 @@ function render(){
       if(!dm.classList.contains('show')) fxSprite('discover',innerWidth/2,innerHeight/2,Math.min(innerWidth*.7,460),{dur:1100,z:70});   // v89
       dm.classList.add('show');
     } else dm.classList.remove('show'); }
-  renderOppHand(op.handCount);
+  renderOppHand(op.handCount+(ui.drawGhosts[OPP]||0));
   $('playerHp').textContent=Math.max(0, me.hp);
   { const el=$('playerArmor'); el.textContent=me.armor||''; el.classList.toggle('show', me.armor>0); $('playerArmorNext').textContent=me.armorNext?`다음 턴 방어도 +${me.armorNext}`:''; }   // v37: 방어도가 있을 때만 방패 모양으로 표시
   { const el=$('playerAtk'); el.textContent=me.heroAtk||''; el.classList.toggle('show', (me.heroAtk||0)>0); el.classList.toggle('used', !!me.heroAttacked); }   // v80: 영웅 공격력은 칼 모양
@@ -1110,29 +1224,43 @@ function render(){
   const legal = active ? v.legal : [];
   const pending = ui.pending;
 
+  { const pile=$('myDeckPile'); if(pile){ $('myDeckPileCnt').textContent=me.deckCount; pile.classList.toggle('empty', me.deckCount===0); pile.title=`내 덱 — ${me.deckCount}장 남음 (눌러서 보기)`; } }   // v129 왼쪽 덱 더미
+  if(ui.place && (!active || !me.hand.some(c=>c.id===ui.place.cardId))) ui.place=null;   // 내 턴이 아니게 됐거나 카드가 없어지면 자리 고르기 취소
+  const place=ui.place;
+  if(ui.handSeenGame!==game || !ui.handSeen){ ui.handSeenGame=game; ui.handSeen=new Set(me.hand.map(c=>c.id)); }   // v129 새 판: 처음 손패는 연출 없이
   const hand=$('hand'); hand.innerHTML='';
   me.hand.forEach(c=>{
-    const isPending = !!pending && pending.cardId===c.id;
-    const playable = legal.some(a=>a.type==='PLAY_CARD' && a.cardId===c.id) && (!pending || isPending);
+    const isPending = (!!pending && pending.cardId===c.id) || (!!place && place.cardId===c.id);
+    const playable = legal.some(a=>a.type==='PLAY_CARD' && a.cardId===c.id) && ((!pending && !place) || isPending || (!!place && !pending));
     const ht={kind:'hand', seat:MY, id:c.id}, isTarget=isPendingTarget(ht);      // 복제 같은 주문은 손패 카드가 대상이 된다
-    const extra=(playable||isTarget?'':'unaffordable')+(isPending?' selected':'')+(isTarget?' targetable':'');
+    const fresh=!ui.handSeen.has(c.id); ui.handSeen.add(c.id);                     // v129 손에 새로 들어온 카드: 뒤집히며 등장
+    const extra=(playable||isTarget?'':'unaffordable')+(isPending?' selected':'')+(isTarget?' targetable':'')+(fresh?' drawn-in':'');
     hand.appendChild(cardEl(c, {extra, onClick:()=> isPending ? cancelPending() : isTarget ? resolvePending(ht) : playCard(c)}));
   });
+  for(let k=0;k<(ui.drawGhosts[MY]||0);k++){ const g=document.createElement('div'); g.className='card draw-ghost'; hand.appendChild(g); }   // 연출 중: 막 뽑은 카드(뒷면)
 
   const pz=zoneEl(MY); pz.innerHTML='';
-  me.board.forEach(m=>{
-    const canAttack = !pending && legal.some(a=>a.type==='ATTACK' && a.attackerId===m.id);
+  const ghostCard = place ? place.card : (pending && Number.isInteger(pending.pos) ? pending.card : null);   // v129 놓을 자리 미리보기
+  const ghostPos = place ? place.pos : (ghostCard ? pending.pos : -1);
+  const mkGhost=()=>{ const g=boardDecor(cardEl(ghostCard, {extra:'place-ghost'}), ghostCard); g.onclick=null; return g; };
+  pz.classList.toggle('placing', !!place);
+  pz.onpointermove = place ? zonePlaceMove : null;
+  pz.onclick = place ? zonePlaceClick : null;
+  me.board.forEach((m,i)=>{
+    if(ghostCard && ghostPos===i) pz.appendChild(mkGhost());
+    const canAttack = !pending && !place && legal.some(a=>a.type==='ATTACK' && a.attackerId===m.id);
     const t=minionT(MY, m.id), isTarget=isPendingTarget(t);
     const extra=(ui.selected===m.id?'selected':'')+(canAttack?' attackable':'')+(m.summoned&&!m.charge&&!m.rush?' sick':'')+(isTarget?' targetable':'')+(m.taunt?' taunt':'')+(m.shield?' shielded':'')+(m.frozen?' frozen':'');
-    pz.appendChild(cardEl(m, {extra, onClick: pending ? ()=>resolvePending(t) : ()=>selectMinion(m, canAttack)}));
+    pz.appendChild(boardDecor(cardEl(m, {extra, onClick: place ? undefined : pending ? ()=>resolvePending(t) : ()=>selectMinion(m, canAttack)}), m));
   });
+  if(ghostCard && ghostPos>=me.board.length) pz.appendChild(mkGhost());
 
   const az=zoneEl(OPP); az.innerHTML='';
   op.board.forEach(m=>{
     const t=minionT(OPP, m.id);
     const isTarget=isPendingTarget(t) || (ui.selected!==null && !!findAtk(ui.selected, t));
     const extra=(m.summoned&&!m.charge&&!m.rush?'sick':'')+(isTarget?' targetable':'')+(m.taunt?' taunt':'')+(m.shield?' shielded':'')+(m.frozen?' frozen':'');
-    az.appendChild(cardEl(m, {extra, onClick: pending ? ()=>resolvePending(t) : ()=>attackTarget(t)}));
+    az.appendChild(boardDecor(cardEl(m, {extra, onClick: pending ? ()=>resolvePending(t) : ()=>attackTarget(t)}), m));
   });
 
   $('endTurnBtn').disabled = !active || !!pending;
@@ -2494,7 +2622,8 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
   function show(el){
     cur=el;
     const cl=el.cloneNode(true);
-    cl.classList.remove('selected','attackable','dead','frozen-x'); cl.style.cssText='filter:none; opacity:1;'; cl.removeAttribute('title');   // 덱 편집의 흐림(0장·미보유) 효과는 빼고 보여 준다
+    cl.classList.remove('selected','attackable','dead','frozen-x'); cl.style.cssText='filter:none; opacity:1;'; cl.removeAttribute('title');
+    cl.querySelectorAll('.kw').forEach(x=>x.remove()); cl.classList.remove('taunt','shielded','stealthed','frozen','targetable','place-ghost','r-legend');   // v130 필드용 아이콘·테두리는 빼고 카드 그대로   // 덱 편집의 흐림(0장·미보유) 효과는 빼고 보여 준다
     place(el, cl, el.textContent||'', false);
   }
   const target=e=>{ const c=e.target.closest && e.target.closest('.card'); return (!c || c.closest(SKIP) || c.classList.contains('card-back') || !c.querySelector('.cname')) ? null : c; };
@@ -2504,6 +2633,14 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
     if(c!==cur) show(c);
   });
   document.addEventListener('touchstart', e=>{ const c=target(e); if(c && c.closest('#offerModal')) show(c); else if(cur) hide(); }, {passive:true});
+  // v130 터치: 필드 하수인을 꾹 누르고 있으면 전체 카드(설명)를 보여 주고, 손을 떼면 닫는다 (그때의 클릭은 공격 선택으로 넘기지 않음)
+  let lpTimer=null, lpShown=false;
+  document.addEventListener('touchstart', e=>{ const c=target(e); clearTimeout(lpTimer); if(!c || !c.closest('.zone')) return;
+    lpTimer=setTimeout(()=>{ lpShown=true; show(c); }, 420); }, {passive:true});
+  ['touchmove','touchcancel'].forEach(t=>document.addEventListener(t, ()=>clearTimeout(lpTimer), {passive:true}));
+  document.addEventListener('touchend', ()=>{ clearTimeout(lpTimer); if(lpShown){ setTimeout(()=>{ hide(); lpShown=false; }, 350); } }, {passive:true});
+  document.addEventListener('click', e=>{ if(lpShown){ e.stopPropagation(); e.preventDefault(); } }, true);
+  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.zone .card')) e.preventDefault(); });
   document.addEventListener('touchend', ()=>{ if(cur && cur.closest && cur.closest('#offerModal')) setTimeout(hide, 900); }, {passive:true});
   // v117 전투 기록: 카드 이름이 들어 있는 줄에 마우스를 올리면 그 카드를 띄운다 (기록 창은 오른쪽이라 왼쪽에)
   document.addEventListener('mouseover', e=>{

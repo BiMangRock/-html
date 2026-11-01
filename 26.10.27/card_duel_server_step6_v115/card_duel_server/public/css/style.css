@@ -826,3 +826,68 @@ body.boss-portrait #aiAvatar>span{background-size:cover; background-position:cen
 .rank-table .stars{color:#ffd86b; letter-spacing:.05em;}
 .rank-panel a{color:#7fd4ff;}
 .rank-counts{display:flex; flex-wrap:wrap; gap:.4rem .8rem; justify-content:center; font-size:.85rem;}
+
+/* ===== v129 왼쪽 덱 더미 · 카드 뽑기 연출 · 하수인 자리 고르기 ===== */
+.main{position:relative;}
+.deck-pile{position:absolute; left:.6rem; bottom:.3rem; width:100px; z-index:3; cursor:pointer; filter:drop-shadow(0 6px 8px rgba(0,0,0,.55)); transition:transform .15s ease;}
+.deck-pile:hover{transform:translateY(-3px);}
+.deck-pile img{width:100%; display:block; pointer-events:none; user-select:none;}
+.deck-pile .deck-cnt{position:absolute; right:-2px; bottom:8px; min-width:1.5rem; text-align:center; background:#14121f; color:var(--parch); border:1px solid var(--gold-d); border-radius:10px; font-size:.72rem; font-weight:700; padding:0 .35rem; line-height:1.35;}
+.deck-pile.empty img{opacity:.25; filter:grayscale(1);}
+.hand{padding-left:118px; padding-right:0;}
+.fly-card, .card.draw-ghost, .card-back.draw-ghost.big{
+  border:2px solid #c9a227; border-radius:8px;
+  background:radial-gradient(circle at 50% 46%, rgba(120,240,255,.95) 0 6%, rgba(80,220,255,.35) 7% 17%, transparent 18%),
+             radial-gradient(circle at 50% 46%, transparent 0 24%, #d4af37 25% 27%, transparent 28%),
+             radial-gradient(circle at 50% 46%, transparent 0 33%, rgba(80,220,255,.55) 34% 35.5%, transparent 36.5%),
+             linear-gradient(160deg,#1d2c5c,#0d1430);
+  box-shadow:0 0 12px rgba(90,220,255,.45), inset 0 0 0 3px rgba(212,175,55,.35);}
+.fly-card{position:fixed; left:0; top:0; z-index:90; pointer-events:none; transform-origin:50% 50%; will-change:transform;}
+.fly-card.small{border-radius:5px;}
+.card.draw-ghost{cursor:default; padding:0;}
+.hand .card.drawn-in{animation:cardDrawIn .42s cubic-bezier(.3,.8,.35,1) both;}
+@keyframes cardDrawIn{0%{transform:perspective(500px) rotateY(85deg) scale(.92); filter:brightness(1.6)} 100%{transform:none; filter:none}}
+.zone.placing{cursor:pointer; outline:2px dashed rgba(201,162,39,.45); outline-offset:-3px; background:rgba(201,162,39,.05);}
+.zone.placing .card{cursor:pointer;}
+.card.place-ghost{opacity:.55; pointer-events:none; outline:2px dashed var(--gold); box-shadow:0 0 14px rgba(201,162,39,.75); transform:translateY(-4px); transition:none;}
+@media (orientation:landscape) and (max-height:540px){
+  .deck-pile{width:60px; left:.3rem; bottom:.1rem;}
+  .deck-pile .deck-cnt{font-size:.6rem; bottom:4px;}
+  .hand{padding-left:70px; padding-right:.4rem;}
+}
+@media (max-width:640px) and (orientation:portrait){
+  .deck-pile{width:64px;}
+  .hand{padding-left:72px; padding-right:8px;}
+}
+@media (prefers-reduced-motion:reduce){ .hand .card.drawn-in{animation-duration:.01s;} }
+
+/* ===== v130 필드 하수인: 하스스톤 방식 (타원 초상화 + 공격력·체력, 설명은 미리보기에서) ===== */
+.zone .card{width:86px; height:112px; background:none; border:none; padding:0; box-shadow:none; justify-content:flex-start; overflow:visible; outline:none !important;}
+.zone .card .cost, .zone .card .cname, .zone .card .effect, .zone .card .stats .race, .zone .card .info-dot{display:none;}
+.zone .card .card-art{position:absolute; left:5px; right:5px; top:0; bottom:14px; height:auto; flex:none; margin:0; border-radius:50%;
+  border:3px solid #8d8a94; background:#171629; overflow:hidden;
+  box-shadow:0 0 0 1px #2a2633, inset 0 0 10px rgba(0,0,0,.55), 0 4px 8px rgba(0,0,0,.55);}
+.zone .card .card-art img{object-fit:cover !important; object-position:center 30%; transform:scale(1.04);}
+.zone .card.r-legend .card-art{border-color:#d4af37; box-shadow:0 0 0 1px #6b5413, 0 0 10px rgba(212,175,55,.45), inset 0 0 10px rgba(0,0,0,.55), 0 4px 8px rgba(0,0,0,.55);}
+.zone .card:not(:has(.card-art)) .cname{display:flex; position:absolute; left:5px; right:5px; top:0; bottom:14px; border-radius:50%; border:3px solid #8d8a94;
+  background:radial-gradient(circle at 50% 40%,#3d3760,#1a1730); color:var(--parch); align-items:center; justify-content:center; text-align:center; padding:10px; font-size:.68rem; line-height:1.15;}
+.zone .card .stats{position:absolute; left:-6px; right:-6px; bottom:-4px; display:flex; justify-content:space-between; align-items:flex-end; pointer-events:none; z-index:3;}
+.zone .card .stats .atk, .zone .card .stats .life{display:flex; align-items:center; justify-content:center; color:#fff; font:900 1.2rem/1 var(--font-d,Georgia),serif;
+  text-shadow:0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; background:center/contain no-repeat;}
+.zone .card .stats .atk{width:40px; height:46px; padding:9px 0 0 5px; background-image:url(/images/stat_atk.webp);}
+.zone .card .stats .life{width:34px; height:44px; padding:10px 0 0; background-image:url(/images/stat_hp.webp);}
+.zone .card .stats .buffed{color:#5dff6a;} .zone .card .stats .hurt{color:#ff5a4a;} .zone .card .stats .nerfed{color:#ffb3a8;}
+.zone .card .kw{position:absolute; left:50%; bottom:2px; transform:translateX(-50%); display:flex; gap:1px; z-index:4; pointer-events:auto;}
+.zone .card .kw span{min-width:17px; height:17px; padding:0 2px; border-radius:9px; background:rgba(16,13,26,.9); border:1px solid #8a6f1c; font-size:10px; line-height:15px; text-align:center; color:#ffe9b0;}
+.zone .card.sick::after{content:"z z z"; top:4px; right:6px; bottom:auto; color:#cfe8ff; font-size:.62rem; letter-spacing:1px; text-shadow:0 0 3px #000; z-index:4;}
+.zone .card.attackable .card-art{border-color:#46e27a; box-shadow:0 0 0 2px #1d7a3b, 0 0 14px 3px rgba(70,226,122,.75), inset 0 0 10px rgba(0,0,0,.5);}
+.zone .card.selected{transform:translateY(-6px) scale(1.05);}
+.zone .card.selected .card-art{border-color:var(--teal-l); box-shadow:0 0 0 2px #0e5a55, 0 0 18px 4px var(--teal-l);}
+.zone .card.targetable .card-art{border-color:var(--gold); box-shadow:0 0 0 2px #6b5413, 0 0 16px 4px rgba(201,162,39,.85);}
+.zone .card.taunt::before{inset:-10px -8px 2px; border-radius:0; opacity:1; background-size:100% 100%,118% 108%,80% 90%,100% 100%;}
+.zone .card.frozen::before, .zone .card.shielded::before, .zone .card.stealthed::before{border-radius:50%;}
+.zone .card.shielded .card-art{box-shadow:0 0 0 2px rgba(255,236,150,.9), 0 0 16px 5px rgba(255,220,110,.75), inset 0 0 10px rgba(0,0,0,.4);}
+.zone .card.place-ghost{opacity:.6; transform:translateY(-4px);}
+.zone .card.place-ghost .card-art{border-style:dashed; border-color:var(--gold);}
+@media (orientation:landscape) and (max-height:540px){ .zone .card .kw span{min-width:19px; height:19px; font-size:11px; line-height:17px;} }
+@media (orientation:landscape) and (max-height:540px){ #cardPreview .card{transform:scale(1.45);} #cardPreview .kw-notes{width:11rem;} #cardPreview .kw-notes div{font-size:.66rem;} }   /* v130 폰 가로: 꾹 눌러 보는 미리보기가 화면 안에 들어오게 */

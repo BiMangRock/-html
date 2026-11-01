@@ -24,7 +24,7 @@ const cryptoRng = () => crypto.randomInt(0, 2 ** 30) / 2 ** 30;
 function cleanAction(a) {
   if (!a || typeof a !== 'object' || !ALLOWED.has(a.type)) return null;
   const c = { type: a.type };
-  for (const k of ['cardId', 'attackerId', 'index']) {
+  for (const k of ['cardId', 'attackerId', 'index', 'pos']) {   // pos: v129 하수인을 놓을 자리
     if (a[k] !== undefined) { if (!Number.isInteger(a[k])) return null; c[k] = a[k]; }
   }
   if (a.target !== undefined && a.target !== null) {
