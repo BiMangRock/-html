@@ -45,6 +45,22 @@ const A = mkUser('alice'), B = mkUser('bob'), C = mkUser('carol'), D = mkUser('d
   assert.strictEqual(pvpdb.legendPlace(C), 2, '전설에서 이기면 승수 +1 → 순위 상승'); assert.strictEqual(pvpdb.rankOf(B).legendWins, 9, '전설은 져도 승수 그대로');
   assert.strictEqual(pvpdb.ranking().counts[5], 3); }
 console.log('✔ 정산 · 전설 순위');
+{ // v128 전체 순위: 모든 계정 · 랭크 안 한 계정은 브론즈 3 · 승/패
+  const E2 = mkUser('erin');                                     // 랭크전 0판
+  pvpdb.invalidateBoard();
+  const all = pvpdb.fullBoard();
+  assert.strictEqual(all.length, 5, '가입한 모든 계정');
+  assert.deepStrictEqual(all.slice(0, 3).map(x => x.name), ['bob', 'carol', 'dave'], '전설이 맨 위 (승수 순)');
+  const e = all.find(x => x.name === 'erin'); assert.deepStrictEqual([e.tier, e.div, e.stars, e.wins, e.losses], [0, 3, 0, 0, 0], '안 한 계정 = 브론즈 3 · ★0 · 0승 0패');
+  const a = all.find(x => x.name === 'alice'); assert.deepStrictEqual([a.wins, a.losses], [1, 0], '랭크전 승/패만 센다 (일반전 · 무승부 제외)');
+  assert.ok(a.place < e.place, '별 1개가 0개보다 위');
+  const c = all.find(x => x.name === 'carol'); assert.deepStrictEqual([c.wins, c.losses], [1, 0]);
+  const pb = pvpdb.publicBoard({ limit: 2 }); assert.strictEqual(pb.total, 5); assert.strictEqual(pb.rows.length, 2); assert.strictEqual(pb.rows[0].id, undefined, '공개 응답에 내부 번호 없음');
+  assert.strictEqual(pb.counts[0], 2); assert.strictEqual(pb.counts[5], 3);
+  const qq = pvpdb.publicBoard({ q: 'ERI' }); assert.strictEqual(qq.matched, 1); assert.strictEqual(qq.rows[0].place, e.place, '검색해도 전체 순위 그대로');
+  assert.strictEqual(pvpdb.myBoardRow(E2).name, 'erin');
+  assert.strictEqual(pvpdb.publicBoard({ limit: 9999 }).rows.length, 5); }
+console.log('✔ 전체 순위 · 공개 순위 · 승/패');
 
 // ---------- 대기열 분리: 랭크전끼리만 만난다 ----------
 (async () => {

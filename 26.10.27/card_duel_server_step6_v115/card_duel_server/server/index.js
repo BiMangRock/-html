@@ -30,6 +30,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.use('/api', pvp.publicRouter);                       // v128 공개 순위 (로그인 없이) — 다른 API 보다 먼저
 app.use('/api', auth.router);
 app.use('/api', saves.router);
 app.use('/api', require('./bosses').router);           // v116: 보스 목록 (읽기: 로그인 / 쓰기: 개발자)
@@ -38,6 +39,7 @@ app.use('/api', pvp.router);                             // 유저 대전: /api/
 app.use('/api', (req, res) => res.status(404).json({ error: '없는 API예요.' }));
 
 // 게임 화면은 로그인한 사람만. 아니면 로그인 화면으로.
+app.get('/ranking', (req, res) => { res.set('Cache-Control', 'no-store'); res.sendFile(path.join(PUBLIC, 'ranking.html')); });   // v128 공개 순위 페이지 (로그인 없이)
 const sendIndex = (req, res) => auth.getSessionUser(req) ? res.sendFile(path.join(PUBLIC, 'index.html')) : res.redirect('/login.html');
 app.get(['/', '/index.html'], (req, res) => { res.set('Cache-Control', 'no-store'); sendIndex(req, res); });
 

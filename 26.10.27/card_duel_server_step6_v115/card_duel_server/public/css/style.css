@@ -817,9 +817,12 @@ body.boss-portrait #aiAvatar>span{background-size:cover; background-position:cen
 .rank-line{color:#ffd86b !important;}
 .rank-modal{position:fixed; inset:0; z-index:9000; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6);}
 .rank-modal.show{display:flex;}
-.rank-panel{width:min(26rem, 94vw); max-height:88vh; overflow:auto; padding:1rem 1.1rem; border-radius:14px; border:1px solid var(--gold-d); background:linear-gradient(180deg,#241f38,#181428); color:var(--parch); text-align:center;}
+.rank-panel{width:min(32rem, 94vw); max-height:88vh; overflow:auto; padding:1rem 1.1rem; border-radius:14px; border:1px solid var(--gold-d); background:linear-gradient(180deg,#241f38,#181428); color:var(--parch); text-align:center;}
 .rank-panel h4{margin:.8rem 0 .35rem; color:var(--gold);}
 .rank-table{width:100%; border-collapse:collapse; font-size:.85rem;}
 .rank-table th,.rank-table td{padding:.3rem .4rem; border-bottom:1px solid rgba(138,111,28,.35);}
 .rank-table tr.me td{color:#ffd86b; font-weight:700;}
+.rank-table tr.gap td{color:var(--parch-d); border-bottom:none;}
+.rank-table .stars{color:#ffd86b; letter-spacing:.05em;}
+.rank-panel a{color:#7fd4ff;}
 .rank-counts{display:flex; flex-wrap:wrap; gap:.4rem .8rem; justify-content:center; font-size:.85rem;}

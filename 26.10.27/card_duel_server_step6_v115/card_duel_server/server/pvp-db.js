@@ -28,6 +28,36 @@ function legendPlace(uid, s = rankOf(uid)) {
     .get(RANK.LEGEND, s.legendWins, s.legendWins, s.legendAt ?? 0).n + 1;
 }
 const rankOut = uid => { const s = rankOf(uid); return { ...s, place: legendPlace(uid, s) }; };
+// v128 전체 순위: 가입한 모든 계정 (랭크전을 안 했으면 브론즈 3 · 별 0). 랭크전 승/패 포함
+//  정렬: 전설(전설 승수 많은 순 → 먼저 전설에 온 순) → 높은 등급 → 높은 단계(1이 높음) → 별 많은 순 → 먼저 그 자리에 온 순 → 가입 순
+let boardCache = null;
+function fullBoard() {
+  const users = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;              // 새로 가입하면 바로 반영
+  if (boardCache && boardCache.users === users && Date.now() - boardCache.at < 5000) return boardCache.list;   // 5초 캐시 (공개 페이지 새로고침 대비)
+  const rows = db.prepare(`SELECT u.id, u.username, r.tier, r.div, r.stars, r.legend_wins, r.legend_at, r.updated_at,
+      (SELECT COUNT(*) FROM pvp_matches m WHERE m.ranked=1 AND m.winner=u.id) AS wins,
+      (SELECT COUNT(*) FROM pvp_matches m WHERE m.ranked=1 AND m.winner IS NOT NULL AND m.winner!=u.id AND (m.p0=u.id OR m.p1=u.id)) AS losses
+    FROM users u LEFT JOIN rank_state r ON r.user_id=u.id`).all();
+  const list = rows.map(r => ({ id: r.id, name: r.username, tier: r.tier ?? 0, div: r.div ?? RANK.DIVS, stars: r.stars ?? 0, legendWins: r.legend_wins ?? 0,
+    legendAt: r.legend_at, at: r.updated_at ?? Infinity, wins: r.wins, losses: r.losses }));
+  list.sort((a, b) => b.tier - a.tier
+    || (a.tier >= RANK.LEGEND ? (b.legendWins - a.legendWins) || ((a.legendAt ?? 0) - (b.legendAt ?? 0)) : (a.div - b.div) || (b.stars - a.stars))
+    || (a.at - b.at) || (a.id - b.id));
+  list.forEach((x, i) => { x.place = i + 1; });
+  boardCache = { at: Date.now(), users, list };
+  return list;
+}
+const boardOut = x => ({ place: x.place, name: x.name, tier: x.tier, div: x.div, stars: x.stars, legendWins: x.legendWins, wins: x.wins, losses: x.losses });
+// 공개 순위 (로그인 없이): offset/limit 페이지 · q 이름 검색
+function publicBoard({ offset = 0, limit = 50, q = '' } = {}) {
+  const all = fullBoard(), qq = String(q || '').trim().toLowerCase().slice(0, 16);
+  const pool = qq ? all.filter(x => x.name.toLowerCase().includes(qq)) : all;
+  const off = Math.max(0, Math.floor(Number(offset) || 0)), lim = Math.max(1, Math.min(100, Math.floor(Number(limit) || 50)));
+  const counts = RANK.TIERS.map(() => 0); for (const x of all) counts[x.tier]++;
+  return { total: all.length, matched: pool.length, offset: off, rows: pool.slice(off, off + lim).map(boardOut), counts };
+}
+const myBoardRow = uid => { const x = fullBoard().find(y => y.id === uid); return x ? boardOut(x) : null; };
+const invalidateBoard = () => { boardCache = null; };
 // 순위표: 전설 목록(최대 limit명) + 등급별 인원
 function ranking(limit = 100) {
   const legends = db.prepare(`SELECT r.user_id, u.username, r.legend_wins, r.legend_at FROM rank_state r JOIN users u ON u.id=r.user_id
@@ -88,6 +118,7 @@ function settle(g) {
       return o;
     });
     db.exec('COMMIT');
+    boardCache = null;                                                                // v128 순위가 바뀌었을 수 있다
     return out;
   } catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
 }
@@ -103,4 +134,4 @@ function statsOf(uid) {
   return { record: { wins, losses, draws }, winGold: PVP.WIN_GOLD, rewardsToday: rewardsToday(uid, day), rank: rankOut(uid) };
 }
 
-module.exports = { loadDeck, settle, statsOf, rankOf, rankOut, ranking, legendPlace };
+module.exports = { loadDeck, settle, statsOf, rankOf, rankOut, ranking, legendPlace, fullBoard, publicBoard, myBoardRow, invalidateBoard };

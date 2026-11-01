@@ -72,6 +72,14 @@ router.post('/pvp/queue', h.queue);
 router.post('/pvp/cancel', h.cancel);
 router.post('/pvp/mulligan', h.mulligan);
 router.post('/pvp/action', h.action);
-router.get('/pvp/ranking', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ ...pvpdb.ranking(100), me: pvpdb.rankOut(req.user.id) }); });   // v127 순위표
+router.get('/pvp/ranking', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ ...pvpdb.ranking(100), board: pvpdb.publicBoard({ limit: 100 }), me: pvpdb.rankOut(req.user.id), myRow: pvpdb.myBoardRow(req.user.id) }); });   // v127 순위표 (v128 전체 순위 + 내 순위)
+// v128 공개 순위 (로그인 없이): GET /api/public/ranking?offset=0&limit=50&q=이름
+const publicRouter = express.Router();
+const publicOk = makeBucket(60, 60000);
+publicRouter.get('/public/ranking', (req, res) => {
+  const ip = req.ip || 'x'; if (!publicOk(ip)) return res.status(429).json({ error: '요청이 너무 많아요. 잠시 뒤 다시 해 주세요.' });
+  res.set('Cache-Control', 'public, max-age=5');
+  res.json(pvpdb.publicBoard({ offset: req.query.offset, limit: req.query.limit, q: req.query.q }));
+});
 
-module.exports = { router, core, makeHandlers };
+module.exports = { router, publicRouter, core, makeHandlers };

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>카드 결투 · 랭크 순위</title>
+<style>
+  :root { --gold:#e8c35a; --gold-d:#8a6f1c; --parch:#efe4c8; --parch-d:#b9ab88; --bg:#120f26; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top,#2a2350,var(--bg) 70%); color:var(--parch); font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
+  main { max-width:46rem; margin:0 auto; padding:1.4rem 1rem 3rem; }
+  h1 { margin:.2rem 0 .3rem; text-align:center; color:var(--gold); font-size:1.6rem; }
+  .sub { text-align:center; color:var(--parch-d); font-size:.85rem; margin:0 0 1rem; }
+  .counts { display:flex; flex-wrap:wrap; gap:.4rem; justify-content:center; margin-bottom:1rem; }
+  .counts span { padding:.25rem .6rem; border:1px solid var(--gold-d); border-radius:999px; font-size:.82rem; background:rgba(0,0,0,.25); }
+  .counts b { color:var(--gold); }
+  .bar { display:flex; gap:.5rem; margin-bottom:.7rem; }
+  .bar input { flex:1; padding:.55rem .7rem; border-radius:8px; border:1px solid var(--gold-d); background:rgba(0,0,0,.35); color:var(--parch); font-size:.95rem; }
+  .bar button, .pager button { padding:.5rem .8rem; border-radius:8px; border:1px solid var(--gold-d); background:transparent; color:var(--gold); cursor:pointer; font-size:.9rem; }
+  .bar button:disabled, .pager button:disabled { opacity:.4; cursor:default; }
+  table { width:100%; border-collapse:collapse; background:rgba(18,15,38,.8); border:1px solid var(--gold-d); border-radius:12px; overflow:hidden; }
+  th, td { padding:.55rem .6rem; border-bottom:1px solid rgba(138,111,28,.3); text-align:left; font-size:.92rem; }
+  th { color:var(--gold); font-weight:700; background:rgba(0,0,0,.25); font-size:.82rem; }
+  td.place { width:3.5rem; text-align:center; font-weight:800; }
+  tr.top1 td.place { color:#ffd700; } tr.top2 td.place { color:#d8d8d8; } tr.top3 td.place { color:#d08a4a; }
+  .stars { color:#ffd86b; letter-spacing:.05em; margin-left:.25rem; }
+  .wl .w { color:#8fe08f; } .wl .l { color:#ff8f8f; }
+  .rate { color:var(--parch-d); font-size:.8rem; margin-left:.3rem; }
+  .empty { text-align:center; color:var(--parch-d); padding:1.4rem; }
+  .pager { display:flex; justify-content:center; align-items:center; gap:.8rem; margin-top:.8rem; font-size:.88rem; color:var(--parch-d); }
+  .foot { text-align:center; margin-top:1.4rem; font-size:.8rem; color:var(--parch-d); }
+  .foot a { color:#7fd4ff; }
+  @media (max-width:520px) { th.hide-s, td.hide-s { display:none; } th, td { padding:.45rem .4rem; font-size:.85rem; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>🏆 카드 결투 랭크 순위</h1>
+  <p class="sub" id="sub">불러오는 중…</p>
+  <div class="counts" id="counts"></div>
+  <div class="bar">
+    <input id="q" type="search" placeholder="아이디 검색" maxlength="16" autocomplete="off">
+    <button id="refresh" type="button" title="새로고침">↻</button>
+  </div>
+  <table>
+    <thead><tr><th>순위</th><th>아이디</th><th>등급</th><th>랭크 승/패</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="4" class="empty">불러오는 중…</td></tr></tbody>
+  </table>
+  <div class="pager"><button id="prev" type="button">◀ 이전</button><span id="page"></span><button id="next" type="button">다음 ▶</button></div>
+  <p class="foot">랭크전을 아직 안 한 계정은 🥉 브론즈 3 · ★0 으로 표시돼요. 1분마다 자동으로 새로고침돼요.<br><a href="/">게임으로 가기</a></p>
+</main>
+<script>
+(() => {
+  const TIERS = ['브론즈', '실버', '골드', '플래티넘', '다이아', '전설'];
+  const ICONS = ['🥉', '🥈', '🥇', '💠', '💎', '👑'];
+  const LEGEND = 5, STARS = 3, PER = 50;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let offset = 0, q = '', last = null, timer = null;
+
+  const rankCell = x => x.tier >= LEGEND
+    ? `${ICONS[LEGEND]} 전설 <b>${x.legendWins}승</b>`
+    : `${ICONS[x.tier]} ${TIERS[x.tier]} ${x.div}<span class="stars">${'★'.repeat(x.stars)}${'☆'.repeat(STARS - x.stars)}</span>`;
+  const wl = x => { const n = x.wins + x.losses; return `<span class="wl"><span class="w">${x.wins}승</span> <span class="l">${x.losses}패</span></span>${n ? `<span class="rate">(${Math.round(x.wins * 100 / n)}%)</span>` : ''}`; };
+
+  function render(d) {
+    $('sub').textContent = `전체 ${d.total}명${q ? ` · "${q}" 검색 결과 ${d.matched}명` : ''} · ${new Date().toLocaleTimeString('ko-KR')} 기준`;
+    $('counts').innerHTML = TIERS.map((t, i) => `<span>${ICONS[i]} ${t} <b>${d.counts[i] || 0}</b></span>`).join('');
+    $('rows').innerHTML = d.rows.length ? d.rows.map(x => `<tr class="${x.place <= 3 ? 'top' + x.place : ''}"><td class="place">${x.place}</td><td>${esc(x.name)}</td><td>${rankCell(x)}</td><td>${wl(x)}</td></tr>`).join('')
+      : `<tr><td colspan="4" class="empty">${q ? '검색된 아이디가 없어요.' : '아직 가입한 사람이 없어요.'}</td></tr>`;
+    const pages = Math.max(1, Math.ceil(d.matched / PER)), cur = Math.floor(d.offset / PER) + 1;
+    $('page').textContent = `${cur} / ${pages}`;
+    $('prev').disabled = d.offset <= 0; $('next').disabled = d.offset + PER >= d.matched;
+  }
+  async function load() {
+    try {
+      const r = await fetch(`/api/public/ranking?offset=${offset}&limit=${PER}&q=${encodeURIComponent(q)}`, { cache: 'no-store' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || '오류');
+      last = d; render(d);
+    } catch (e) { $('sub').textContent = `순위를 불러오지 못했어요: ${e.message || e}`; }
+  }
+  $('refresh').onclick = load;
+  $('prev').onclick = () => { offset = Math.max(0, offset - PER); load(); };
+  $('next').onclick = () => { offset += PER; load(); };
+  $('q').oninput = () => { clearTimeout(timer); timer = setTimeout(() => { q = $('q').value.trim(); offset = 0; load(); }, 300); };
+  setInterval(() => { if (!document.hidden) load(); }, 60000);
+  load();
+})();
+</script>
+</body>
+</html>

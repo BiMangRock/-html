@@ -156,11 +156,17 @@ const PvpClient = (() => {
     box.innerHTML = '<div class="rank-panel"><h3>🏆 순위표</h3><p class="sub">불러오는 중…</p></div>'; box.classList.add('show');
     const r = await fetch('/api/pvp/ranking', { credentials: 'same-origin' }).then(x => x.json()).catch(() => null);
     if (!r) { box.querySelector('.sub').textContent = '순위표를 불러오지 못했어요.'; return; }
-    const rows = r.legends.length ? r.legends.map(x => `<tr${r.me && r.me.place === x.place ? ' class="me"' : ''}><td>${x.place}</td><td>${escHtml(x.name)}</td><td>${x.wins}승</td></tr>`).join('') : '<tr><td colspan="3">아직 전설이 없어요. 첫 번째 전설이 되어 보세요!</td></tr>';
-    const counts = RANK.TIERS.map((t, i) => `<span>${RANK.ICONS[i]} ${t} <b>${r.counts[i] || 0}</b></span>`).join('');
-    box.innerHTML = `<div class="rank-panel"><h3>🏆 순위표</h3><p class="sub">내 등급: ${rankLine(r.me)}</p>
-      <h4>👑 전설 순위 (전설에서 거둔 승수)</h4><table class="rank-table"><tr><th>순위</th><th>이름</th><th>전설 승수</th></tr>${rows}</table>
-      <h4>등급별 인원</h4><div class="rank-counts">${counts}</div><button type="button" class="menu-btn back">닫기</button></div>`;
+    const B = r.board || { total: 0, rows: [], counts: r.counts }, mine = r.myRow;
+    const cell = x => x.tier >= RANK.LEGEND ? `${ladderLabel(x)} <b>${x.legendWins}승</b>` : `${ladderLabel(x)} <span class="stars">${ladderStars(x)}</span>`;
+    const line = x => `<tr${mine && mine.place === x.place ? ' class="me"' : ''}><td>${x.place}</td><td>${escHtml(x.name)}</td><td>${cell(x)}</td><td>${x.wins}승 ${x.losses}패</td></tr>`;
+    let rows = B.rows.map(line).join('') || '<tr><td colspan="4">아직 아무도 없어요.</td></tr>';
+    if (mine && !B.rows.some(x => x.place === mine.place)) rows += `<tr class="gap"><td colspan="4">⋯</td></tr>${line(mine)}`;
+    const counts = RANK.TIERS.map((t, i) => `<span>${RANK.ICONS[i]} ${t} <b>${(B.counts || [])[i] || 0}</b></span>`).join('');
+    box.innerHTML = `<div class="rank-panel"><h3>🏆 순위표</h3><p class="sub">내 등급: ${rankLine(r.me)}${mine ? ` · 전체 ${B.total}명 중 <b>${mine.place}위</b>` : ''}</p>
+      <table class="rank-table"><tr><th>순위</th><th>이름</th><th>등급</th><th>랭크 승/패</th></tr>${rows}</table>
+      <h4>등급별 인원</h4><div class="rank-counts">${counts}</div>
+      <p class="sub">로그인 없이 보는 공개 순위: <a href="/ranking" target="_blank" rel="noopener">${location.origin}/ranking</a></p>
+      <button type="button" class="menu-btn back">닫기</button></div>`;
     box.querySelector('button').onclick = () => box.classList.remove('show');
   }
   el('pvpRankBoardBtn').onclick = openBoard;
