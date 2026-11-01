@@ -172,6 +172,36 @@ button{font-family:inherit}
 .hero .av{width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid var(--gold2);display:block;margin:0 auto 3px;transition:border-color .3s}
 .hero.foe .av{border-color:var(--red)}
 @media (max-width:900px){.hero .av{width:36px;height:36px}.msg img{width:34px;height:34px}.msg .bub{font-size:12.5px}}
+
+/* v139 폰 가로 화면: 안내는 왼쪽, 전장은 오른쪽에 한 화면으로 (전에는 손패가 화면 밖으로 밀려났다) */
+@media (orientation:landscape) and (max-height:540px){
+  :root{--cw:60px;--ch:84px;--mw:52px;--mh:62px}
+  .top{padding:4px 10px;gap:8px}.top h1{font-size:13px}.chapname{display:none}.tbtn{padding:4px 8px;font-size:11px}
+  .layout{flex-direction:row}
+  .coach{width:250px;max-height:none;border-right:1px solid var(--line);border-bottom:0;padding:8px 10px;gap:5px}
+  .coach h2{font-size:14px}.coach .task{font-size:12px;padding:6px 8px}.coach .body{min-height:40px}
+  .msg img{width:28px;height:28px}.msg .bub{font-size:12px;padding:5px 8px;line-height:1.45}
+  .cbtn{padding:7px 10px;font-size:13px}
+  .stage{padding:4px 8px;gap:3px}
+  .row{gap:6px}.sidecol{width:84px}
+  .hero{width:84px;padding:3px 4px}.hero .av{width:26px;height:26px;margin-bottom:1px}.hero .nm{font-size:10px}.hero .hp{font-size:16px;margin:0}.hero .hp small{font-size:10px}
+  .mana{margin-top:2px;min-height:10px}.mana i{width:8px;height:10px}.mnum,.mini{font-size:10px}
+  .board{min-height:calc(var(--mh) + 12px);padding:3px;gap:6px}
+  .mid{min-height:30px;gap:8px}.turn{font-size:11px;padding:2px 10px}.endb{padding:6px 16px;font-size:13px}
+  .hand{min-height:calc(var(--ch) + 4px);gap:4px}
+  .hc .tx,.hc .ty{display:none}.hc .art{height:40px;margin:2px}.hc .nm{font-size:9.5px}.hc .cost{width:22px;height:22px;font-size:12px;left:-6px;top:-6px}.hc .st{min-width:20px;height:20px;font-size:12px;bottom:-6px}
+  .mn .nm{font-size:8.5px;bottom:12px;padding:0 10px}.mn .st{min-width:20px;height:20px;font-size:12px;bottom:-6px}.mn .tags{display:none}
+  .hc:hover{transform:translateY(-4px) scale(1.04)}
+}
+/* v139 끌어서 내기·공격 · 길게 눌러 설명 */
+#dragArrow{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:60;display:none}
+.hc img,.mn img{-webkit-user-drag:none}
+.hc,.mn{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.hc.dragging{opacity:.25}
+.hc.drag-float{position:fixed!important;left:0;top:0;z-index:70;pointer-events:none;margin:0;transition:none!important;animation:none!important;box-shadow:0 16px 36px rgba(0,0,0,.6),0 0 0 2px var(--gold)}
+.hc.drag-float.drop-ok{box-shadow:0 16px 36px rgba(0,0,0,.6),0 0 18px 4px var(--green)}
+body.dragging,body.dragging *{cursor:grabbing!important}
+.inspect.show.force{display:block!important;left:50%;right:auto;top:40%;transform:translate(-50%,-50%);width:min(78vw,300px);font-size:14px;z-index:80;box-shadow:0 10px 30px rgba(0,0,0,.6)}
 </style>
 </head>
 <body>
@@ -3594,9 +3624,13 @@ const STEPS=[
   body:`<p>왼쪽 아래 <b>마나 수정</b>이 지금 쓸 수 있는 자원입니다. 매 턴 최대 마나가 <b>1씩 늘고</b>(최대 10), 턴이 시작되면 가득 채워집니다.</p>
         <p>손패 카드의 <b>왼쪽 위 파란 숫자</b>가 비용, 하수인은 <b>왼쪽 아래 공격력 · 오른쪽 아래 체력</b>입니다. 이번 턴 마나가 모자란 카드는 흐리게 보입니다.</p>
         <p>하수인은 전장에 남아 싸우고, <b>주문</b>은 효과만 쓰고 사라집니다.</p>`},
+ {ch:0,type:'look',card:'책벌레',title:'카드 설명 보기',
+  body:`<p>카드가 무슨 일을 하는지 궁금하면 <b>PC는 카드 위에 마우스를 올리고</b>, <b>폰은 카드를 길게 누르세요</b>. 설명 창이 뜨고, 마우스를 치우거나 손을 떼면 닫힙니다.</p>
+        <p>짧게 누르거나 끌면 카드를 내는 동작이라, 설명을 보려다 실수로 카드를 낼 걱정은 없어요.</p>`,
+  task:`손패의 <b>책벌레</b> 위에 마우스를 올려 보세요. (폰은 <b>길게 누르기</b>)`,nudge:'책벌레 위에 마우스를 올리거나, 폰이면 길게 눌러 보세요.'},
  {ch:0,type:'play',card:'책벌레',title:'하수인 내기',
   body:`<p>지금 마나는 1입니다. 비용 1짜리 <b>책벌레</b>를 내 봅시다.</p>`,
-  task:`손패의 <b>책벌레</b>를 클릭하세요.`,nudge:'지금은 책벌레를 내 보세요.'},
+  task:`손패의 <b>책벌레</b>를 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'지금은 책벌레를 내 보세요.'},
  {ch:1,type:'info',title:'전투의 함성!',
   body:`<p>방금 책벌레가 낼 때 <b>카드를 1장 뽑게</b> 했습니다. 이런 능력이 ${KW}전투의 함성${E}입니다.</p>
         <p>전투의 함성은 <b>손에서 내는 순간 딱 한 번</b> 발동합니다. 책벌레처럼 카드를 뽑거나, 피해를 주거나, 아군을 회복·강화하는 등 종류가 다양합니다. 카드 설명에 <b>"전투의 함성:"</b>으로 적혀 있어요.</p>
@@ -3609,11 +3643,11 @@ const STEPS=[
   body:`<p>최대 마나가 <b>2</b>로 늘었고, 카드 1장을 뽑았습니다. 상대는 <b>들쥐</b>를 냈네요.</p>
         <p>내 책벌레는 이제 <span style="color:var(--green);font-weight:700">초록 테두리</span>입니다. 초록 테두리 = <b>지금 공격할 수 있음</b>. 방금 낸 하수인에는 <b>zZ</b>가 붙어 이번 턴엔 공격할 수 없다는 뜻입니다.</p>`},
  {ch:2,type:'attack',attacker:'책벌레',target:{hero:1},title:'영웅 공격',
-  body:`<p>공격은 <b>내 하수인을 클릭 → 대상 클릭</b> 순서입니다. 상대에게 <b>도발</b> 하수인이 없으니 영웅을 바로 칠 수 있어요. 영웅은 반격하지 않습니다.</p>`,
-  task:`<b>책벌레</b>를 클릭하고, <b>상대 영웅</b>을 클릭하세요.`,nudge:'책벌레로 상대 영웅을 공격해 보세요.'},
+  body:`<p>공격은 <b>내 하수인을 잡고 대상까지 끌어다 놓으면</b> 됩니다. (하수인 클릭 → 대상 클릭도 됩니다) 상대에게 <b>도발</b> 하수인이 없으니 영웅을 바로 칠 수 있어요. 영웅은 반격하지 않습니다.</p>`,
+  task:`<b>책벌레</b>를 잡아 <b>상대 영웅</b>까지 끌어다 놓으세요. 화살표가 따라와요. (책벌레 클릭 → 상대 영웅 클릭도 돼요)`,nudge:'책벌레로 상대 영웅을 공격해 보세요.'},
  {ch:0,type:'play',card:'견습 검사',title:'두 번째 하수인',
   body:`<p>남은 마나 2로 <b>견습 검사</b>(비용 2, 공격력 2 / 체력 2)를 냅니다. 이 카드엔 전투의 함성이 없어요. 모든 하수인이 능력이 있는 건 아닙니다.</p>`,
-  task:`손패의 <b>견습 검사</b>를 클릭하세요.`,nudge:'견습 검사를 내 보세요.'},
+  task:`손패의 <b>견습 검사</b>를 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'견습 검사를 내 보세요.'},
  {ch:0,type:'end',title:'턴 종료',body:`<p>이번에도 마나를 다 썼습니다. 턴을 넘기세요.</p>`,task:`<b>턴 종료</b>를 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
  {type:'enemy',turn:1},
  {ch:3,type:'info',title:'도발 하수인',
@@ -3621,49 +3655,49 @@ const STEPS=[
         <p>은색으로 빛나는 하수인이 ${KW}도발${E}입니다. 도발 하수인이 있으면 상대는 <b>영웅이든 다른 하수인이든 도발부터 공격해야</b> 합니다. 정말 막히는지 직접 해 봅시다.</p>`},
  {ch:3,type:'probe',attacker:'견습 검사',target:{hero:1},title:'도발에 막혀 보기',
   body:`<p>일부러 도발을 무시하고 영웅을 공격해 보세요. 게임이 막아 줍니다.</p>`,
-  task:`<b>견습 검사</b> → <b>상대 영웅</b> 순서로 클릭하세요.`,nudge:'견습 검사로 상대 영웅을 눌러 보세요(막힐 거예요).'},
+  task:`<b>견습 검사</b>를 잡아 <b>상대 영웅</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'견습 검사로 상대 영웅을 눌러 보세요(막힐 거예요).'},
  {ch:3,type:'info',title:'먼저 도발을 치워야 해요',
   body:`<p>방금 뜬 빨간 메시지처럼 도발이 있으면 영웅을 칠 수 없습니다. 도발을 없애는 방법은 둘: <b>공격으로 때려 눕히거나, 주문으로 처리</b>하는 것.</p>
         <p>이번에는 주문으로 해결해 봅니다. 손패의 <b>불꽃 화살</b>이 있죠?</p>`},
  {ch:4,type:'play',card:'불꽃 화살',target:{seat:1,name:'돌담 견습병'},title:'주문 쓰기',
   body:`<p><b>불꽃 화살</b>(비용 2)은 <b>대상 하나에 피해 3</b>을 주는 주문입니다. 주문은 쓰면 사라지고 효과만 남습니다.</p>
         <p>돌담 견습병의 체력이 3이라 한 방에 쓰러집니다.</p>`,
-  task:`<b>불꽃 화살</b>을 클릭하고, 대상으로 <b>돌담 견습병</b>을 클릭하세요.`,nudge:'불꽃 화살을 돌담 견습병에게 써 보세요.'},
+  task:`<b>불꽃 화살</b>을 잡아 <b>돌담 견습병</b>까지 끌어다 놓으세요. (불꽃 화살 클릭 → 돌담 견습병 클릭도 돼요)`,nudge:'불꽃 화살을 돌담 견습병에게 써 보세요.'},
  {ch:2,type:'attack',attacker:'견습 검사',target:{seat:1,name:'들쥐'},title:'하수인끼리 싸우기',
   body:`<p>도발이 사라졌습니다. 하수인이 하수인을 공격하면 <b>서로의 공격력만큼 피해를 입습니다</b>. 견습 검사(공격력 2)가 들쥐(1/2)를 치면 들쥐는 쓰러지고, 검사는 1 피해를 받아 체력 1이 됩니다.</p>`,
-  task:`<b>견습 검사</b> → 상대 <b>들쥐</b>를 클릭하세요.`,nudge:'견습 검사로 들쥐를 공격해 보세요.'},
+  task:`<b>견습 검사</b>를 잡아 상대 <b>들쥐</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'견습 검사로 들쥐를 공격해 보세요.'},
  {ch:2,type:'attack',attacker:'책벌레',target:{hero:1},title:'다시 영웅 공격',
   body:`<p>상대 전장이 비었습니다. 책벌레로 영웅을 한 번 더 칩니다.</p>`,
-  task:`<b>책벌레</b> → <b>상대 영웅</b>을 클릭하세요.`,nudge:'책벌레로 상대 영웅을 공격하세요.'},
+  task:`<b>책벌레</b>를 잡아 <b>상대 영웅</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'책벌레로 상대 영웅을 공격하세요.'},
  {ch:5,type:'play',card:'은빛 신병',title:'보호막',
   body:`<p>마나 1이 남았으니 <b>은빛 신병</b>을 냅니다. 이 하수인은 ${K2}보호막${E}(파란 빛)을 가지고 있습니다. 보호막은 <b>다음에 받는 피해를 한 번 완전히 막고</b> 사라집니다.</p>`,
-  task:`손패의 <b>은빛 신병</b>을 클릭하세요.`,nudge:'은빛 신병을 내 보세요.'},
+  task:`손패의 <b>은빛 신병</b>을 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'은빛 신병을 내 보세요.'},
  {ch:5,type:'end',title:'턴 종료',body:`<p>턴을 넘깁니다.</p>`,task:`<b>턴 종료</b>를 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
  {type:'enemy',turn:2},
  {ch:5,type:'play',card:'약초꾼',target:{seat:0,name:'견습 검사'},title:'치유의 전투의 함성',
   body:`<p>내 네 번째 턴, 마나는 <b>4</b>입니다. 상대는 방패병과 들쥐를 냈어요. 견습 검사가 체력 1로 다쳐 있죠.</p>
         <p><b>약초꾼</b>의 전투의 함성은 <b>대상 하나의 체력을 3 회복</b>입니다. 전투의 함성 중에는 이렇게 <b>대상을 직접 고르는 것</b>도 있어요. (체력은 최대치까지만 회복)</p>`,
-  task:`<b>약초꾼</b>을 클릭하고, 대상으로 <b>견습 검사</b>를 클릭하세요.`,nudge:'약초꾼을 내고 견습 검사를 회복시켜 보세요.'},
+  task:`<b>약초꾼</b>을 잡아 <b>견습 검사</b>까지 끌어다 놓으세요. (약초꾼 클릭 → 견습 검사 클릭도 돼요)`,nudge:'약초꾼을 내고 견습 검사를 회복시켜 보세요.'},
  {ch:6,type:'play',card:'날쌘 척후병',title:'속공',
   body:`<p><b>날쌘 척후병</b>은 ${KW}속공${E}입니다. 속공 하수인은 <b>낸 턴에도 하수인을 공격</b>할 수 있습니다. 단, 낸 턴에 <b>영웅은 공격할 수 없습니다</b>.</p>`,
-  task:`손패의 <b>날쌘 척후병</b>을 클릭하세요.`,nudge:'날쌘 척후병을 내 보세요.'},
+  task:`손패의 <b>날쌘 척후병</b>을 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'날쌘 척후병을 내 보세요.'},
  {ch:6,type:'probe',attacker:'날쌘 척후병',target:{hero:1},title:'속공의 한계 확인',
   body:`<p>척후병으로 영웅을 공격해 보세요. 어떻게 되는지 확인합니다.</p>`,
-  task:`<b>날쌘 척후병</b> → <b>상대 영웅</b>을 클릭하세요.`,nudge:'날쌘 척후병으로 상대 영웅을 눌러 보세요(막힐 거예요).'},
+  task:`<b>날쌘 척후병</b>을 잡아 <b>상대 영웅</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'날쌘 척후병으로 상대 영웅을 눌러 보세요(막힐 거예요).'},
  {ch:6,type:'attack',attacker:'날쌘 척후병',target:{seat:1,name:'들쥐'},title:'속공으로 하수인 공격',
   body:`<p>영웅은 안 되지만 <b>하수인은 바로</b> 칠 수 있습니다. 들쥐(1/2)를 공격하세요. 척후병도 반격으로 1 피해를 받습니다.</p>`,
-  task:`<b>날쌘 척후병</b> → 상대 <b>들쥐</b>를 클릭하세요.`,nudge:'척후병으로 들쥐를 공격하세요.'},
+  task:`<b>날쌘 척후병</b>을 잡아 상대 <b>들쥐</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'척후병으로 들쥐를 공격하세요.'},
  {ch:5,type:'attack',attacker:'은빛 신병',target:{seat:1,name:'방패병'},title:'보호막의 효과',
   body:`<p>보호막이 있는 은빛 신병으로 방패병(공격력 1)을 공격합니다. 반격 피해를 <b>보호막이 대신 막아</b> 체력이 그대로인지 보세요.</p>`,
-  task:`<b>은빛 신병</b> → 상대 <b>방패병</b>을 클릭하세요.`,nudge:'은빛 신병으로 방패병을 공격하세요.'},
+  task:`<b>은빛 신병</b>을 잡아 상대 <b>방패병</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'은빛 신병으로 방패병을 공격하세요.'},
  {ch:5,type:'end',title:'턴 종료',body:`<p>손에는 <b>불사조</b>가 있지만 비용 4라 이번 턴엔 쓸 수 없었어요. 다음 턴에 씁니다.</p>`,task:`<b>턴 종료</b>를 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
  {type:'enemy',turn:3},
  {ch:6,type:'play',card:'불사조',title:'돌진',
   body:`<p>마지막 턴입니다. 상대 영웅 체력은 8, 도발은 없습니다. <b>불사조</b>는 ${KW}돌진${E} 하수인입니다. 돌진은 <b>낸 턴에 영웅까지 바로 공격</b>할 수 있습니다. 속공과 달리 영웅도 칠 수 있다는 점이 다릅니다.</p>`,
-  task:`손패의 <b>불사조</b>를 클릭하세요.`,nudge:'불사조를 내 보세요.'},
+  task:`손패의 <b>불사조</b>를 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'불사조를 내 보세요.'},
  {ch:7,type:'attackAll',title:'모든 하수인으로 마무리!',
   body:`<p>내 하수인 전부 초록 테두리죠? 상대 전장엔 도발이 없으니 <b>전부 영웅에게</b> 공격하면 체력 8을 모두 깎을 수 있습니다.</p>`,
-  task:`초록 테두리 하수인을 하나씩 클릭하고 <b>상대 영웅</b>을 클릭하세요.`,nudge:'초록 테두리 하수인으로 상대 영웅을 공격하세요.'},
+  task:`초록 테두리 하수인을 하나씩 <b>상대 영웅</b>까지 끌어다 놓으세요.`,nudge:'초록 테두리 하수인으로 상대 영웅을 공격하세요.'},
  {ch:7,type:'win'}
 ];
 
@@ -3673,29 +3707,30 @@ const NAME={J:'제이나',G:'가로쉬'};
 const DIALOG={
 0:[['G1','스톰윈드의 애송이가 감히 호드의 대족장 앞에 서다니. 체력 10? 웃기는군.'],['J1','신경 쓰지 마세요. 저는 제이나, 오늘 당신의 군사 고문이에요.'],['J1','이 게임의 목표는 하나, <b>상대 영웅의 체력을 0으로</b> 만드는 거예요. 연습에서는 가로쉬의 체력이 <b>10</b>이에요.'],['J2','위쪽이 가로쉬, 아래쪽이 나예요. 번갈아 턴을 진행하고, 안내하는 곳은 <span class="kw">노란 테두리</span>로 반짝여요. 카드 위에 마우스를 올리면 설명도 보여요!']],
 1:[['J1','왼쪽 아래 <b>마나 수정</b>이 지금 쓸 수 있는 자원이에요. 매 턴 최대 마나가 <b>1씩 늘고</b>(최대 10), 턴이 시작되면 가득 채워져요.'],['J2','손패 카드의 <b>왼쪽 위 파란 숫자</b>가 비용, 하수인은 <b>왼쪽 아래 공격력 · 오른쪽 아래 체력</b>이에요. 마나가 모자란 카드는 흐리게 보여요.'],['J1','하수인은 전장에 남아 싸우고, <b>주문</b>은 효과만 쓰고 사라져요.']],
-2:[['J1','지금 마나는 1이에요. 비용 1짜리 <b>책벌레</b>를 내 봐요.']],
-3:[['J1',`방금 책벌레가 낼 때 <b>카드를 1장 뽑게</b> 했죠? 이런 능력이 ${KW}전투의 함성${E}이에요.`],['J2','전투의 함성은 <b>손에서 내는 순간 딱 한 번</b> 발동해요. 카드 뽑기, 피해, 회복·강화 등 종류가 다양하고, 카드 설명에 "전투의 함성:"으로 적혀 있어요.'],['J1','새로 뽑은 카드는 <b>불꽃 화살</b>(주문)이에요.']],
-4:[['J1','마나를 다 썼으니 턴을 넘겨요. 하수인은 <b>낸 턴에는 공격할 수 없어서</b> 책벌레는 다음 턴부터 싸울 수 있어요.']],
-6:[['J1','내 두 번째 턴이에요. 최대 마나가 <b>2</b>로 늘었고 카드 1장을 뽑았어요.'],['J2','책벌레는 이제 <span style="color:var(--green);font-weight:700">초록 테두리</span>예요. 초록 테두리 = <b>지금 공격할 수 있음</b>. 방금 낸 하수인에 붙는 <b>zZ</b>는 이번 턴엔 공격할 수 없다는 뜻이고요.']],
-7:[['J1','공격은 <b>내 하수인을 클릭 → 대상 클릭</b> 순서예요. 가로쉬에게 <b>도발</b> 하수인이 없으니 영웅을 바로 칠 수 있어요. 영웅은 반격하지 않아요.']],
-8:[['J1','남은 마나 2로 <b>견습 검사</b>(비용 2, 2/2)를 내요. 이 카드엔 전투의 함성이 없어요. 모든 하수인이 능력이 있는 건 아니에요.']],
-9:[['J1','이번에도 마나를 다 썼어요. 턴을 넘겨요.']],
-11:[['J1','들쥐가 내 영웅을 때렸어요(체력 29). 신경 쓰지 말고, 은색으로 빛나는 하수인을 보세요.'],['J2',`그게 ${KW}도발${E}이에요. 도발 하수인이 있으면 상대는 <b>영웅이든 다른 하수인이든 도발부터 공격해야</b> 해요. 정말 막히는지 직접 해 봐요.`]],
-12:[['J1','일부러 도발을 무시하고 영웅을 공격해 보세요. 게임이 막아 줄 거예요.']],
-13:[['J1','빨간 메시지처럼 도발이 있으면 영웅을 칠 수 없어요. 없애는 방법은 둘: <b>공격으로 쓰러뜨리거나, 주문으로 처리</b>하는 것.'],['J2','이번엔 주문으로 해결해요. 손패의 <b>불꽃 화살</b>이 있죠?']],
-14:[['J1','<b>불꽃 화살</b>(비용 2)은 <b>대상 하나에 피해 3</b>을 주는 주문이에요. 쓰면 사라지고 효과만 남아요.'],['J3','돌담 견습병의 체력이 3이라 한 방에 쓰러져요!']],
-15:[['J1','도발이 사라졌어요. 하수인이 하수인을 공격하면 <b>서로의 공격력만큼 피해를 입어요</b>. 견습 검사(공격력 2)가 들쥐(1/2)를 치면 들쥐는 쓰러지고, 검사는 1 피해를 받아 체력 1이 돼요.']],
-16:[['J1','가로쉬의 전장이 비었어요. 책벌레로 영웅을 한 번 더 쳐요.']],
-17:[['J1',`마나 1이 남았으니 <b>은빛 신병</b>을 내요. 이 하수인은 ${K2}보호막${E}(파란 빛)이 있어서 <b>다음에 받는 피해를 한 번 완전히 막고</b> 사라져요.`]],
-18:[['J1','턴을 넘겨요.']],
-20:[['J1','내 네 번째 턴, 마나는 <b>4</b>예요. 견습 검사가 체력 1로 다쳐 있죠.'],['J2','<b>약초꾼</b>의 전투의 함성은 <b>대상 하나의 체력을 3 회복</b>이에요. 이렇게 <b>대상을 직접 고르는</b> 전투의 함성도 있어요. (체력은 최대치까지만 회복)']],
-21:[['J1',`<b>날쌘 척후병</b>은 ${KW}속공${E}이에요. 속공 하수인은 <b>낸 턴에도 하수인을 공격</b>할 수 있어요. 단, 낸 턴에 <b>영웅은 공격할 수 없어요</b>.`]],
-22:[['J1','척후병으로 가로쉬의 영웅을 공격해 보세요. 어떻게 되는지 확인해요.']],
-23:[['J1','영웅은 안 되지만 <b>하수인은 바로</b> 칠 수 있어요. 들쥐(1/2)를 공격해요. 척후병도 반격으로 1 피해를 받아요.']],
-24:[['J1','보호막이 있는 은빛 신병으로 방패병(공격력 1)을 공격해요. 반격 피해를 <b>보호막이 대신 막아</b> 체력이 그대로인지 보세요.']],
-25:[['J1','손에는 <b>불사조</b>가 있지만 비용 4라 이번 턴엔 쓸 수 없었어요. 다음 턴에 써요.']],
-27:[['J1',`마지막 턴이에요. 가로쉬의 체력은 8, 도발은 없어요. <b>불사조</b>는 ${KW}돌진${E} 하수인이에요.`],['J2','돌진은 <b>낸 턴에 영웅까지 바로 공격</b>할 수 있어요. 속공과 달리 영웅도 칠 수 있다는 점이 달라요.']],
-28:[['J3','내 하수인 전부 초록 테두리죠? 가로쉬의 전장엔 도발이 없으니 <b>전부 영웅에게</b> 공격하면 체력 8을 모두 깎을 수 있어요. 가요!']]
+2:[['J1','시작하기 전에 하나만! 카드가 무슨 일을 하는지 궁금하면 <b>PC는 마우스를 카드 위에 올리고</b>, <b>폰은 카드를 길게 누르면</b> 설명 창이 떠요.'],['J2','손을 떼거나 마우스를 치우면 닫혀요. 짧게 누르거나 끌면 카드를 내는 거라, 설명을 보다가 실수로 낼 일은 없어요. <b>책벌레</b>로 해 봐요.']],
+3:[['J1','지금 마나는 1이에요. 비용 1짜리 <b>책벌레</b>를 내 봐요.'],['J2','손패의 카드를 <b>잡고 전장(가운데)으로 끌어다 놓으면</b> 카드를 내요. 그냥 클릭(탭)해도 돼요.']],
+4:[['J1',`방금 책벌레가 낼 때 <b>카드를 1장 뽑게</b> 했죠? 이런 능력이 ${KW}전투의 함성${E}이에요.`],['J2','전투의 함성은 <b>손에서 내는 순간 딱 한 번</b> 발동해요. 카드 뽑기, 피해, 회복·강화 등 종류가 다양하고, 카드 설명에 "전투의 함성:"으로 적혀 있어요.'],['J1','새로 뽑은 카드는 <b>불꽃 화살</b>(주문)이에요.']],
+5:[['J1','마나를 다 썼으니 턴을 넘겨요. 하수인은 <b>낸 턴에는 공격할 수 없어서</b> 책벌레는 다음 턴부터 싸울 수 있어요.']],
+7:[['J1','내 두 번째 턴이에요. 최대 마나가 <b>2</b>로 늘었고 카드 1장을 뽑았어요.'],['J2','책벌레는 이제 <span style="color:var(--green);font-weight:700">초록 테두리</span>예요. 초록 테두리 = <b>지금 공격할 수 있음</b>. 방금 낸 하수인에 붙는 <b>zZ</b>는 이번 턴엔 공격할 수 없다는 뜻이고요.']],
+8:[['J1','공격은 <b>내 하수인을 잡고 대상까지 끌어다 놓으면</b> 돼요. 화살표가 손가락(마우스)을 따라와요. 하수인 클릭 → 대상 클릭도 돼요. 가로쉬에게 <b>도발</b> 하수인이 없으니 영웅을 바로 칠 수 있어요. 영웅은 반격하지 않아요.']],
+9:[['J1','남은 마나 2로 <b>견습 검사</b>(비용 2, 2/2)를 내요. 이 카드엔 전투의 함성이 없어요. 모든 하수인이 능력이 있는 건 아니에요.']],
+10:[['J1','이번에도 마나를 다 썼어요. 턴을 넘겨요.']],
+12:[['J1','들쥐가 내 영웅을 때렸어요(체력 29). 신경 쓰지 말고, 은색으로 빛나는 하수인을 보세요.'],['J2',`그게 ${KW}도발${E}이에요. 도발 하수인이 있으면 상대는 <b>영웅이든 다른 하수인이든 도발부터 공격해야</b> 해요. 정말 막히는지 직접 해 봐요.`]],
+13:[['J1','일부러 도발을 무시하고 영웅을 공격해 보세요. 게임이 막아 줄 거예요.']],
+14:[['J1','빨간 메시지처럼 도발이 있으면 영웅을 칠 수 없어요. 없애는 방법은 둘: <b>공격으로 쓰러뜨리거나, 주문으로 처리</b>하는 것.'],['J2','이번엔 주문으로 해결해요. 손패의 <b>불꽃 화살</b>이 있죠?']],
+15:[['J1','<b>불꽃 화살</b>(비용 2)은 <b>대상 하나에 피해 3</b>을 주는 주문이에요. 쓰면 사라지고 효과만 남아요.'],['J3','돌담 견습병의 체력이 3이라 한 방에 쓰러져요!']],
+16:[['J1','도발이 사라졌어요. 하수인이 하수인을 공격하면 <b>서로의 공격력만큼 피해를 입어요</b>. 견습 검사(공격력 2)가 들쥐(1/2)를 치면 들쥐는 쓰러지고, 검사는 1 피해를 받아 체력 1이 돼요.']],
+17:[['J1','가로쉬의 전장이 비었어요. 책벌레로 영웅을 한 번 더 쳐요.']],
+18:[['J1',`마나 1이 남았으니 <b>은빛 신병</b>을 내요. 이 하수인은 ${K2}보호막${E}(파란 빛)이 있어서 <b>다음에 받는 피해를 한 번 완전히 막고</b> 사라져요.`]],
+19:[['J1','턴을 넘겨요.']],
+21:[['J1','내 네 번째 턴, 마나는 <b>4</b>예요. 견습 검사가 체력 1로 다쳐 있죠.'],['J2','<b>약초꾼</b>의 전투의 함성은 <b>대상 하나의 체력을 3 회복</b>이에요. 이렇게 <b>대상을 직접 고르는</b> 전투의 함성도 있어요. (체력은 최대치까지만 회복)']],
+22:[['J1',`<b>날쌘 척후병</b>은 ${KW}속공${E}이에요. 속공 하수인은 <b>낸 턴에도 하수인을 공격</b>할 수 있어요. 단, 낸 턴에 <b>영웅은 공격할 수 없어요</b>.`]],
+23:[['J1','척후병으로 가로쉬의 영웅을 공격해 보세요. 어떻게 되는지 확인해요.']],
+24:[['J1','영웅은 안 되지만 <b>하수인은 바로</b> 칠 수 있어요. 들쥐(1/2)를 공격해요. 척후병도 반격으로 1 피해를 받아요.']],
+25:[['J1','보호막이 있는 은빛 신병으로 방패병(공격력 1)을 공격해요. 반격 피해를 <b>보호막이 대신 막아</b> 체력이 그대로인지 보세요.']],
+26:[['J1','손에는 <b>불사조</b>가 있지만 비용 4라 이번 턴엔 쓸 수 없었어요. 다음 턴에 써요.']],
+28:[['J1',`마지막 턴이에요. 가로쉬의 체력은 8, 도발은 없어요. <b>불사조</b>는 ${KW}돌진${E} 하수인이에요.`],['J2','돌진은 <b>낸 턴에 영웅까지 바로 공격</b>할 수 있어요. 속공과 달리 영웅도 칠 수 있다는 점이 달라요.']],
+29:[['J3','내 하수인 전부 초록 테두리죠? 가로쉬의 전장엔 도발이 없으니 <b>전부 영웅에게</b> 공격하면 체력 8을 모두 깎을 수 있어요. 가요!']]
 };
 const ENEMY_TALK=[[['G1','들쥐 한 마리를 앞세운다. 호드의 힘을 보여주마!']],[['G3','돌담 견습병! 도발로 막아라! 들쥐, 영웅을 물어뜯어!']],[['G2','방패병, 들쥐! 전선을 지켜라.']],[['G1','숲 늑대… 이걸로 네 마지막 턴을 막아 주마.']]];
 /* 대화 큐: 말풍선을 하나씩 띄운다 (다음 행동을 하면 남은 대사는 즉시 표시) */
@@ -3757,12 +3792,13 @@ function minionEl(m,seat){
   d.onmouseenter=()=>inspect(m); d.onmouseleave=()=>inspect(null);
   return d;
 }
-function inspect(c){
+function inspect(c,force){
   const b=$('#inspect');
-  if(!c){b.classList.remove('show');return;}
+  if(c) lookCheck(c);
+  if(!c){b.classList.remove('show','force');return;}
   const isM=c.type!=='spell';
   b.innerHTML=`<b>${c.name}</b><div class="s">${isM?`하수인 · 공격력 ${c.atk} / 체력 ${c.hp}`:'주문'} · 비용 ${c.cost}</div>${cardText(c)||'<span style="color:var(--dim)">특수 능력 없음</span>'}`;
-  b.classList.add('show');
+  b.classList.add('show'); b.classList.toggle('force',!!force);
 }
 
 /* ---------- 렌더 ---------- */
@@ -3810,6 +3846,7 @@ function applyHL(){
   } else if(st.type==='attackAll'){
     if(sel&&sel.kind==='atk') add('.hero[data-seat="1"]'); else S.seats[0].board.forEach(m=>{ if(canAttack(m)) add(`.mn[data-seat="0"][data-id="${m.id}"]`); });
   } else if(st.type==='end') add('#endBtn');
+  else if(st.type==='look') add(`.hc[data-name="${st.card}"]`);
 }
 
 /* ---------- 코치 패널 ---------- */
@@ -4011,7 +4048,102 @@ function showWin(){
   <div style="display:flex;gap:8px;justify-content:center;margin-top:12px"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn" style="flex:none" onclick="closeModal();init()">다시 하기</button></div></div>`),900);
 }
 
+
+/* ---------- v139 끌어서 내기·공격 + 길게 눌러 설명 보기 (클릭 방식도 그대로 된다) ---------- */
+//  손패 카드: 전장 쪽으로 끌어 놓으면 낸다. 대상이 필요한 카드는 끌면 화살표가 나오고, 대상 위에서 놓으면 쓴다.
+//  내 하수인: 잡고 끌면 화살표 → 적 위에서 놓으면 공격. 빈 곳에서 놓으면 취소.
+//  폰: 카드를 꾹 누르고 있으면 설명 창, 손을 떼면 닫힌다.
+const DR=(function(){
+  const NS='http://www.w3.org/2000/svg', svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('id','dragArrow');
+  svg.innerHTML='<defs><marker id="dah" markerWidth="10" markerHeight="9" refX="7" refY="4.5" orient="auto"><polygon points="0 0,10 4.5,0 9" fill="#e8c36a"/></marker></defs><line x1="0" y1="0" x2="0" y2="0" stroke="#e8c36a" stroke-width="5" stroke-linecap="round" marker-end="url(#dah)"/>';
+  document.body.appendChild(svg); const line=svg.querySelector('line');
+  let st=null, eat=0, lpT=null, lpAt=null, lpOn=false;
+  const TH=8;
+  const handOf=id=>S.seats[0].hand.find(x=>x.id===id);
+  function cardAt(el){ const hc=el.closest&&el.closest('.hc'), mn=el.closest&&el.closest('.mn');
+    if(hc) return handOf(Number(hc.dataset.id)); if(mn) return findMin(Number(mn.dataset.seat), Number(mn.dataset.id)); return null; }
+  function fromEl(){ return st.kind==='atk' ? document.querySelector(`.mn[data-seat="0"][data-id="${st.m.id}"]`) : document.querySelector(`.hc[data-id="${st.c.id}"]`); }
+  function arrow(x,y){ const a=fromEl(); if(!a) return; const r=a.getBoundingClientRect(); svg.style.display='block';
+    line.setAttribute('x1',r.left+r.width/2); line.setAttribute('y1',r.top+(st.kind==='atk'?r.height*.2:r.height*.3)); line.setAttribute('x2',x); line.setAttribute('y2',y); }
+  function down(e){
+    eat=0; clearTimeout(lpT); lpAt=null;
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    const t=e.target; if(!t.closest) return;
+    if(e.pointerType!=='mouse'){ const c=cardAt(t); if(c){ lpAt={x:e.clientX,y:e.clientY}; lpT=setTimeout(()=>{ lpOn=true; cancel(); inspect(c,true); },430); } }
+    if(busy || S.over || S.turn!==0 || st) return;
+    const hc=t.closest('.hc'), mn=t.closest('.mn[data-seat="0"]');
+    if(hc){ const c=handOf(Number(hc.dataset.id)); if(c) st={kind:'hand', c, x0:e.clientX, y0:e.clientY, pid:e.pointerId}; }
+    else if(mn){ const m=findMin(0, Number(mn.dataset.id)); if(m) st={kind:'atk', m, x0:e.clientX, y0:e.clientY, pid:e.pointerId}; }
+  }
+  function begin(){
+    st.on=true; document.body.classList.add('dragging');
+    if(st.kind==='atk'){
+      if(!(sel && sel.kind==='atk' && sel.id===st.m.id)) onMinion(st.m, 0);       // 안내·검사는 클릭과 똑같이
+      if(!(sel && sel.kind==='atk' && sel.id===st.m.id)){ st.dead=true; return; }
+      return;
+    }
+    const c=st.c;
+    if(cardTargets(S,0,c).length){                                                 // 대상이 필요한 카드: 화살표로 조준
+      if(!(sel && sel.kind==='cast' && sel.card.id===c.id)) onHand(c);
+      if(!(sel && sel.kind==='cast' && sel.card.id===c.id)){ st.dead=true; return; }
+      st.aim=true; return;
+    }
+    const src=document.querySelector(`.hc[data-id="${c.id}"]`); if(!src){ st.dead=true; return; }
+    const r=src.getBoundingClientRect(), g=src.cloneNode(true);
+    g.classList.add('drag-float'); g.classList.remove('hl','new','picked'); g.style.width=r.width+'px'; g.style.height=r.height+'px';
+    document.body.appendChild(g); st.float=g; st.fw=r.width; st.fh=r.height; src.classList.add('dragging');
+  }
+  const overField=(x,y)=>{ const s=$('#stage').getBoundingClientRect(), h=$('#hand').getBoundingClientRect();
+    return x>=s.left && x<=s.right && y>=s.top && y<=s.bottom && !(y>=h.top-4 && x>=h.left && x<=h.right); };
+  function move(e){
+    if(lpAt && Math.hypot(e.clientX-lpAt.x, e.clientY-lpAt.y)>9){ clearTimeout(lpT); lpAt=null; }
+    if(!st || e.pointerId!==st.pid) return;
+    if(!st.on){ if(Math.hypot(e.clientX-st.x0, e.clientY-st.y0)<TH || lpOn) return; begin(); }
+    if(st.dead) return;
+    e.preventDefault();
+    if(st.kind==='atk' || st.aim){ arrow(e.clientX, e.clientY); return; }
+    st.float.style.transform=`translate(${e.clientX-st.fw/2}px,${e.clientY-st.fh*.6}px) rotate(-4deg) scale(1.05)`;
+    st.float.classList.toggle('drop-ok', overField(e.clientX, e.clientY));
+  }
+  function clear(){ if(st && st.float) st.float.remove(); document.querySelectorAll('.hc.dragging').forEach(x=>x.classList.remove('dragging')); svg.style.display='none'; document.body.classList.remove('dragging'); st=null; }
+  function up(e){
+    clearTimeout(lpT); lpAt=null;
+    if(lpOn){ lpOn=false; inspect(null); eat=Date.now()+600; }
+    if(!st || e.pointerId!==st.pid) return;
+    const s=st; if(!s.on){ st=null; return; }
+    eat=Date.now()+600;
+    if(s.float) s.float.style.display='none';
+    svg.style.display='none';
+    const el=document.elementFromPoint(e.clientX, e.clientY);
+    clear();
+    if(s.dead) return;
+    const mn=el && el.closest && el.closest('.mn'), he=el && el.closest && el.closest('.hero');
+    if(s.kind==='atk' || s.aim){
+      if(mn && (s.aim || mn.dataset.seat==='1')){ const m=findMin(Number(mn.dataset.seat), Number(mn.dataset.id)); if(m) return onMinion(m, Number(mn.dataset.seat)); }
+      if(he && (s.aim || he.dataset.seat==='1')) return onHero(Number(he.dataset.seat));
+      sel=null; render(); return;                                                  // 빈 곳에 놓음 → 취소
+    }
+    if(overField(e.clientX, e.clientY)) onHand(s.c);
+  }
+  function cancel(){ if(!st) return; const s=st; clear(); if(s.on && !s.dead){ sel=null; render(); } }
+  document.addEventListener('pointerdown', down, true);
+  document.addEventListener('pointermove', move, {passive:false, capture:true});
+  document.addEventListener('pointerup', up, true);
+  document.addEventListener('pointercancel', ()=>{ clearTimeout(lpT); if(lpOn){ lpOn=false; inspect(null); } cancel(); }, true);
+  window.addEventListener('click', e=>{ if(Date.now()<eat){ eat=0; e.stopPropagation(); e.preventDefault(); } }, true);
+  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.hc,.mn')) e.preventDefault(); });
+  document.addEventListener('dragstart', e=>{ if(e.target.closest && e.target.closest('.hc,.mn,.hero')) e.preventDefault(); });   // 그림(img)의 기본 끌기가 끼어들지 않게
+  return {cancel};
+})();
+/* 설명 보기 단계: 안내한 카드의 설명 창을 띄우면 다음으로 */
+function lookCheck(c){
+  const st=stepNow(); if(!st || st.type!=='look' || busy || st._seen || !c || c.name!==st.card) return;
+  st._seen=true; setTimeout(()=>{ if(stepNow()===st) advance(); }, 1300);
+}
+
 function init(){
+  STEPS.forEach(x=>{ delete x._seen; });
   closeModal(); flushSay(); Q=[]; MOOD[0]='J1'; MOOD[1]='G1'; $('#cbody').innerHTML='<div class="chat"></div>'; S=buildState(); stepIdx=0; sel=null; busy=false; lastHand=new Set(S.seats[0].hand.map(c=>c.id));
   document.querySelectorAll('.fxl>*').forEach(e=>e.remove());
   showStep();

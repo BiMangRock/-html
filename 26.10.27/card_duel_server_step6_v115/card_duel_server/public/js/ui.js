@@ -35,8 +35,14 @@ function showMulligan(done){                                  // v77 멀리건: 
   upd(); m.classList.add('show');
   ok.onclick=()=>{ m.classList.remove('show'); const n=mulliganHand(Host.state, MY, [...out]); view=Host.view(MY); if(n) logLine(`멀리건: 시작 카드 ${n}장을 바꿨습니다.`); done(); };
 }
+function controlTipOnce(){                                        // v139 바뀐 조작을 한 번만 알려 준다 (기기마다)
+  const K='cardDuel.ctrlTip.v139'; try{ if(localStorage.getItem(K)) return; localStorage.setItem(K,'1'); }catch(_){ return; }
+  const touch=!(window.matchMedia && matchMedia('(hover:hover)').matches);
+  toast('카드를 전장으로 끌어다 놓으면 내고, 내 하수인을 적에게 끌어다 놓으면 공격해요. (누르기도 그대로 돼요)');
+  setTimeout(()=>toast(touch?'카드 설명은 카드를 길게 누르면 보여요.':'카드 설명은 카드 위에 마우스를 올리면 보여요.'), 900);
+}
 function beginMatch(){                                           // 멀리건을 거친 뒤 첫 화면·상대 선공 진행
-  const go=()=>{ ui.busy=false; render();
+  const go=()=>{ ui.busy=false; render(); controlTipOnce();
     if(Host.state.turn===OPP){ ui.busy=true; render(); runOpponentTurn().then(()=>{ if(Host.state.over) finishGame(); ui.busy=false; render(); }); } };
   const P=Host.state.seats[MY];
   if(!(P.startIds||[]).length){ go(); return; }
@@ -958,6 +964,134 @@ function drawArrow(x1,y1,x2,y2){
   line.setAttribute('x1',x1); line.setAttribute('y1',y1); line.setAttribute('x2',x2); line.setAttribute('y2',y2);
 }
 
+// ---------- v139 끌어서 내기·공격 (하스스톤 방식) — 누르고 대상 누르기(탭-탭)도 그대로 된다 ----------
+//  · 손패 하수인: 잡고 전장 위로 끌면 놓일 자리가 보이고, 손을 떼면 그 자리에 낸다
+//  · 대상이 없는 주문: 전장 위로 끌어 놓으면 쓴다
+//  · 대상이 있는 주문: 끌기 시작하면 화살표가 나오고, 대상 위에서 손을 떼면 쓴다
+//  · 내 하수인·영웅: 잡고 끌면 화살표가 나오고, 적 위에서 손을 떼면 공격한다
+//  · 빈 곳(손패 위 등)에서 손을 떼면 취소. 움직이지 않고 떼면 원래대로 클릭(탭-탭)으로 처리된다
+const Drag=(function(){
+  const TH=8;
+  let st=null, eatUntil=0;
+  const canAct=()=>!!(view && game && !game.replay && !game.spectate && view.turn===MY && !view.over && !ui.busy && !view.pending);
+  function targetAt(x,y){
+    const el=document.elementFromPoint(x,y); if(!el || !el.closest) return null;
+    if(el.closest('#aiHero')) return heroT(OPP);
+    if(el.closest('#playerHero')) return heroT(MY);
+    const c=el.closest('.card[data-id]'); if(!c || c.classList.contains('place-ghost')) return null;
+    const id=Number(c.dataset.id);
+    if(c.closest('#aiZone')) return minionT(OPP,id);
+    if(c.closest('#playerZone')) return minionT(MY,id);
+    if(c.closest('#hand')) return {kind:'hand', seat:MY, id};
+    return null;
+  }
+  const inRect=(r,x,y)=>x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+  const overBoard=(x,y)=>{ const b=document.querySelector('.board'); return !!b && inRect(b.getBoundingClientRect(),x,y) && !inRect($('hand').getBoundingClientRect(),x,y); };
+  const handCardEl=id=>$('hand').querySelector(`.card[data-id="${id}"]`);
+  function anchorPoint(){                                    // 화살표가 시작하는 곳
+    const el = st.kind==='attack' ? (st.id==='hero' ? $('playerHero') : zoneEl(MY).querySelector(`.card[data-id="${st.id}"]`)) : handCardEl(st.id);
+    if(!el) return {x:st.x0, y:st.y0};
+    const r=el.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+(st.kind==='attack'?0:r.height*.3)};
+  }
+  function arrowTo(x,y){ const a=anchorPoint(); $('arrowSvg').style.display='block'; drawArrow(a.x, a.y, x, y); }
+  function hideArrow(){ $('arrowSvg').style.display='none'; }
+
+  function down(e){
+    eatUntil=0;                                                 // 새로 누르기 시작했으면 진짜 클릭이다
+    if(st || (e.pointerType==='mouse' && e.button!==0) || !canAct() || ui.lpShown) return;
+    const t=e.target; if(!t.closest) return;
+    const hc=t.closest('#hand .card[data-id]'), bc=t.closest('#playerZone .card[data-id]'), he=t.closest('#playerHero');
+    if(t.closest('.hero-power, .emote-menu')) return;
+    if(hc && !hc.classList.contains('draw-ghost')){
+      if(ui.pending || ui.place) return;                      // 이미 탭으로 고르는 중이면 끌기는 쓰지 않는다
+      const c=view.me.hand.find(x=>x.id===Number(hc.dataset.id)); if(!c) return;
+      st={kind:'hand', id:c.id, card:c, x0:e.clientX, y0:e.clientY, pid:e.pointerId};
+    } else if(bc && !ui.pending && !ui.place){
+      const id=Number(bc.dataset.id);
+      if(!view.legal.some(a=>a.type==='ATTACK' && a.attackerId===id)) return;
+      st={kind:'attack', id, x0:e.clientX, y0:e.clientY, pid:e.pointerId};
+    } else if(he && !ui.pending && !ui.place && view.legal.some(a=>a.type==='HERO_ATTACK')){
+      st={kind:'attack', id:'hero', x0:e.clientX, y0:e.clientY, pid:e.pointerId};
+    }
+  }
+  function begin(e){
+    st.started=true; ui.dragging=true; document.body.classList.add('dragging-cards');
+    if(st.kind==='attack'){
+      stopArrow(); ui.selected=st.id; ui.place=null; ui.pending=null; render();
+      return;
+    }
+    const c=st.card, entries=view.legal.filter(a=>a.type==='PLAY_CARD' && a.cardId===c.id);
+    if(!entries.length){ eatUntil=Date.now()+500; finish(); playCard(c); return; }   // 낼 수 없는 카드: 이유만 알려 준다
+    st.entries=entries;
+    ui.selected=null; stopArrow();
+    if(c.type==='spell' && entries.some(a=>a.target)){        // 대상 주문: 바로 조준
+      st.mode='aim'; ui.pending={cardId:c.id, entries}; render(); return;
+    }
+    st.mode='carry'; ui.dragId=c.id;
+    const src=handCardEl(c.id), r=src ? src.getBoundingClientRect() : {width:90, height:126};
+    const z=src ? (parseFloat(getComputedStyle(src).zoom)||1) : 1;   // 폰: 손패 카드는 zoom 으로 줄어 있다 → 같은 크기로 보이게
+    const g=cardEl(c, {extra:'drag-float'}); g.style.transformOrigin='0 0';
+    document.body.appendChild(g); st.float=g; st.fw=r.width; st.fh=r.height; st.z=z;
+    render();
+  }
+  function move(e){
+    if(!st || e.pointerId!==st.pid) return;
+    if(!st.started){ if(Math.hypot(e.clientX-st.x0, e.clientY-st.y0)<TH) return; if(!canAct() || ui.lpShown){ st=null; return; } begin(e); if(!st) return; }
+    e.preventDefault();
+    const x=e.clientX, y=e.clientY;
+    if(st.kind==='attack' || st.mode==='aim'){ arrowTo(x,y); return; }
+    st.float.style.transform=`translate(${x-st.fw/2}px,${y-st.fh*.6}px) rotate(-4deg) scale(${st.z*1.05})`;
+    if(st.card.type!=='spell'){                                 // 하수인: 전장 위면 놓일 자리 미리보기
+      const over=overBoard(x,y) && view.me.board.length<CONFIG.MAX_BOARD;
+      if(over){ const pos=placeIndexAt(x);
+        if(!ui.place){ ui.place={cardId:st.card.id, card:st.card, entries:st.entries, pos, drag:true}; render(); }
+        else if(pos!==ui.place.pos){ ui.place.pos=pos; moveGhost(pos); } }
+      else if(ui.place){ ui.place=null; render(); }
+    } else st.float.classList.toggle('drop-ok', overBoard(x,y));
+  }
+  function finish(){ if(st && st.float) st.float.remove(); hideArrow(); document.body.classList.remove('dragging-cards'); ui.dragging=false; ui.dragId=null; st=null; }
+  function up(e){
+    if(!st || e.pointerId!==st.pid) return;
+    const s=st; if(!s.started){ st=null; return; }               // 움직이지 않았다 → 평소 클릭으로
+    eatUntil=Date.now()+500;
+    const x=e.clientX, y=e.clientY;
+    if(s.float) s.float.style.display='none';
+    hideArrow();
+    if(s.kind==='attack'){
+      const t=targetAt(x,y), a=t && findAtk(s.id, t);
+      finish(); ui.selected=null;
+      if(a){ playerAction(a); return; }
+      if(t && t.seat===OPP) logLine(view.opp.board.some(m=>m.taunt) ? '상대 도발 하수인을 먼저 공격해야 합니다.' : '공격할 수 없습니다.');
+      render(); return;
+    }
+    if(s.mode==='aim'){
+      const t=targetAt(x,y); const ok=t && isPendingTarget(t);
+      finish();
+      if(ok){ resolvePending(t); return; }
+      ui.pending=null; render(); return;
+    }
+    const board=overBoard(x,y);
+    finish();
+    if(!board){ ui.place=null; render(); return; }               // 손패 쪽에 다시 놓음 → 취소
+    if(s.card.type!=='spell'){
+      if(ui.place){ placeAt(ui.place.pos); return; }
+      playCard(s.card); return;
+    }
+    if(s.entries.length===1 && !s.entries[0].target){ playerAction(s.entries[0]); return; }
+    playCard(s.card);
+  }
+  function cancel(){ if(!st) return; const s=st; finish(); if(s.started){ if(s.kind==='attack') ui.selected=null; ui.place=null; if(s.mode==='aim') ui.pending=null; if(view) render(); } }
+  document.addEventListener('pointerdown', down);
+  document.addEventListener('pointermove', move, {passive:false});
+  document.addEventListener('pointerup', up);
+  document.addEventListener('pointercancel', cancel);
+  window.addEventListener('blur', cancel);
+  window.addEventListener('click', e=>{ if(Date.now()<eatUntil){ eatUntil=0; e.stopPropagation(); e.preventDefault(); } }, true);   // 끌기가 끝난 뒤 따라오는 클릭은 버린다
+  document.addEventListener('dragstart', e=>{ if(e.target.closest && e.target.closest('#hand, #playerZone, #playerHero')) e.preventDefault(); });
+  return {cancel, active:()=>!!(st && st.started)};
+})();
+window.Drag=Drag;
+
 // ---------- 렌더 (view 만 읽는다) ----------
 // 사용자가 제공한 스크린샷에서 추출한 하수인 이미지를 로컬 파일로 사용합니다. 인터넷 연결이 필요 없습니다.
 // v117: cards.js 의 카드에 art:'images/…' 를 적으면 아래 표에 없어도 그 그림을 쓴다
@@ -1366,7 +1500,7 @@ function cardEl(c, opts={}){
     el.innerHTML=`<div class="cost">${c.cost}</div><div class="cname">${c.name}</div>${art?`<div class="card-art"><img src="${art}" alt="${c.name}" loading="lazy"></div>`:''}<div class="effect">${tags}${tags&&eff?'<br>':''}${eff}</div><div class="stats"><span class="atk">${c.atk}</span>${(c.tribe||runeOf(c).length)?`<span class="race">${c.tribe?c.tribe.replace(/ \/ /g,'·'):''}${runeOf(c).length?`<small class="rn">${runeOf(c).join('·')} 룬</small>`:''}</span>`:''}<span class="life">${c.hp}</span></div>`;
   }
   const more = det && (det.own || eff!==fullEff);                                                 // ⓘ 표시: 앞면이 줄었거나 따로 적은 설명이 있을 때
-  if(more){ const d=document.createElement('div'); d.className='info-dot'; d.textContent='i'; d.title='눌러서 자세히 보기'; const ar=el.querySelector('.card-art'); if(!ar) d.classList.add('noart'); (ar||el).appendChild(d); }   // 그림 오른쪽 위 (이름을 가리지 않게)
+  if(more){ const d=document.createElement('div'); d.className='info-dot'; d.textContent='i'; d.title='마우스를 올리면(폰은 길게 누르면) 자세히 보기'; const ar=el.querySelector('.card-art'); if(!ar) d.classList.add('noart'); (ar||el).appendChild(d); }   // 그림 오른쪽 위 (이름을 가리지 않게)
   if(opts.onClick) el.onclick=opts.onClick;
   return el;
 }
@@ -1435,7 +1569,7 @@ function render(){
     const playable = legal.some(a=>a.type==='PLAY_CARD' && a.cardId===c.id) && ((!pending && !place) || isPending || (!!place && !pending));
     const ht={kind:'hand', seat:MY, id:c.id}, isTarget=isPendingTarget(ht);      // 복제 같은 주문은 손패 카드가 대상이 된다
     const fresh=!ui.handSeen.has(c.id); ui.handSeen.add(c.id);                     // v129 손에 새로 들어온 카드: 뒤집히며 등장
-    const extra=(playable||isTarget?'':'unaffordable')+(isPending?' selected':'')+(isTarget?' targetable':'')+(fresh?' drawn-in':'');
+    const extra=(playable||isTarget?'':'unaffordable')+(isPending?' selected':'')+(isTarget?' targetable':'')+(fresh?' drawn-in':'')+(ui.dragId===c.id?' dragging':'');
     hand.appendChild(cardEl(c, {extra, onClick:()=> isPending ? cancelPending() : isTarget ? resolvePending(ht) : playCard(c)}));
   });
   for(let k=0;k<(ui.drawGhosts[MY]||0);k++){ const g=document.createElement('div'); g.className='card draw-ghost'; hand.appendChild(g); }   // 연출 중: 막 뽑은 카드(뒷면)
@@ -1879,7 +2013,7 @@ const gcol=(inner,lbl)=>`<div class="gp-col">${inner}${lbl?`<div class="gp-lbl">
 const ghero=(emo,hp,o={})=>`<div class="hero-o ${o.dead?'dead':''}">${emo}${o.atk?`<span class="atkb">${o.atk}</span>`:''}${o.arm!=null?`<span class="arm">${o.arm}</span>`:''}<span class="hpb">${hp}</span></div>`;
 const gback=n=>`<div class="stack">${'<div class="mc back"></div>'.repeat(n)}</div>`;
 const gdots=(i,n)=>'<span class="gp-dots">'+Array.from({length:n},(_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')+'</span>';
-const guidePg={rule:0, card:0};
+const guidePg={rule:0, card:0, mode:0};
 function gpGo(kind,d){ guidePg[kind]+=d; guideTab(kind); }
 function gPager(kind, pages){
   const i=Math.max(0,Math.min(pages.length-1,guidePg[kind])); guidePg[kind]=i; const p=pages[i];
@@ -1912,6 +2046,10 @@ function guideRule(){
    {t:'🏆 승리 조건', s:`<div class="gp-row">${gcol(ghero('🙂',C.HERO_HP),'내 영웅 체력 '+C.HERO_HP)}${gcol(ghero('😈',C.HERO_HP),'상대 영웅 체력 '+C.HERO_HP)}</div><div class="gp-sep"></div>
       <div class="gp-row">${gcol(ghero('😈',0,{dead:true}),'상대 체력 0')}<span class="gp-arrow">=</span>${gcol('<div style="font-size:2rem">🏆</div>','승리!')}</div>`,
     x:`<p>상대 영웅의 체력을 <b>0</b>으로 만들면 승리! 반대로 내 체력이 0이 되면 패배입니다. 영웅 체력은 <b>${C.HERO_HP}</b>에서 시작합니다.</p>`},
+   {t:'🖐 조작법', s:`<div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'손패 카드',c:3}),'잡아서')}<span class="gp-arrow">⤴</span>${gcol('<div class="slot" style="width:64px;height:84px"></div>','전장에 놓기 = 내기')}</div>
+      <div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'내 하수인',a:3,h:4}),'잡아서 끌면 화살표')}<span class="gp-arrow">➶</span>${gcol(gmc({cls:'en',art:EN,nm:'상대',a:2,h:3}),'적 위에서 놓기 = 공격')}</div><div class="gp-sep"></div>
+      <div class="gp-row"><div class="step"><i>🖱</i><span>PC<br>마우스 올리기</span></div><div class="step"><i>👆</i><span>폰<br>길게 누르기</span></div><span class="gp-arrow">=</span><div class="step"><i>🔍</i><span>카드<br>자세한 설명</span></div></div>`,
+    x:'<p><b>카드 내기</b>: 손패 카드를 잡고 전장으로 끌어다 놓으면 냅니다. 하수인은 놓는 위치가 곧 자리예요. 대상이 필요한 주문은 끌면 화살표가 나오고, 대상 위에서 손을 떼면 씁니다.</p><p><b>공격</b>: 내 하수인을 잡고 적 하수인이나 영웅 위에서 놓습니다. 빈 곳에서 놓으면 취소돼요. <b>누르고 → 대상 누르기</b>(탭 두 번)도 똑같이 됩니다.</p><p><b>설명 보기</b>: PC는 카드 위에 마우스를 올리고, 폰은 카드를 <b>길게 누르세요</b>. 손을 떼면 닫힙니다.</p>'},
    {t:'🃏 게임 준비', s:`<div class="gp-row">${gcol(gback(3),'덱 <b style="color:#f0c869">'+C.DECK_SIZE+'장</b>')}${gcol(`<div style="display:flex;gap:6px">${gmc({cls:'me',art:ME,nm:'같은 카드',c:4})}${gmc({cls:'me',art:ME,nm:'같은 카드',c:4})}</div>`,'같은 카드는 최대 '+C.COPIES+'장')}</div><div class="gp-sep"></div>
       <div class="gp-row">${gcol(gback(C.START_HAND),'선공 · 시작 손패 '+C.START_HAND+'장')}${gcol(`<div style="display:flex;align-items:center;gap:8px">${gback(C.START_HAND+C.SECOND_HAND)}<div class="coin">동전</div></div>`,'후공 · +'+C.SECOND_HAND+'장과 동전 1장')}</div>`,
     x:'<p>선공·후공은 <b>무작위</b>로 정해집니다. 후공은 카드를 더 받아 불리함을 보충합니다.</p>'},
@@ -1925,9 +2063,9 @@ function guideRule(){
       <div class="gp-lbl" style="max-width:none">손패 — 최대 ${C.MAX_HAND}장 (넘치면 소각 🔥)</div><div class="slots">${'<div class="slot h"></div>'.repeat(C.MAX_HAND)}<div class="slot no">🔥</div></div>
       <div class="gp-sep"></div><div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'낸 턴',a:3,h:5,zz:true}),'낸 턴: 공격 불가')}<span class="gp-arrow">→</span>${gcol(gmc({cls:'me',art:ME,nm:'다음 턴',a:3,h:5}),'다음 턴부터 공격')}</div>`,
     x:`<p>필드에는 하수인을 최대 <b>${C.MAX_BOARD}기</b>까지 둘 수 있고, 가득 차면 더 소환되지 않습니다. 손패는 <b>${C.MAX_HAND}장</b>까지이며 넘치게 뽑으면 그 카드가 불타 사라집니다. 하수인은 턴마다 <b>한 번</b> 공격하고, 낸 턴에는 공격하지 못합니다(돌진·속공 제외).</p>`},
-   {t:'⚔️ 공격 방법', s:`<div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'내 하수인',a:3,h:4}),'① 내 하수인을 누른다')}<span class="gp-arrow">⚔</span>${gcol(gmc({cls:'en',art:EN,nm:'상대 하수인',a:2,h:3}),'② 대상을 고른다')}</div>
+   {t:'⚔️ 공격 방법', s:`<div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'내 하수인',a:3,h:4}),'① 내 하수인을 잡고')}<span class="gp-arrow">⚔</span>${gcol(gmc({cls:'en',art:EN,nm:'상대 하수인',a:2,h:3}),'② 대상 위에 놓는다')}</div>
       <div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'내 하수인',a:3,h:2}),'<span class="dmg">-2</span> 서로 공격력만큼<br>피해를 주고받음')}${gcol(gmc({cls:'en',art:EN,nm:'상대 하수인',a:2,h:0,x:true,}),'<span class="dmg">-3</span> 체력 0 → 처치')}</div>`,
-    x:'<p>내 하수인을 누르고 대상을 고릅니다. 서로 <b>공격력만큼</b> 피해를 주고받으며, 체력이 0이 되면 죽습니다. 상대 영웅도 공격 대상이 될 수 있습니다.</p>'},
+    x:'<p>내 하수인을 대상까지 끌어다 놓습니다(누르고 → 대상 누르기도 됩니다). 서로 <b>공격력만큼</b> 피해를 주고받으며, 체력이 0이 되면 죽습니다. 상대 영웅도 공격 대상이 될 수 있습니다.</p>'},
    {t:'🛡 도발', s:`<div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'내 하수인',a:3,h:4}),'')}<span class="gp-arrow" style="color:#ff6a5a">🚫 →</span>${gcol(ghero('😈',C.HERO_HP),'영웅·다른 하수인')}</div>
       <div class="gp-row">${gcol(gmc({cls:'me',art:ME,nm:'내 하수인',a:3,h:4}),'')}<span class="gp-arrow">⚔ →</span>${gcol(gmc({cls:'en taunt',art:TAUNT,nm:'도발 하수인',a:3,h:6}),'도발부터 공격!')}</div>`,
     x:'<p>상대에게 <b>도발</b> 하수인(회색 테두리)이 있으면 영웅과 다른 하수인은 공격할 수 없고, <b>도발부터</b> 처리해야 합니다.</p>'},
@@ -1937,12 +2075,81 @@ function guideRule(){
   ];
   return gPager('rule',pages);
 }
-function openGuide(){ guidePg.rule=0; guidePg.card=0; showScreen('guide'); guideTab('fx'); }
+function openGuide(tab){ guidePg.rule=0; guidePg.card=0; guidePg.mode=0; showScreen('guide'); guideTab(tab||'fx'); }
 function guideTab(t){
   document.querySelectorAll('.g-tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===t));
-  const b=$('guideBody'); b.innerHTML = t==='fx'?guideFx():t==='card'?guideCard():guideRule(); b.scrollTop=0;
+  const b=$('guideBody'); b.innerHTML = t==='fx'?guideFx():t==='card'?guideCard():t==='mode'?guideMode():guideRule(); b.scrollTop=0;
 }
-document.querySelectorAll('.g-tabs button').forEach(b=>b.addEventListener('click',()=>{ guidePg.rule=0; guidePg.card=0; guideTab(b.dataset.t); }));
+document.querySelectorAll('.g-tabs button').forEach(b=>b.addEventListener('click',()=>{ guidePg.rule=0; guidePg.card=0; guidePg.mode=0; guideTab(b.dataset.t); }));
+// ---------- v139 모드 안내: 가이드의 [🎮 모드] 탭 + 각 모드에 처음 들어갈 때 한 번 뜨는 안내 ----------
+const gsteps=list=>`<div class="gp-row">${list.map(([i,s],k)=>(k?'<span class="gp-arrow">›</span>':'')+`<div class="step"><i>${i}</i><span>${s}</span></div>`).join('')}</div>`;
+const gboxes=list=>`<div class="gp-row">${list.map(([i,s])=>`<div class="step"><i>${i}</i><span>${s}</span></div>`).join('')}</div>`;
+function modeGuidePages(){
+  const P=(typeof PVP!=='undefined')?PVP:{WIN_GOLD:50, TURN_MS:60000, MULLIGAN_MS:30000, RECONNECT_MS:60000, MAX_TIMEOUTS:3, MAX_TURNS:150, REPLAY_KEEP:20};
+  const R=(typeof RANK!=='undefined')?RANK:{TIERS:['브론즈','실버','골드','플래티넘','다이아','전설'], DIVS:3, STARS_PER_DIV:3, STREAK_BONUS_FROM:3, FALLBACK_MS:30000};
+  const sec=ms=>Math.round(ms/1000), pct=x=>Math.round(Math.abs(x-1)*100);
+  const tiers=Object.entries(typeof CHEAT_TIERS!=='undefined'?CHEAT_TIERS:{}).map(([p,t])=>[t.count?'😈':'🙂', `배당 ${p}%<br>${t.count?`치트 ${t.count}개`:'치트 없음'}`]);
+  const ex=(typeof CHEATS!=='undefined'?CHEATS:[]).filter(c=>['hp','startMana','chargeAll'].includes(c.id)).map(c=>`${c.icon} ${c.name}(${c.desc(c.levels[0]).replace(/\s*\(.*\)\s*$/,'')})`).join(' · ');
+  const B=ECON.BET_TIERS;
+  return {
+    ai:[
+      {t:'🤖 AI 대전', s:gboxes([['🎲','초급<br>무작위로 행동'],['📏','중급<br>규칙대로 행동'],['🧠','중급2<br>한 수 앞을 계산']]),
+       x:`<p>컴퓨터와 1대1로 싸웁니다. <b>📚 내 덱</b>에 저장한 덱을 그대로 씁니다.</p><p><b>초급</b>은 이기면 <b>${ECON.EASY_WIN}골드</b>. <b>중급·중급2</b>는 다음 화면에서 <b>일반 모드</b>와 <b>배팅 모드</b> 중 하나를 고릅니다.</p>`},
+      {t:'💰 일반 모드 · 배팅 모드', s:gboxes([['🆓','일반 모드<br>참가비 없음'],['🎲','배팅 모드<br>골드를 건다']]),
+       x:`<p><b>일반 모드</b>: 이기면 <b>오늘의 보상</b>(하루 시작 ${ECON.POOL_START}골드)을 받습니다. 이기면 다음 보상이 +${pct(ECON.POOL_UP)}%, 지면 −${pct(ECON.POOL_DOWN)}%가 되고, 매일 새벽 ${ECON.RESET_HOUR}시에 ${ECON.POOL_START}골드로 돌아갑니다.</p><p><b>배팅 모드</b>: 골드를 걸고 배당(${B[0]}~${B[B.length-1]}%)을 고릅니다. 지면 건 골드를 모두 잃고, <b>배당 200% 이상이면 상대 AI가 치트를 받습니다</b>.</p>`}],
+    bet:[
+      {t:'🎲 배팅 모드', s:gsteps([['💰','금액<br>정하기'],['📈','배당<br>고르기'],['⚔️','대전'],['🏆','이기면<br>건 금액 × 배당']]),
+       x:`<p>건 골드는 <b>시작하는 순간 빠져나가고</b>, 도중에 나가면 돌려받지 못합니다. 이기면 건 골드에 더해 <b>건 골드 × 배당%</b>를 받아요. (예: 100골드 · 배당 200% → 이기면 300골드를 돌려받음) 무승부면 건 골드를 그대로 돌려받습니다.</p>`},
+      {t:'😈 치트', s:gboxes(tiers),
+       x:`<p>배당이 높을수록 상대 AI가 <b>치트</b>(특수 능력)를 더 받습니다. 치트는 게임을 시작할 때 후보 중에서 <b>무작위로 뽑히고</b>, 판 위쪽 상대 쪽에 칩으로 표시됩니다. 칩에 마우스를 올리면(폰은 탭) 효과가 보여요.</p>${ex?`<p>예: ${ex}. 배당이 높을수록 더 센 치트도 후보에 들어갑니다.</p>`:''}`}],
+    pvp:[
+      {t:'⚔️ 유저 대전', s:gsteps([['🔎','상대<br>찾기'],['🔄',`멀리건<br>${sec(P.MULLIGAN_MS)}초`],['⏱',`한 턴<br>${sec(P.TURN_MS)}초`],['🏆',`승리<br>${P.WIN_GOLD}골드`]]),
+       x:`<p>다른 사람과 실시간으로 대전합니다. 저장된 <b>내 덱</b>으로 싸우고, 이기면 매번 <b>${P.WIN_GOLD}골드</b>를 받습니다 (하루 횟수 제한 없음).</p><p>한 턴은 <b>${sec(P.TURN_MS)}초</b>. 시간이 지나면 턴이 자동으로 넘어가고, <b>연속 ${P.MAX_TIMEOUTS}번</b> 넘어가면 패배합니다. 연결이 끊기면 <b>${sec(P.RECONNECT_MS)}초</b> 안에 돌아와야 해요.</p>`},
+      {t:'🏆 일반전 · 랭크전', s:gsteps(R.TIERS.map((n,i)=>[['🥉','🥈','🥇','💠','💎','👑'][i]||'⭐', n])),
+       x:`<p>두 탭은 대기열이 따로입니다. <b>랭크전</b>은 ${R.TIERS.slice(0,-1).join(' → ')}(각 ${R.DIVS}단계, 단계마다 별 ${R.STARS_PER_DIV}개) → ${R.TIERS[R.TIERS.length-1]}로 올라갑니다.</p><p>이기면 별 +1, <b>${R.STREAK_BONUS_FROM}연승째부터 +2</b>, 지면 −1 (브론즈는 안 줄어요). 실버 이상은 한 번 오르면 그 등급 아래로 안 떨어지고, 전설은 거둔 승수로 순위를 매깁니다. 랭크전 상대가 ${sec(R.FALLBACK_MS)}초 안에 안 잡히면 일반전으로 바꿀 수 있어요.</p>`},
+      {t:'🎞 리플레이 · 친구', s:gboxes([['🎞','지난 판<br>다시 보기'],['👥','친구<br>대전'],['👁','관전']]),
+       x:`<p><b>🎞 지난 판 다시 보기</b>로 최근 ${P.REPLAY_KEEP}판을 양쪽 손패까지 다시 볼 수 있어요. <b>👥 친구</b> 화면에서 접속 중인 친구에게 대전을 신청하거나 관전할 수 있습니다. 친구 대전은 연습용이라 골드·랭크·전적·일일 퀘스트에 반영되지 않아요.</p>`}],
+    adv:[
+      {t:'🗺 모험 모드', s:gsteps([['🎓','챕터<br>고르기'],['👹','보스에게<br>도전'],['🎁','처음 깨면<br>보상']]),
+       x:'<p>정해진 덱을 쓰는 <b>보스</b>와 싸웁니다. 져도 골드를 잃지 않아요. 챕터는 <b>도장깨기</b> 방식이라 앞 단계를 깨야 다음 단계가 열립니다.</p><p>보스는 전용 카드와 <b>특수 능력</b>을 가질 수 있어요. 보스 칸의 칩에 마우스를 올리면(폰은 탭) 효과가 보입니다.</p>'},
+      {t:'🎒 보상 · 모험 덱', s:gboxes([['🎁','카드 묶음<br>골라 받기'],['🎒','모험 덱<br>편집']]),
+       x:'<p>보스를 <b>처음 깨면</b> 보상을 받습니다. 카드 묶음 중 하나를 고르는 보상은 창을 닫아도 모험 화면의 <b>[🎁 받지 않은 보상]</b>에서 나중에 고를 수 있어요.</p><p><b>🎒 모험 전용</b> 카드는 <b>모험 덱</b>에만 넣을 수 있습니다. 모험 화면의 <b>[🎒 모험 덱 편집]</b>에서 꾸미고, AI 대전·유저 대전은 계속 일반 덱을 씁니다.</p>'}],
+  };
+}
+function guideMode(){
+  const g=modeGuidePages(), pages=[...g.ai, ...g.bet, ...g.pvp, ...g.adv];
+  return gPager('mode', pages);
+}
+// 처음 들어가는 화면에서 한 번만 (기기마다 기억). 가이드 → 🎮 모드 탭에서 언제든 다시 볼 수 있다
+const ModeIntro=(function(){
+  const KEY='cardDuel.modeIntro.v1', SCREEN={difficulty:'ai', bet:'bet', pvp:'pvp', adventure:'adv'};
+  const TITLE={ai:'🤖 AI 대전 안내', bet:'🎲 배팅 모드 안내', pvp:'⚔️ 유저 대전 안내', adv:'🗺 모험 모드 안내'};
+  let seen={}; try{ seen=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(_){}
+  const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(seen)); }catch(_){} };
+  let box=null;
+  function close(){ if(box){ box.remove(); box=null; } }
+  function open(key){
+    const pages=modeGuidePages()[key]; if(!pages) return;
+    close(); seen[key]=1; save();
+    let i=0;
+    box=document.createElement('div'); box.id='modeIntro'; box.setAttribute('role','dialog'); box.setAttribute('aria-label', TITLE[key]);
+    const draw=()=>{ const p=pages[i], last=i===pages.length-1;
+      box.innerHTML=`<div class="mi-card"><div class="mi-top"><b>${TITLE[key]}</b><button type="button" class="mi-skip">건너뛰기</button></div>
+        <div class="gp-head"><span>${i+1} / ${pages.length}</span><b>${p.t}</b></div><div class="gp-stage">${p.s}</div><div class="gp-text">${p.x}</div>
+        <div class="gp-nav"><button type="button" class="mi-prev" ${i?'':'disabled'}>◀ 이전</button>${gdots(i,pages.length)}<button type="button" class="mi-next">${last?'시작하기 ✔':'다음 ▶'}</button></div>
+        <p class="mi-foot">📖 가이드 → 🎮 모드 탭에서 언제든 다시 볼 수 있어요.</p></div>`;
+      box.querySelector('.mi-skip').onclick=close;
+      box.querySelector('.mi-prev').onclick=()=>{ if(i>0){ i--; draw(); } };
+      box.querySelector('.mi-next').onclick=()=>{ if(last) close(); else { i++; draw(); } };
+    };
+    draw(); document.body.appendChild(box);
+    box.addEventListener('click', e=>{ if(e.target===box) close(); });
+  }
+  function onScreen(name){ const k=SCREEN[name]; if(k && !seen[k]) setTimeout(()=>open(k), 120); }
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && box) close(); });
+  return {open, onScreen, close, reset(){ seen={}; save(); }};
+})();
+
 
 function renderPowerScreen(){                     // v131 메뉴 → 영웅 능력 고르기
   const box=$('powerGrid'); if(!box) return; const cur=HeroPowerPref.get(); box.innerHTML='';
@@ -1956,6 +2163,7 @@ function updatePowerMenuDesc(){ const el=$('powerMenuDesc'); if(!el) return; con
   el.textContent = h ? `지금: ${h.icon} ${h.name} — ${h.text} (비용 ${HP_COST}, 턴마다 한 번)` : '지금: 🎲 판마다 무작위 (비용 1, 턴마다 한 번)'; }
 const PRELOAD_SCREENS=new Set(['mode','difficulty','playmode','bet','adventure','pvp','friends','test']);   // v138 대전을 고르는 화면에 오면 뒤에서 미리 받기 시작
 function showScreen(name){
+  if(typeof ModeIntro!=='undefined') ModeIntro.onScreen(name);   // v139 처음 들어가는 모드면 안내를 한 번 띄운다
   if(PRELOAD_SCREENS.has(name) && typeof Preload!=='undefined') Preload.warmup();
   if(name==='power') renderPowerScreen();
   if(name==='main') updatePowerMenuDesc();
@@ -2937,12 +3145,19 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
   const SKIP='#mulliganModal,#discoverModal,#spellCast,#burnCast,#cardPreview';
   let cur=null;
   function hide(){ box.style.display='none'; box.innerHTML=''; cur=null; }
-  function place(anchor, cardNode, textForNotes, preferLeft){              // 카드(확대)를 띄우고, 오른쪽에 키워드 설명을 붙인다
+  function place(anchor, cardNode, textForNotes, preferLeft, card){        // 카드(확대)를 띄우고, 오른쪽에 자세한 설명·키워드 설명을 붙인다
     box.innerHTML=''; box.appendChild(cardNode); box.style.display='block';
-    const p=cardNode.getBoundingClientRect(), notes=keywordNotes(textForNotes);
+    const p=cardNode.getBoundingClientRect(), det=card ? cardDetailOf(card) : null;
+    const notes=keywordNotes(textForNotes+(det?' '+det.desc:''));
+    const descShown = det && (det.own || frontText(card, effectText(card)||'')!==(effectText(card)||''));   // v139 앞면에 다 적혀 있으면 설명은 되풀이하지 않는다
+    const parts=[];
+    if(descShown) parts.push(`<div class="pv-desc"><b>${escHtml(card.name)}</b><span>${escHtml(det.desc)}</span></div>`);
+    if(det && det.quote) parts.push(`<div class="pv-quote">🗨 ${escHtml(det.quote)}</div>`);
+    if(det && det.flavor) parts.push(`<div class="pv-flavor">${escHtml(det.flavor)}</div>`);
+    notes.forEach(([k,d])=>parts.push(`<div><b>${escHtml(k)}</b><span>${escHtml(d)}</span></div>`));
     let nw=0;
-    if(notes.length){ const n=document.createElement('div'); n.className='kw-notes'; n.style.left=(p.width+10)+'px';
-      n.innerHTML=notes.map(([k,d])=>`<div><b>${escHtml(k)}</b><span>${escHtml(d)}</span></div>`).join(''); box.appendChild(n); nw=n.getBoundingClientRect().width+10; }
+    if(parts.length){ const n=document.createElement('div'); n.className='kw-notes'+(descShown?' wide':''); n.style.left=(p.width+10)+'px';
+      n.innerHTML=parts.join(''); box.appendChild(n); nw=n.getBoundingClientRect().width+10; }
     const r=anchor.getBoundingClientRect(), w=p.width+nw, h=Math.max(p.height, box.lastChild.getBoundingClientRect().height);
     let x=preferLeft ? r.left-w-14 : r.right+14;
     if(!preferLeft && x+w>innerWidth-6) x=r.left-w-14;
@@ -2955,24 +3170,33 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
     const cl=el.cloneNode(true);
     cl.classList.remove('selected','attackable','dead','frozen-x'); cl.style.cssText='filter:none; opacity:1;'; cl.removeAttribute('title');
     cl.querySelectorAll('.kw').forEach(x=>x.remove()); cl.classList.remove('taunt','shielded','stealthed','frozen','targetable','place-ghost','r-legend');   // v130 필드용 아이콘·테두리는 빼고 카드 그대로   // 덱 편집의 흐림(0장·미보유) 효과는 빼고 보여 준다
-    place(el, cl, el.textContent||'', false);
+    let card=null; try{ card=cardDetail.cardOf(el); }catch(_){}
+    place(el, cl, el.textContent||'', false, card);
   }
   const target=e=>{ const c=e.target.closest && e.target.closest('.card'); return (!c || c.closest(SKIP) || c.classList.contains('card-back') || !c.querySelector('.cname')) ? null : c; };
   document.addEventListener('mouseover', e=>{
-    if(!hover && !(e.target.closest && e.target.closest('#offerModal'))) return;          // 터치 기기는 보상 창만
+    if(ui.dragging){ if(cur) hide(); return; }                                             // v139 끄는 중에는 미리보기를 띄우지 않는다
+    if(!hover) return;                                                                      // v139 터치 기기는 길게 누르기로 본다 (아래)
     const c=target(e); if(!c){ if(cur && !(cur.dataset && cur.dataset.card)) hide(); return; }
     if(c!==cur) show(c);
   });
-  document.addEventListener('touchstart', e=>{ const c=target(e); if(c && c.closest('#offerModal')) show(c); else if(cur) hide(); }, {passive:true});
-  // v130 터치: 필드 하수인을 꾹 누르고 있으면 전체 카드(설명)를 보여 주고, 손을 떼면 닫는다 (그때의 클릭은 공격 선택으로 넘기지 않음)
-  let lpTimer=null, lpShown=false;
-  document.addEventListener('touchstart', e=>{ const c=target(e); clearTimeout(lpTimer); if(!c || !c.closest('.zone')) return;
-    lpTimer=setTimeout(()=>{ lpShown=true; show(c); }, 420); }, {passive:true});
-  ['touchmove','touchcancel'].forEach(t=>document.addEventListener(t, ()=>clearTimeout(lpTimer), {passive:true}));
-  document.addEventListener('touchend', ()=>{ clearTimeout(lpTimer); if(lpShown){ setTimeout(()=>{ hide(); lpShown=false; }, 350); } }, {passive:true});
-  document.addEventListener('click', e=>{ if(lpShown){ e.stopPropagation(); e.preventDefault(); } }, true);
-  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.zone .card')) e.preventDefault(); });
-  document.addEventListener('touchend', ()=>{ if(cur && cur.closest && cur.closest('#offerModal')) setTimeout(hide, 900); }, {passive:true});
+  // v139 터치: 어떤 카드든(손패·필드·도감·발견 창) 꾹 누르고 있으면 큰 카드와 자세한 설명을 보여 주고, 손을 떼면 닫는다
+  //  그때의 클릭은 카드 내기·공격·선택으로 넘기지 않는다. 손가락을 움직이면(끌기) 길게 누르기가 아니다.
+  const lpTarget=e=>{ const c=e.target.closest && e.target.closest('.card'); return (!c || c.closest('#cardPreview') || c.classList.contains('card-back') || c.classList.contains('place-ghost') || !c.querySelector('.cname')) ? null : c; };
+  let lpTimer=null, lpAt=null, lpEat=0;
+  document.addEventListener('pointerdown', e=>{
+    clearTimeout(lpTimer); lpAt=null; lpEat=0;
+    if(e.pointerType==='mouse') return;
+    const c=lpTarget(e); if(!c) return;
+    lpAt={x:e.clientX, y:e.clientY};
+    lpTimer=setTimeout(()=>{ ui.lpShown=true; if(window.Drag) Drag.cancel(); show(c); }, 430);
+  }, true);
+  document.addEventListener('pointermove', e=>{ if(lpAt && Math.hypot(e.clientX-lpAt.x, e.clientY-lpAt.y)>9){ clearTimeout(lpTimer); lpAt=null; } }, true);
+  const lpEnd=()=>{ clearTimeout(lpTimer); lpAt=null; if(ui.lpShown){ ui.lpShown=false; hide(); lpEat=Date.now(); } };
+  document.addEventListener('pointerup', lpEnd, true);
+  document.addEventListener('pointercancel', lpEnd, true);
+  window.addEventListener('click', e=>{ if(Date.now()-lpEat<600){ lpEat=0; e.stopPropagation(); e.preventDefault(); } }, true);
+  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.card')) e.preventDefault(); });
   // v117 전투 기록: 카드 이름이 들어 있는 줄에 마우스를 올리면 그 카드를 띄운다 (기록 창은 오른쪽이라 왼쪽에)
   document.addEventListener('mouseover', e=>{
     const li=e.target.closest && e.target.closest('#logList [data-card]');
@@ -3034,12 +3258,9 @@ const cardDetail=(function(){
     if(el._card) return el._card;
     return cardByName(name) || null;
   }
-  document.addEventListener('click', e=>{
-    if(e.target.closest && e.target.closest('#cardDetail')) return;
-    const el=e.target.closest && e.target.closest('.card.has-detail'); if(!el) return;
-    const c=cardOfEl(el); if(c) show(el, c);
-  });
+  // v139 카드를 누를 때 상세 창을 띄우던 동작은 없앴다 — 누르기는 내기·공격·선택 전용.
+  //  설명은 PC는 마우스를 올려서, 폰은 길게 눌러서 큰 카드 옆에 함께 본다 (위의 미리보기).
   ['mousedown','touchstart'].forEach(t=>document.addEventListener(t, e=>{ if(box.style.display==='block' && !(e.target.closest && e.target.closest('#cardDetail'))) hide(); }, {capture:true, passive:true}));
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') hide(); });
-  return {show, hide};
+  return {show, hide, cardOf:cardOfEl};
 })();

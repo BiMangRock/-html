@@ -186,6 +186,36 @@ button{font-family:inherit}
 .hero .av{width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid var(--gold2);display:block;margin:0 auto 3px;transition:border-color .3s}
 .hero.foe .av{border-color:var(--red)}
 @media (max-width:900px){.hero .av{width:36px;height:36px}.msg img{width:34px;height:34px}.msg .bub{font-size:12.5px}}
+
+/* v139 폰 가로 화면: 안내는 왼쪽, 전장은 오른쪽에 한 화면으로 (전에는 손패가 화면 밖으로 밀려났다) */
+@media (orientation:landscape) and (max-height:540px){
+  :root{--cw:60px;--ch:84px;--mw:52px;--mh:62px}
+  .top{padding:4px 10px;gap:8px}.top h1{font-size:13px}.chapname{display:none}.tbtn{padding:4px 8px;font-size:11px}
+  .layout{flex-direction:row}
+  .coach{width:250px;max-height:none;border-right:1px solid var(--line);border-bottom:0;padding:8px 10px;gap:5px}
+  .coach h2{font-size:14px}.coach .task{font-size:12px;padding:6px 8px}.coach .body{min-height:40px}
+  .msg img{width:28px;height:28px}.msg .bub{font-size:12px;padding:5px 8px;line-height:1.45}
+  .cbtn{padding:7px 10px;font-size:13px}
+  .stage{padding:4px 8px;gap:3px}
+  .row{gap:6px}.sidecol{width:84px}
+  .hero{width:84px;padding:3px 4px}.hero .av{width:26px;height:26px;margin-bottom:1px}.hero .nm{font-size:10px}.hero .hp{font-size:16px;margin:0}.hero .hp small{font-size:10px}
+  .mana{margin-top:2px;min-height:10px}.mana i{width:8px;height:10px}.mnum,.mini{font-size:10px}
+  .board{min-height:calc(var(--mh) + 12px);padding:3px;gap:6px}
+  .mid{min-height:30px;gap:8px}.turn{font-size:11px;padding:2px 10px}.endb{padding:6px 16px;font-size:13px}
+  .hand{min-height:calc(var(--ch) + 4px);gap:4px}
+  .hc .tx,.hc .ty{display:none}.hc .art{height:40px;margin:2px}.hc .nm{font-size:9.5px}.hc .cost{width:22px;height:22px;font-size:12px;left:-6px;top:-6px}.hc .st{min-width:20px;height:20px;font-size:12px;bottom:-6px}
+  .mn .nm{font-size:8.5px;bottom:12px;padding:0 10px}.mn .st{min-width:20px;height:20px;font-size:12px;bottom:-6px}.mn .tags{display:none}
+  .hc:hover{transform:translateY(-4px) scale(1.04)}
+}
+/* v139 끌어서 내기·공격 · 길게 눌러 설명 */
+#dragArrow{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:60;display:none}
+.hc img,.mn img{-webkit-user-drag:none}
+.hc,.mn{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.hc.dragging{opacity:.25}
+.hc.drag-float{position:fixed!important;left:0;top:0;z-index:70;pointer-events:none;margin:0;transition:none!important;animation:none!important;box-shadow:0 16px 36px rgba(0,0,0,.6),0 0 0 2px var(--gold)}
+.hc.drag-float.drop-ok{box-shadow:0 16px 36px rgba(0,0,0,.6),0 0 18px 4px var(--green)}
+body.dragging,body.dragging *{cursor:grabbing!important}
+.inspect.show.force{display:block!important;left:50%;right:auto;top:40%;transform:translate(-50%,-50%);width:min(78vw,300px);font-size:14px;z-index:80;box-shadow:0 10px 30px rgba(0,0,0,.6)}
 </style>
 </head>
 <body>
@@ -3617,16 +3647,16 @@ const STEPS=[
  {ch:0,type:'play',card:'부정한 알',title:'부정한 알 내기',
   body:`<p>비용 1짜리 <b>부정한 알</b>(0/2)을 냅니다. 공격력이 0이라 싸울 수는 없지만, 쓰러지면 <b>3/3 언데드 닭</b>이 나옵니다.</p>
         <p>게다가 알이 살아 있는 동안 <b>내 턴이 끝날 때마다</b> 닭이 점점 커집니다. 오래 살려 둘수록 이득이에요.</p>`,
-  task:`손패의 <b>부정한 알</b>을 클릭하세요.`,nudge:'부정한 알을 내 보세요.'},
+  task:`손패의 <b>부정한 알</b>을 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'부정한 알을 내 보세요.'},
  {ch:0,type:'play',card:'유물 수집가',title:'유물 수집가 내기',
   body:`<p>남은 마나 2로 <b>유물 수집가</b>(3/2)를 냅니다. 공격력은 높고 체력이 낮아서 싸우다 쓰러지기 쉽습니다. 대신 쓰러질 때 <b>내 손패에서 비용이 가장 높은 주문 한 장을 복사</b>합니다.</p>`,
-  task:`손패의 <b>유물 수집가</b>를 클릭하세요.`,nudge:'유물 수집가를 내 보세요.'},
+  task:`손패의 <b>유물 수집가</b>를 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'유물 수집가를 내 보세요.'},
  {ch:0,type:'end',title:'턴 종료',body:`<p>마나를 다 썼습니다. 턴을 넘기세요.</p>`,task:`가운데의 <b>턴 종료</b> 버튼을 누르세요.`,nudge:'턴 종료 버튼을 눌러 주세요.'},
  {type:'enemy',turn:0},
  {ch:0,type:'attack',attacker:'유물 수집가',target:{seat:1,name:'견습 검사'},title:'일부러 맞바꾸기',
   body:`<p>상대가 <b>숲 늑대</b>(3/3)와 <b>견습 검사</b>(2/2)를 냈습니다. 내 손패에는 비용 4짜리 주문 <b>화염구</b>가 있어요.</p>
         <p>유물 수집가(3/2)로 견습 검사(2/2)를 공격하면 서로 쓰러집니다. 수집가가 쓰러지는 순간 ${KW}죽음의 메아리${E}가 터지니 지켜보세요.</p>`,
-  task:`<b>유물 수집가</b> → 상대 <b>견습 검사</b>를 클릭하세요.`,nudge:'유물 수집가로 견습 검사를 공격해 보세요.'},
+  task:`<b>유물 수집가</b>를 잡아 상대 <b>견습 검사</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'유물 수집가로 견습 검사를 공격해 보세요.'},
  {ch:0,type:'info',title:'화염구가 한 장 더!',
   body:`<p>죽음의 메아리로 손패에서 가장 비싼 주문인 <b>화염구</b>가 한 장 복사됐습니다. 손패를 확인해 보세요. 하수인이 쓰러졌는데도 이득을 본 셈이죠.</p>
         <p>죽음의 메아리는 <b>상대 하수인에게도</b> 똑같이 있습니다. 상대 하수인을 쓰러뜨리면 그쪽의 죽음의 메아리가 상대에게 발동한다는 점을 기억하세요.</p>
@@ -3638,18 +3668,18 @@ const STEPS=[
         <p>이 닭은 내 턴이 끝날 때마다 +1/+1씩 더 커집니다. 이렇게 <b>맞아서 죽는 게 오히려 이득</b>인 하수인도 있습니다.</p>`},
  {ch:0,type:'attack',attacker:'언데드 닭',target:{seat:1,name:'방패병'},title:'닭으로 공격',
   body:`<p>상대가 방패병(1/4)도 냈네요. 5/5 닭으로 쳐서 쓰러뜨립시다.</p>`,
-  task:`<b>언데드 닭</b> → 상대 <b>방패병</b>을 클릭하세요.`,nudge:'언데드 닭으로 방패병을 공격하세요.'},
+  task:`<b>언데드 닭</b>을 잡아 상대 <b>방패병</b>까지 끌어다 놓으세요. (차례로 클릭해도 돼요)`,nudge:'언데드 닭으로 방패병을 공격하세요.'},
  {ch:1,type:'play',card:'주문 발견',discover:['서리','치유의 빛','불꽃 화살'],pick:'서리',title:'발견',
   body:`<p>이번엔 ${KW}발견${E}입니다. 발견은 <b>카드 3장 중 하나를 골라</b> 손패로 가져오는 능력이에요. 보통 고른 카드는 <b>비용이 줄어든 채로</b> 들어옵니다.</p>
         <p>손패의 <b>주문 발견</b>(비용 1)은 "주문 1장을 발견, 비용 1 감소"입니다. 써 볼까요?</p>`,
-  task:`손패의 <b>주문 발견</b>을 클릭하세요.`,nudge:'주문 발견을 써 보세요.'},
+  task:`손패의 <b>주문 발견</b>을 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'주문 발견을 써 보세요.'},
  {ch:1,type:'info',title:'서리가 손에 들어왔다',
   body:`<p><b>서리</b>가 손패에 들어왔고 비용이 2에서 <b>1</b>로 줄었습니다. 고르지 않은 두 장은 사라졌어요. 발견 후보는 쓸 때마다 달라지니, 상황에 맞는 카드를 고르는 게 핵심입니다.</p>
         <p>한 가지 주의: 손패가 <b>10장으로 가득 차 있으면</b> 발견한 카드가 사라집니다. 발견하기 전에 손패 자리를 확인하세요.</p>`},
  {ch:2,type:'play',card:'서리',target:{seat:1,name:'숲 늑대'},title:'동결',
   body:`<p><b>서리</b>는 적 하수인 하나를 ${KW}동결${E}시킵니다. 얼어붙은 하수인은 <b>공격할 수 없고</b>, 얼음은 그 하수인 주인의 턴이 끝나면 풀립니다. 즉 상대의 한 턴 동안 막아 주는 셈이에요.</p>
         <p>가장 위협적인 <b>숲 늑대</b>(3/3)를 얼려 봅시다.</p>`,
-  task:`<b>서리</b>를 클릭하고, 대상으로 <b>숲 늑대</b>를 클릭하세요.`,nudge:'서리를 숲 늑대에게 써 보세요.'},
+  task:`<b>서리</b>를 잡아 <b>숲 늑대</b>까지 끌어다 놓으세요. (서리 클릭 → 숲 늑대 클릭도 돼요)`,nudge:'서리를 숲 늑대에게 써 보세요.'},
  {ch:2,type:'info',title:'얼음 표시',
   body:`<p>숲 늑대에 <span class="kw2">얼음</span> 표시와 푸른 빛이 생겼습니다. 이제 상대 턴에 늑대가 공격하려 해도 막힙니다. 턴을 넘겨서 확인해 봅시다.</p>
         <p>마나가 3 남아 있지만 지금은 그대로 넘겨도 괜찮아요.</p>`},
@@ -3658,7 +3688,7 @@ const STEPS=[
  {ch:3,type:'play',card:'시프',title:'주문 공격력',
   body:`<p>상대 숲 늑대는 <b>얼음</b> 때문에 공격하지 못했습니다(들쥐만 내 영웅을 쳐서 체력 29). 늑대의 얼음은 상대 턴이 끝나며 풀렸어요.</p>
         <p>이번엔 마나 6을 전부 써서 <b>시프</b>(4/6)를 냅니다. 시프에는 ${KW}주문 공격력${E}이 있습니다.</p>`,
-  task:`손패의 <b>시프</b>를 클릭하세요.`,nudge:'시프를 내 보세요.'},
+  task:`손패의 <b>시프</b>를 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'시프를 내 보세요.'},
  {ch:3,type:'info',title:'주문 공격력 +3',
   body:`<p>${KW}주문 공격력 +N${E}은 이 하수인이 전장에 있는 동안 <b>내 피해 주문을 N만큼 더 아프게</b> 만듭니다. 영웅과 하수인 모두에게 적용되고, 회복에는 적용되지 않아요.</p>
         <p>시프는 기본 <b>+1</b>에 더해 <b>이번 게임에서 내가 쓴 주문의 속성 종류</b>만큼 더 강해집니다. 지금까지 쓴 주문은 주문 발견(비전)과 서리(냉기), 속성 2종이라 <b>+3</b>이에요. 내 영웅 아래와 시프 위의 표시를 확인해 보세요.</p>`},
@@ -3669,14 +3699,14 @@ const STEPS=[
         <p>${KW}탈진${E}: 덱이 비어 있는데 카드를 뽑아야 하면 <b>영웅이 피해</b>를 입습니다. 피해는 뽑아야 할 때마다 <b>1, 2, 3…</b> 으로 계속 커지고 멈출 수 없어요.</p>`},
  {ch:4,type:'play',card:'책벌레',title:'뽑을 카드가 없을 때',
   body:`<p><b>책벌레</b>의 전투의 함성은 "카드 1장 뽑기"입니다. 덱이 비었으니 카드는 못 뽑고, 대신 탈진 피해를 받아요. 이번엔 <b>2</b>입니다. 확인해 봅시다.</p>`,
-  task:`손패의 <b>책벌레</b>를 클릭하세요.`,nudge:'책벌레를 내 보세요.'},
+  task:`손패의 <b>책벌레</b>를 전장으로 <b>끌어다 놓으세요</b>. (클릭해도 돼요)`,nudge:'책벌레를 내 보세요.'},
  {ch:4,type:'info',title:'탈진은 계속 커집니다',
   body:`<p>탈진 피해가 <b>2</b>였습니다(체력 28 → 26). 다음엔 3, 그다음엔 4… 이 연습에선 일부러 덱을 비웠지만, 실전에서는 <b>긴 게임</b>이나 <b>카드를 너무 많이 뽑는 효과</b>가 탈진의 원인이 됩니다. 덱 장수를 눈여겨보세요.</p>
         <p>이제 마무리할 차례입니다. 마나는 6 남았고, 상대 영웅 체력은 10입니다.</p>`},
  {ch:5,type:'play',card:'화염구',target:{hero:1},title:'주문 공격력으로 마무리',
   body:`<p><b>화염구</b>의 원래 피해는 6이라 상대 영웅 체력 10을 못 깎습니다. 하지만 지금 시프의 주문 공격력은 <b>+3</b>이고, <b>화염</b> 주문을 처음 쓰는 순간 속성이 3종이 되어 <b>+4</b>가 됩니다.</p>
         <p>6 + 4 = <b>10 피해!</b> 정확히 상대 체력만큼입니다.</p>`,
-  task:`<b>화염구</b>를 클릭하고, 대상으로 <b>상대 영웅</b>을 클릭하세요.`,nudge:'화염구를 상대 영웅에게 써 보세요.'},
+  task:`<b>화염구</b>를 잡아 <b>상대 영웅</b>까지 끌어다 놓으세요. (화염구 클릭 → 상대 영웅 클릭도 돼요)`,nudge:'화염구를 상대 영웅에게 써 보세요.'},
  {ch:5,type:'win'}
 ];
 
@@ -3771,12 +3801,13 @@ function minionEl(m,seat){
   d.onmouseenter=()=>inspect(m); d.onmouseleave=()=>inspect(null);
   return d;
 }
-function inspect(c){
+function inspect(c,force){
   const b=$('#inspect');
-  if(!c){b.classList.remove('show');return;}
+  if(c) lookCheck(c);
+  if(!c){b.classList.remove('show','force');return;}
   const isM=c.type!=='spell';
   b.innerHTML=`<b>${c.name}</b><div class="s">${isM?`하수인 · 공격력 ${c.atk} / 체력 ${c.hp}`:'주문'} · 비용 ${c.cost}</div>${cardText(c)||'<span style="color:var(--dim)">특수 능력 없음</span>'}`;
-  b.classList.add('show');
+  b.classList.add('show'); b.classList.toggle('force',!!force);
 }
 
 /* ---------- 렌더 ---------- */
@@ -3824,6 +3855,7 @@ function applyHL(){
   } else if(st.type==='attackAll'){
     if(sel&&sel.kind==='atk') add('.hero[data-seat="1"]'); else S.seats[0].board.forEach(m=>{ if(canAttack(m)) add(`.mn[data-seat="0"][data-id="${m.id}"]`); });
   } else if(st.type==='end') add('#endBtn');
+  else if(st.type==='look') add(`.hc[data-name="${st.card}"]`);
 }
 
 /* ---------- 코치 패널 ---------- */
@@ -4072,7 +4104,102 @@ function showWin(){
   <div style="display:flex;gap:8px;justify-content:center;margin-top:12px"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn" style="flex:none" onclick="closeModal();init()">다시 하기</button></div></div>`),900);
 }
 
+
+/* ---------- v139 끌어서 내기·공격 + 길게 눌러 설명 보기 (클릭 방식도 그대로 된다) ---------- */
+//  손패 카드: 전장 쪽으로 끌어 놓으면 낸다. 대상이 필요한 카드는 끌면 화살표가 나오고, 대상 위에서 놓으면 쓴다.
+//  내 하수인: 잡고 끌면 화살표 → 적 위에서 놓으면 공격. 빈 곳에서 놓으면 취소.
+//  폰: 카드를 꾹 누르고 있으면 설명 창, 손을 떼면 닫힌다.
+const DR=(function(){
+  const NS='http://www.w3.org/2000/svg', svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('id','dragArrow');
+  svg.innerHTML='<defs><marker id="dah" markerWidth="10" markerHeight="9" refX="7" refY="4.5" orient="auto"><polygon points="0 0,10 4.5,0 9" fill="#e8c36a"/></marker></defs><line x1="0" y1="0" x2="0" y2="0" stroke="#e8c36a" stroke-width="5" stroke-linecap="round" marker-end="url(#dah)"/>';
+  document.body.appendChild(svg); const line=svg.querySelector('line');
+  let st=null, eat=0, lpT=null, lpAt=null, lpOn=false;
+  const TH=8;
+  const handOf=id=>S.seats[0].hand.find(x=>x.id===id);
+  function cardAt(el){ const hc=el.closest&&el.closest('.hc'), mn=el.closest&&el.closest('.mn');
+    if(hc) return handOf(Number(hc.dataset.id)); if(mn) return findMin(Number(mn.dataset.seat), Number(mn.dataset.id)); return null; }
+  function fromEl(){ return st.kind==='atk' ? document.querySelector(`.mn[data-seat="0"][data-id="${st.m.id}"]`) : document.querySelector(`.hc[data-id="${st.c.id}"]`); }
+  function arrow(x,y){ const a=fromEl(); if(!a) return; const r=a.getBoundingClientRect(); svg.style.display='block';
+    line.setAttribute('x1',r.left+r.width/2); line.setAttribute('y1',r.top+(st.kind==='atk'?r.height*.2:r.height*.3)); line.setAttribute('x2',x); line.setAttribute('y2',y); }
+  function down(e){
+    eat=0; clearTimeout(lpT); lpAt=null;
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    const t=e.target; if(!t.closest) return;
+    if(e.pointerType!=='mouse'){ const c=cardAt(t); if(c){ lpAt={x:e.clientX,y:e.clientY}; lpT=setTimeout(()=>{ lpOn=true; cancel(); inspect(c,true); },430); } }
+    if(busy || S.over || S.turn!==0 || st) return;
+    const hc=t.closest('.hc'), mn=t.closest('.mn[data-seat="0"]');
+    if(hc){ const c=handOf(Number(hc.dataset.id)); if(c) st={kind:'hand', c, x0:e.clientX, y0:e.clientY, pid:e.pointerId}; }
+    else if(mn){ const m=findMin(0, Number(mn.dataset.id)); if(m) st={kind:'atk', m, x0:e.clientX, y0:e.clientY, pid:e.pointerId}; }
+  }
+  function begin(){
+    st.on=true; document.body.classList.add('dragging');
+    if(st.kind==='atk'){
+      if(!(sel && sel.kind==='atk' && sel.id===st.m.id)) onMinion(st.m, 0);       // 안내·검사는 클릭과 똑같이
+      if(!(sel && sel.kind==='atk' && sel.id===st.m.id)){ st.dead=true; return; }
+      return;
+    }
+    const c=st.c;
+    if(cardTargets(S,0,c).length){                                                 // 대상이 필요한 카드: 화살표로 조준
+      if(!(sel && sel.kind==='cast' && sel.card.id===c.id)) onHand(c);
+      if(!(sel && sel.kind==='cast' && sel.card.id===c.id)){ st.dead=true; return; }
+      st.aim=true; return;
+    }
+    const src=document.querySelector(`.hc[data-id="${c.id}"]`); if(!src){ st.dead=true; return; }
+    const r=src.getBoundingClientRect(), g=src.cloneNode(true);
+    g.classList.add('drag-float'); g.classList.remove('hl','new','picked'); g.style.width=r.width+'px'; g.style.height=r.height+'px';
+    document.body.appendChild(g); st.float=g; st.fw=r.width; st.fh=r.height; src.classList.add('dragging');
+  }
+  const overField=(x,y)=>{ const s=$('#stage').getBoundingClientRect(), h=$('#hand').getBoundingClientRect();
+    return x>=s.left && x<=s.right && y>=s.top && y<=s.bottom && !(y>=h.top-4 && x>=h.left && x<=h.right); };
+  function move(e){
+    if(lpAt && Math.hypot(e.clientX-lpAt.x, e.clientY-lpAt.y)>9){ clearTimeout(lpT); lpAt=null; }
+    if(!st || e.pointerId!==st.pid) return;
+    if(!st.on){ if(Math.hypot(e.clientX-st.x0, e.clientY-st.y0)<TH || lpOn) return; begin(); }
+    if(st.dead) return;
+    e.preventDefault();
+    if(st.kind==='atk' || st.aim){ arrow(e.clientX, e.clientY); return; }
+    st.float.style.transform=`translate(${e.clientX-st.fw/2}px,${e.clientY-st.fh*.6}px) rotate(-4deg) scale(1.05)`;
+    st.float.classList.toggle('drop-ok', overField(e.clientX, e.clientY));
+  }
+  function clear(){ if(st && st.float) st.float.remove(); document.querySelectorAll('.hc.dragging').forEach(x=>x.classList.remove('dragging')); svg.style.display='none'; document.body.classList.remove('dragging'); st=null; }
+  function up(e){
+    clearTimeout(lpT); lpAt=null;
+    if(lpOn){ lpOn=false; inspect(null); eat=Date.now()+600; }
+    if(!st || e.pointerId!==st.pid) return;
+    const s=st; if(!s.on){ st=null; return; }
+    eat=Date.now()+600;
+    if(s.float) s.float.style.display='none';
+    svg.style.display='none';
+    const el=document.elementFromPoint(e.clientX, e.clientY);
+    clear();
+    if(s.dead) return;
+    const mn=el && el.closest && el.closest('.mn'), he=el && el.closest && el.closest('.hero');
+    if(s.kind==='atk' || s.aim){
+      if(mn && (s.aim || mn.dataset.seat==='1')){ const m=findMin(Number(mn.dataset.seat), Number(mn.dataset.id)); if(m) return onMinion(m, Number(mn.dataset.seat)); }
+      if(he && (s.aim || he.dataset.seat==='1')) return onHero(Number(he.dataset.seat));
+      sel=null; render(); return;                                                  // 빈 곳에 놓음 → 취소
+    }
+    if(overField(e.clientX, e.clientY)) onHand(s.c);
+  }
+  function cancel(){ if(!st) return; const s=st; clear(); if(s.on && !s.dead){ sel=null; render(); } }
+  document.addEventListener('pointerdown', down, true);
+  document.addEventListener('pointermove', move, {passive:false, capture:true});
+  document.addEventListener('pointerup', up, true);
+  document.addEventListener('pointercancel', ()=>{ clearTimeout(lpT); if(lpOn){ lpOn=false; inspect(null); } cancel(); }, true);
+  window.addEventListener('click', e=>{ if(Date.now()<eat){ eat=0; e.stopPropagation(); e.preventDefault(); } }, true);
+  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.hc,.mn')) e.preventDefault(); });
+  document.addEventListener('dragstart', e=>{ if(e.target.closest && e.target.closest('.hc,.mn,.hero')) e.preventDefault(); });   // 그림(img)의 기본 끌기가 끼어들지 않게
+  return {cancel};
+})();
+/* 설명 보기 단계: 안내한 카드의 설명 창을 띄우면 다음으로 */
+function lookCheck(c){
+  const st=stepNow(); if(!st || st.type!=='look' || busy || st._seen || !c || c.name!==st.card) return;
+  st._seen=true; setTimeout(()=>{ if(stepNow()===st) advance(); }, 1300);
+}
+
 function init(){
+  STEPS.forEach(x=>{ delete x._seen; });
   closeModal(); flushSay(); Q=[]; MOOD[0]='J1'; MOOD[1]='G1'; $('#cbody').innerHTML='<div class="chat"></div>'; S=buildState(); stepIdx=0; sel=null; busy=false; lastHand=new Set(S.seats[0].hand.map(c=>c.id));
   document.querySelectorAll('.fxl>*').forEach(e=>e.remove());
   showStep();
