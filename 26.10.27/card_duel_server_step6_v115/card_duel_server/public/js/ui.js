@@ -578,7 +578,7 @@ async function runOpponentTurn(){
     let act=Bot.decide(Host.view(OPP));
     let r=await perform(OPP, act);
     if(!r.ok){ console.error('봇이 불법 행동 시도:', act, r.error); act={type:'END_TURN'}; r=await perform(OPP, act); }
-    if(act.type==='END_TURN') break;
+    if(act.type==='END_TURN' && Host.state.turn!==OPP) break;   // v119 쇼츠 알고리즘: 상대(나)의 턴이 통째로 넘어가면 다시 봇 차례
   }
 }
 
@@ -1038,7 +1038,14 @@ function cardEl(c, opts={}){
   if(c.resting) tags+='<span class="tag" style="background:#3a3a5a;color:#d8d8ff">💤 휴식</span>';                 // v118 과방 소파에서의 쪽잠
   if(c.airpods) tags+='<span class="tag" style="background:#1f4a5a;color:#c8f4ff">🎧 노캔</span>';                // v118 에어팟 노이즈 캔슬링
   if(c.timidTemp||c.timidPerm) tags+='<span class="tag" style="background:#5a4a2a;color:#ffe8b0">소심함</span>';   // v118 공격력 1
-  const eff=effectText(c), art=cardArt(c);
+  if(c.burnout) tags+='<span class="tag" style="background:#4a3a3a;color:#ffc8b0">🔥 번아웃</span>';           // v119 3학년 보스 상태이상
+  if(c.mutiny) tags+='<span class="tag" style="background:#5a2a2a;color:#ffc0c0">⚔ 내부분열</span>';
+  if(c.stunned) tags+='<span class="tag" style="background:#3a3a3a;color:#f0f0a0">💫 기절</span>';
+  if(c.caffeineOD) tags+='<span class="tag" style="background:#6a3a10;color:#ffd9a0">⚡ 카페인 과다</span>';
+  if(c.probation) tags+=`<span class="tag" style="background:#6a1a1a;color:#ffd0d0">📜 경고장 ${c.probation}</span>`;
+  if(c.pfTurn) tags+='<span class="tag" style="background:#2a4a2a;color:#d0ffd0">P/F</span>';   // v121
+  if(c.obese) tags+='<span class="tag" style="background:#5a4a1a;color:#fff0c0">🍗 비만</span>';
+  const fullEff=effectText(c), eff=frontText(c, fullEff), art=cardArt(c);                    // v120 앞면은 짧은 문구 (전체 문구는 상세 창)
   const det=cardDetailOf(c);                                                                       // v118 자세한 설명이 있는 카드: 누르면 상세 창 (앞면은 짧게)
   if(det) el.classList.add('has-detail');
   else if(c.flavor || (cardByName(c.name)||{}).flavor) el.title=c.flavor || cardByName(c.name).flavor;   // v117 카드 설명(분위기 글): 마우스를 올리면 보인다
@@ -1049,7 +1056,8 @@ function cardEl(c, opts={}){
   } else {
     el.innerHTML=`<div class="cost">${c.cost}</div><div class="cname">${c.name}</div>${art?`<div class="card-art"><img src="${art}" alt="${c.name}" loading="lazy"></div>`:''}<div class="effect">${tags}${tags&&eff?'<br>':''}${eff}</div><div class="stats"><span class="atk">${c.atk}</span>${(c.tribe||runeOf(c).length)?`<span class="race">${c.tribe?c.tribe.replace(/ \/ /g,'·'):''}${runeOf(c).length?`<small class="rn">${runeOf(c).join('·')} 룬</small>`:''}</span>`:''}<span class="life">${c.hp}</span></div>`;
   }
-  if(det){ const d=document.createElement('div'); d.className='info-dot'; d.textContent='i'; d.title='눌러서 자세히 보기'; const ar=el.querySelector('.card-art'); if(!ar) d.classList.add('noart'); (ar||el).appendChild(d); }   // 그림 오른쪽 위 (이름을 가리지 않게)
+  const more = det && (det.own || eff!==fullEff);                                                 // ⓘ 표시: 앞면이 줄었거나 따로 적은 설명이 있을 때
+  if(more){ const d=document.createElement('div'); d.className='info-dot'; d.textContent='i'; d.title='눌러서 자세히 보기'; const ar=el.querySelector('.card-art'); if(!ar) d.classList.add('noart'); (ar||el).appendChild(d); }   // 그림 오른쪽 위 (이름을 가리지 않게)
   if(opts.onClick) el.onclick=opts.onClick;
   return el;
 }
@@ -1057,7 +1065,7 @@ function cardEl(c, opts={}){
 // 마나 표시 (내 쪽·상대 쪽 공통). '매 턴 마나 +N' 치트가 있으면 그 추가분까지 총량에 포함한다.
 function renderMana(textId, crystalsId, p){
   const total=Math.max(1, p.maxMana+((p.mods&&p.mods.manaBonus)||0));
-  $(textId).textContent=`마나 ${p.mana} / ${total}`+(p.locked?` · 과부하 ${p.locked}`:'')+(p.overloadNext?` · 다음 턴 과부하 ${p.overloadNext}`:'')+(p.nextMana?` · 다음 턴 마나 +${p.nextMana}`:'')+(p.ascendNext?` · 다음 턴 최대 마나 +${p.ascendNext}`:'')+(p.spellTax?` · 주문 비용 +${p.spellTax}`:'')+(p.taxNext?` · 다음 턴 주문 비용 +${p.taxNext}`:'')+(p.noSpell?' · ✈ 주문 금지':'')+(p.heroFrozen?' · 🧊 영웅 행동 불가':'')+(p.hangover?' · 🍺 숙취(카드 비용만큼 피해)':'')+((p.dormant&&p.dormant.length)?' · 💤 '+p.dormant.map(d=>`${d.name} ${d.left}턴`).join(', '):'')+(p.playLimit!=null?` · 👀 카드 ${p.plays||0}/${p.playLimit}장`:'');
+  $(textId).textContent=`마나 ${p.mana} / ${total}`+(p.locked?` · 과부하 ${p.locked}`:'')+(p.overloadNext?` · 다음 턴 과부하 ${p.overloadNext}`:'')+(p.nextMana?` · 다음 턴 마나 +${p.nextMana}`:'')+(p.ascendNext?` · 다음 턴 최대 마나 +${p.ascendNext}`:'')+(p.spellTax?` · 주문 비용 +${p.spellTax}`:'')+(p.taxNext?` · 다음 턴 주문 비용 +${p.taxNext}`:'')+(p.noSpell?' · ✈ 주문 금지':'')+(p.heroFrozen?' · 🧊 영웅 행동 불가':'')+(p.heroImmune?' · 🛌 휴학 (영웅 면역)':'')+(p.spellDisc?` · 다음 주문 -${p.spellDisc}`:'')+(p.hangover?' · 🍺 숙취(카드 비용만큼 피해)':'')+((p.dormant&&p.dormant.length)?' · 💤 '+p.dormant.map(d=>`${d.name} ${d.left}턴`).join(', '):'')+(p.playLimit!=null?` · 👀 카드 ${p.plays||0}/${p.playLimit}장`:'');
   const cz=$(crystalsId); cz.innerHTML='';
   for(let i=0;i<Math.max(total, p.mana);i++){     // 동전 등으로 최대치를 넘긴 마나도 수정으로 보여준다
     const d=document.createElement('div'); d.className='crystal'+(i<p.mana?'':' empty'); cz.appendChild(d);
@@ -2097,7 +2105,7 @@ function bossAddTemplate(chapter){
     if(b.stage!==k+1 || b.chapter!==chapter) ch.push(()=>{ b.stage=k+1; b.chapter=chapter; });
     if(ADV_TEMPLATE_REWARDS[b.id] && !(b.rewardChoice||[]).length) ch.push(()=>{ b.rewardChoice=ADV_TEMPLATE_REWARDS[b.id].slice(); });
     if(t[4] && JSON.stringify(b.deck)===dflt) ch.push(()=>{ b.deck=t[4].slice(); b.icon=t[2]; b.desc=t[3]; b.name=t[1]; });
-    else if(t[4] && JSON.stringify(b.deck)!==JSON.stringify(t[4]) && (ADV_OLD_TEMPLATE_DECKS[b.id]||[]).some(d=>JSON.stringify(d)===JSON.stringify(b.deck))) ch.push(()=>{ b.deck=t[4].slice(); });   // 예전 틀의 임시 덱 → 새 덱
+    else if(t[4] && JSON.stringify(b.deck)!==JSON.stringify(t[4]) && (ADV_OLD_TEMPLATE_DECKS[b.id]||[]).some(d=>JSON.stringify(d)===JSON.stringify(b.deck))) ch.push(()=>{ b.deck=t[4].slice(); b.icon=t[2]; b.desc=t[3]; });   // 예전 틀의 임시 덱 → 새 덱 (v119: 아이콘·소개도 새 틀로)
     if(ch.length) fill.push({b, ch}); }
   if(!add.length && !fill.length && !legacy.length){ alert('이미 최신 틀이에요.'); return; }
   const lines=[];
@@ -2389,7 +2397,16 @@ const KEYWORD_HELP = [
   ['독박','아군 하수인이 피해를 입을 때 대신 맞습니다. 한 번에 받는 피해는 1로 고정됩니다.'],
   ['휴면','전장에서 잠시 사라졌다가, 정해진 턴이 지나면 돌아옵니다.'],
   ['근육통','내 턴이 시작될 때 아군 하수인이 전부 빙결되고, 영웅도 공격할 수 없습니다.'],
-  ['번아웃','이번 턴에 공격할 수 없습니다.'],
+  ['번아웃','그 하수인 주인의 턴이 시작될 때마다 공격력이 1 감소합니다. (최소 0)'],
+  ['멘붕','이번 턴에 공격할 수 없습니다.'],
+  ['내부분열','공격할 때 원래 대상 대신 무작위 아군 하수인을 공격합니다.'],
+  ['기절','공격할 수 없습니다. 주인의 턴이 시작될 때마다 50% 확률로 풀립니다.'],
+  ['비만','생명력이 2배가 되지만 공격력이 절반(내림)이 됩니다.'],
+  ['경고장','주인의 턴이 정해진 횟수만큼 끝나면 그 하수인은 처치됩니다.'],
+  ['카페인 과다복용','공격력 +3. 주인의 턴이 끝나면 생명력 -2, 기절.'],
+  ['3초만 더 보기','30% 확률로 아무 행동도 못 하고 이번 턴을 넘깁니다.'],
+  ['두꺼운 수험서','0/3 토큰. 죽음의 메아리: 그 주인의 영웅에게 피해 4.'],
+  ['주문 공격력','주문이 주는 피해가 그만큼 늘어납니다.'],
   ['소심함','공격력이 1이 됩니다.'],
   ['식곤증','다음 턴에 카드를 1장 덜 뽑고, 무작위 하수인 하나가 빙결됩니다.'],
   ['화상','적힌 숫자만큼 피해를 받습니다.'],
@@ -2417,6 +2434,12 @@ const KEYWORD_HELP = [
   ['응원 주문','과방 만물상이 주는 1코스트 주문 9종 (타이레놀·에어팟·비타민C·메가커피·포스트잇·보조배터리·A4 요약본·1+1 쿠폰·선배 찬스).'],
   ['대기열','빙결 + 행동 불가: 다음 내 턴까지 적 하수인과 적 영웅이 공격할 수 없습니다.'],
   ['방어도','영웅이 받는 피해를 생명력보다 먼저 흡수합니다.'],
+  ['절대평가','꿀교양 줍줍이 주는 주문 5종 (단순 출석 체크·오픈북 테스트·교수님의 너그러운 자비·P/F·전원 A+ 확정).'],
+  ['면역','피해를 받지 않습니다.'],
+  ['내구도','쓸 때마다 1씩 줄고, 0이 되면 사라집니다.'],
+  ['밤샘 개발자','1/1 기계 토큰. 좋은 효과 1개와 나쁜 효과 1개를 무작위로 가집니다.'],
+  ['함성','전투의 함성의 줄임말 (손에서 낼 때 발동).'],
+  ['죽메','죽음의 메아리의 줄임말 (하수인이 죽을 때 발동).'],
   ['도발','적은 도발 하수인을 먼저 공격해야 합니다.'],
   ['돌진','낸 턴에 바로 공격할 수 있습니다.'],
   ['속공','낸 턴에 하수인만 공격할 수 있습니다.'],
@@ -2483,11 +2506,21 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
 
 // ---------- v118: 카드 상세 창 — 자세한 설명(desc)이 있는 카드는 앞면에 짧게 적고, 카드를 누르면 전체 설명·등장 대사·키워드가 뜬다 ----------
 //  (카드를 고르거나 내는 동작은 그대로 되고, 창은 옆에 떠 있다가 다른 곳을 누르면 닫힌다)
+// v120: 모든 카드 — 따로 적은 설명(desc)이 없으면 키워드 + 원래의 긴 효과 문구로 설명을 만든다 (능력 없는 카드는 null)
+const KW_FLAGS=[['taunt','도발'],['charge','돌진'],['rush','속공'],['shield','보호막'],['windfury','질풍'],['lifesteal','생명력 흡수'],['poison','독성'],['stealth','은신'],['revive','환생'],['elusive','모면'],['echo','잔상']];
+function frontText(c, full){                                                     // 카드 앞면 문구: 짧은 문구 표(cardtext.js)에 있고 효과가 원래 그대로일 때만 줄인다
+  const sh=(typeof CARD_SHORT!=='undefined') && CARD_SHORT[c.name]; if(!sh) return full;
+  const b=cardByName(c.name); return (b && effectText(b)===full) ? sh : full;
+}
 function cardDetailOf(c){
-  if(!c || !c.name) return null;
+  if(!c || !c.name || c.fatigue) return null;
   const b=(typeof cardByName==='function' && cardByName(c.name)) || {};
-  const desc=c.desc || b.desc; if(!desc) return null;
-  return {desc, quote:c.quote || b.quote || '', flavor:c.flavor || b.flavor || ''};
+  const own=c.desc || b.desc;
+  let desc=own;
+  if(!desc){ const kw=KW_FLAGS.filter(([k])=>c[k]).map(([,n])=>n), t=effectText(c)||'';
+    desc=[kw.length?kw.join('. ')+'.':'', t].filter(Boolean).join(' ');
+    if(!desc) return null; }
+  return {desc, own:!!own, quote:c.quote || b.quote || '', flavor:c.flavor || b.flavor || ''};
 }
 const cardDetail=(function(){
   const box=document.createElement('div'); box.id='cardDetail'; document.body.appendChild(box);
