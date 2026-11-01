@@ -11,8 +11,8 @@ const SHOP = {
   GUARANTEE_MIN: '희귀',           // 한 팩에는 이 등급 이상이 최소 1장 (없으면 마지막 한 장을 다시 뽑는다)
   PITY_EPIC: 10,                   // 특급 이상이 연속 이 팩 수 동안 안 나오면 이번 팩에 특급 이상 1장 확정
   PITY_LEGEND: 30,                 // 전설이 연속 이 팩 수 동안 안 나오면 이번 팩에 전설 1장 확정
-  DUP_CAP: 2,                      // 한 카드를 이 장수만큼 가지면, 그 이상 나온 카드는 환급 (덱에 넣을 수 있는 한도 = engine 의 CONFIG.COPIES)
-  REFUND: { '일반': 5, '희귀': 15, '특급': 40, '전설': 100 },   // 중복 카드 1장당 환급 골드
+  DUP_CAP: 2,                      // 덱에 넣을 수 있는 한도 (= engine 의 CONFIG.COPIES). 이보다 많이 나온 카드는 '남는 카드'로 그대로 쌓인다
+  // v134: 중복 골드 환급은 없앴다. 남는 카드는 카드 제작 화면에서 직접 분해(일괄 추출)해 가루로 바꾼다
 };
 const SHOP_RARITIES = ['일반', '희귀', '특급', '전설'];       // collection.js 의 RARITY_ORDER 와 같은 순서
 
@@ -59,14 +59,14 @@ function rollPack(pool, owned, pity, rng) {
   else if (pity.sinceEpic + 1 >= SHOP.PITY_EPIC && !has('특급')) { upgrade(shopPickRarity(rng, '특급')); pityHit = 'epic'; }
   // 4) 보기 좋게 낮은 등급부터 (가장 좋은 카드가 마지막에 공개된다). 같은 등급 안에서는 추첨 순서 유지
   slots.sort((a, b) => idx(a) - idx(b));
-  // 5) 등급 안에서 카드 한 장 추첨 + 중복 환급
-  const cards = []; let refund = 0;
+  // 5) 등급 안에서 카드 한 장 추첨 (v134: 중복이어도 컬렉션에 그대로 들어간다. extra = 덱 한도를 넘는 남는 카드)
+  const cards = []; const refund = 0;
   for (const rar of slots) {
     const list = by[rar]; if (!list.length) throw new Error('등급에 카드가 없어요: ' + rar);
     const c = list[rng(list.length)];
     const have = owned[c.name] || 0;
-    if (have >= SHOP.DUP_CAP) { const g = SHOP.REFUND[rar]; refund += g; cards.push({ name: c.name, rarity: rar, isNew: false, dup: true, refund: g }); }
-    else { owned[c.name] = have + 1; cards.push({ name: c.name, rarity: rar, isNew: have === 0, dup: false, refund: 0 }); }
+    owned[c.name] = have + 1;
+    cards.push({ name: c.name, rarity: rar, isNew: have === 0, dup: false, extra: have >= SHOP.DUP_CAP, refund: 0 });
   }
   // 6) 천장 카운터
   const gotLegend = cards.some(c => c.rarity === '전설'), gotEpic = cards.some(c => idx(c.rarity) >= idx('특급'));

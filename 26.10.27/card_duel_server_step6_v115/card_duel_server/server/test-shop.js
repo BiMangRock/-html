@@ -20,7 +20,7 @@ function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = 
 const seeded = seed => { const f = mulberry32(seed); return n => Math.floor(f() * n); };
 
 (function rules() {
-  assert.strictEqual(SHOP.DUP_CAP, E.CONFIG.COPIES, '환급 기준 장수는 덱 한도(CONFIG.COPIES)와 같아야 함');
+  assert.strictEqual(SHOP.DUP_CAP, E.CONFIG.COPIES, '남는 카드 기준 장수는 덱 한도(CONFIG.COPIES)와 같아야 함');
   assert.strictEqual(Object.values(SHOP.RATES).reduce((a, b) => a + b, 0), 1000, '확률 합은 100%');
   SHOP_RARITIES.forEach(r => assert.ok(POOL.some(c => c.rarity === r), r + ' 등급 카드가 있어야 함'));
 
@@ -67,16 +67,16 @@ const seeded = seed => { const f = mulberry32(seed); return n => Math.floor(f() 
   // 중복 환급: 이미 2장 가진 카드는 환급, 1장이면 2장째로 들어옴
   const all2 = {}; POOL.forEach(c => { all2[c.name] = SHOP.DUP_CAP; });
   r = rollPack(POOL, all2, { sinceEpic: 0, sinceLegend: 0 }, seeded(7));
-  assert.ok(r.cards.every(c => c.dup && !c.isNew && c.refund === SHOP.REFUND[c.rarity]), '다 가진 상태면 전부 환급');
-  assert.strictEqual(r.refund, r.cards.reduce((t, c) => t + SHOP.REFUND[c.rarity], 0));
+  assert.ok(r.cards.every(c => c.extra && !c.isNew && c.refund === 0), 'v134: 다 가진 상태면 전부 남는 카드 (환급 없음)');
+  assert.strictEqual(r.refund, 0);
   const owned = {};
-  for (let i = 0; i < 3000; i++) {            // 계속 열어도 보유 장수는 DUP_CAP 를 넘지 않고, 환급 + 보유 증가 = 뽑은 장수
+  for (let i = 0; i < 3000; i++) {            // v134: 환급 없이 뽑은 카드가 모두 쌓인다
     const before = Object.values(owned).reduce((a, b) => a + b, 0);
     r = rollPack(POOL, owned, { sinceEpic: 0, sinceLegend: 0 }, rng);
     const after = Object.values(owned).reduce((a, b) => a + b, 0);
-    assert.strictEqual((after - before) + r.cards.filter(c => c.dup).length, SHOP.PACK_SIZE);
+    assert.strictEqual(after - before, SHOP.PACK_SIZE, 'v134: 뽑은 장수만큼 그대로 늘어남');
   }
-  assert.ok(Object.values(owned).every(n => n <= SHOP.DUP_CAP), '보유 장수가 한도를 넘지 않음');
+  assert.ok(Object.values(owned).some(n => n > SHOP.DUP_CAP), 'v134: 남는 카드가 쌓임');
   // 같은 팩 안에서 같은 카드가 두 번 나온 경우도 올바르게 처리 (1장째 isNew, 2장째 not new)
   console.log('✔ 팩 규칙 테스트 통과');
 })();
@@ -145,7 +145,7 @@ const server = http.createServer(app).listen(0, async () => {
     const newCards = o.packs.flatMap(p => p.cards).filter(c => !c.dup).length, dupCards = o.packs.flatMap(p => p.cards).filter(c => c.dup);
     assert.strictEqual(newCards + dupCards.length, 50); assert.strictEqual(sumCol(o.collection) - sumCol(colBefore), newCards);
     assert.strictEqual(dupCards.reduce((t, c) => t + c.refund, 0), refundSum);
-    for (const [n, k] of Object.entries(o.collection)) assert.ok(k <= Math.max(SHOP.DUP_CAP, colBefore[n] || 0), n + ' 이(가) 한도를 넘음');
+    assert.strictEqual(o.refund, 0, 'v134: 중복 골드 환급 없음'); assert.strictEqual(sumCol(o.collection) - sumCol(colBefore), 50, 'v134: 50장 모두 컬렉션에');
     assert.strictEqual(dbRaw.prepare('SELECT COUNT(*) n FROM pack_log').get().n, 11, '팩 1개당 기록 1줄 (1 + 10)');
     assert.strictEqual(o.opened, 11);
 

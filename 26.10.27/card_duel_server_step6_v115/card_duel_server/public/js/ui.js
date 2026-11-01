@@ -671,8 +671,11 @@ function renderCraft(){
   const p=ServerStore.progress, dust=p ? p.dust : 0, need=deckNeedsLocal();
   $('craftDust').textContent=`✨ 가루 ${fmt(dust)}`;
   const extra=CARD_POOL.filter(craftableCard).reduce((t,c)=>t+Math.max(0, ServerStore.owned(c.name)-CONFIG.COPIES),0);
-  const xb=$('craftExtra'); xb.textContent=extra?`남는 카드 ${extra}장 모두 분해`:'남는 카드 없음'; xb.disabled=!extra;
-  xb.onclick=()=>armConfirm(xb, async()=>{ const r=await ServerStore.disenchantExtra(); $('craftNote').textContent=r.ok?`✔ ${r.count}장 분해 · 가루 +${r.gain}`:'⚠ '+r.error; renderCraft(); updateDeckMenuDesc(); });
+  const extraGain=CARD_POOL.filter(craftableCard).reduce((t,c)=>t+Math.max(0, ServerStore.owned(c.name)-CONFIG.COPIES)*PROGRESS.DISENCHANT[c.rarity],0);
+  const xb=$('craftExtra'); xb.textContent=extra?`⚒ 일괄 추출 (${extra}장 · +${fmt(extraGain)})`:'⚒ 일괄 추출 (남는 카드 없음)'; xb.disabled=!extra;
+  xb.title=`덱 한도(${CONFIG.COPIES}장)를 넘는 카드를 모두 분해합니다. 각 카드는 ${CONFIG.COPIES}장씩 남습니다.`;
+  xb.onclick=async()=>{ if(!await confirmBox('⚒ 일괄 추출', `${CONFIG.COPIES}장을 넘는 남는 카드 ${extra}장을 모두 분해합니다.\n각 카드는 ${CONFIG.COPIES}장씩 남고, 가루 ${fmt(extraGain)}을(를) 얻습니다.`, '모두 분해')) return;
+    xb.disabled=true; const r=await ServerStore.disenchantExtra(); $('craftNote').textContent=r.ok?`✔ 일괄 추출: ${r.count}장 분해 · 가루 +${fmt(r.gain)}`:'⚠ '+r.error; renderCraft(); updateDeckMenuDesc(); };
   if(!$('craftNote').textContent) $('craftNote').textContent=`분해: 일반 ${PROGRESS.DISENCHANT['일반']} · 희귀 ${PROGRESS.DISENCHANT['희귀']} · 특급 ${PROGRESS.DISENCHANT['특급']} · 전설 ${PROGRESS.DISENCHANT['전설']}  /  제작: ${PROGRESS.CRAFT['일반']} · ${PROGRESS.CRAFT['희귀']} · ${PROGRESS.CRAFT['특급']} · ${PROGRESS.CRAFT['전설']} 가루. 덱에 넣은 장수만큼은 분해할 수 없습니다.`;
   const tabs=$('craftTabs'); tabs.innerHTML='';
   CRAFT_TABS.forEach(([k,label])=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label; b.className=craft.tab===k?'on':''; b.onclick=()=>{ craft.tab=k; renderCraft(); }; tabs.appendChild(b); });
@@ -697,10 +700,26 @@ function renderCraftGrid(dust, need){
     mk.onclick=()=>armConfirm(mk, async()=>{ const r=await ServerStore.craft(c.name); $('craftNote').textContent=r.ok?`✔ ${c.name} 1장을 만들었습니다 (가루 -${cost})`:'⚠ '+r.error; renderCraft(); updateDeckMenuDesc(); }, c.rarity==='전설'||c.rarity==='특급');
     const de=document.createElement('button'); de.type='button'; de.className='de'; de.textContent=`✨ +${gain}`; de.title=keep?`덱에 ${keep}장 쓰는 중 — 그보다 많은 장수만 분해할 수 있어요`:`1장 분해해서 가루 ${gain} 얻기`;
     de.disabled = n<=keep;
-    de.onclick=()=>armConfirm(de, async()=>{ const r=await ServerStore.disenchant(c.name, 1); $('craftNote').textContent=r.ok?`✔ ${c.name} 1장 분해 · 가루 +${r.gain}`:'⚠ '+r.error; renderCraft(); updateDeckMenuDesc(); }, c.rarity==='전설'||c.rarity==='특급');
+    de.onclick=async()=>{                                   // v134 2장 이하인 카드를 분해하면 경고 (남는 카드는 바로 분해)
+      if(n<=CONFIG.COPIES && !await confirmBox('⚠ 정말 분해할까요?', `「${c.name}」은(는) 지금 ${n}장뿐이라 남는 카드가 아닙니다.\n분해하면 ${n-1}장만 남아 덱에 ${n-1===0?'넣을 수 없게':`${n-1}장까지만 넣을 수 있게`} 됩니다.\n(가루 +${gain}, 다시 만들려면 가루 ${cost} 필요)`, '그래도 분해', true)) return;
+      de.disabled=true; const r=await ServerStore.disenchant(c.name, 1); $('craftNote').textContent=r.ok?`✔ ${c.name} 1장 분해 · 가루 +${r.gain}`:'⚠ '+r.error; renderCraft(); updateDeckMenuDesc(); };
     btns.appendChild(mk); btns.appendChild(de); item.appendChild(btns); grid.appendChild(item);
   }
   if(!list.length) grid.innerHTML='<p class="note">해당하는 카드가 없습니다.</p>';
+}
+function confirmBox(title, text, okLabel='확인', danger=false){      // v134 확인 창 (브라우저 alert 대신). 결과: true/false
+  return new Promise(res=>{
+    let ov=$('confirmBox'); if(ov) ov.remove();
+    ov=document.createElement('div'); ov.id='confirmBox';
+    ov.innerHTML=`<div class="cb-panel${danger?' danger':''}"><h3></h3><p></p><div class="cb-btns"><button type="button" class="end-turn sub cb-no">취소</button><button type="button" class="end-turn cb-ok"></button></div></div>`;
+    ov.querySelector('h3').textContent=title; ov.querySelector('p').textContent=text; ov.querySelector('.cb-ok').textContent=okLabel;
+    const done=v=>{ ov.remove(); document.removeEventListener('keydown', key, true); res(v); };
+    const key=e=>{ if(e.key==='Escape'){ e.stopPropagation(); done(false); } else if(e.key==='Enter'){ e.preventDefault(); done(true); } };
+    ov.querySelector('.cb-no').onclick=()=>done(false); ov.querySelector('.cb-ok').onclick=()=>done(true);
+    ov.onclick=e=>{ if(e.target===ov) done(false); };
+    document.addEventListener('keydown', key, true);
+    document.body.appendChild(ov); ov.querySelector(danger?'.cb-no':'.cb-ok').focus();
+  });
 }
 function armConfirm(btn, fn, always=true){             // 실수 방지: 한 번 누르면 "확인?"으로 바뀌고, 3초 안에 한 번 더 누르면 실행
   if(!always || btn.dataset.armed){ delete btn.dataset.armed; btn.disabled=true; fn(); return; }
@@ -2579,7 +2598,7 @@ function renderShop(){
   const left=info?info.pity.left:null;
   $('shopPityEpic').textContent=left?(left.epic<=1?'다음 팩 확정!':`${left.epic}팩`):'…';
   $('shopPityLegend').textContent=left?(left.legend<=1?'다음 팩 확정!':`${left.legend}팩`):'…';
-  $('shopDupNote').textContent=`같은 카드를 ${SHOP.DUP_CAP}장 가지면 그다음부터 나온 카드는 카드 대신 골드로 환급됩니다. 천장은 특급 이상 ${SHOP.PITY_EPIC}팩 · 전설 ${SHOP.PITY_LEGEND}팩 연속으로 안 나오면 다음 팩에 확정입니다.`;
+  $('shopDupNote').textContent=`같은 카드가 ${SHOP.DUP_CAP}장을 넘게 나오면 '남는 카드'로 그대로 쌓입니다. 🔨 카드 제작에서 분해(일괄 추출)하면 가루가 되고, 가루로 원하는 카드를 만들 수 있습니다. 천장은 특급 이상 ${SHOP.PITY_EPIC}팩 · 전설 ${SHOP.PITY_LEGEND}팩 연속으로 안 나오면 다음 팩에 확정입니다.`;
   [[1,'shopBuy1'],[5,'shopBuy5']].forEach(([n,id])=>{
     const b=$(id); b.textContent=`${n}팩 열기 · ${fmt(shopCost(n))}골드`; b.disabled=shopWorking||gold<shopCost(n)||!info;
   });
@@ -2594,7 +2613,7 @@ function renderShopHistory(){
     t.textContent=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`+(h.refund?` · 환급 +${h.refund}💰`:'')+(h.pityHit?' · 천장 확정':'');
     row.appendChild(t);
     const cs=document.createElement('div'); cs.className='sh-c';
-    h.cards.forEach(c=>{ const s=document.createElement('span'); s.className='sh-chip r'+RARITY_ORDER.indexOf(c.rarity)+(c.dup?' dup':''); s.textContent=(c.dup?'♻ ':c.isNew?'✨ ':'')+c.name; cs.appendChild(s); });
+    h.cards.forEach(c=>{ const s=document.createElement('span'); s.className='sh-chip r'+RARITY_ORDER.indexOf(c.rarity)+(c.dup||c.extra?' dup':''); s.textContent=(c.dup||c.extra?'♻ ':c.isNew?'✨ ':'')+c.name; cs.appendChild(s); });
     row.appendChild(cs); box.appendChild(row);
   });
 }
@@ -2651,8 +2670,8 @@ function revealSlots(p){
     const tag=document.createElement('div'); tag.className='pk-tag';
     tag.innerHTML=`<span class="ed-rar r-${RARITY_ORDER.indexOf(c.rarity)}"></span><em></em>`;
     tag.firstChild.textContent=c.rarity;
-    tag.lastChild.textContent=c.dup?`중복 +${c.refund}💰`:(c.isNew?'NEW':'');
-    tag.lastChild.className=c.dup?'dup':'new';
+    tag.lastChild.textContent=c.dup?`중복 +${c.refund}💰`:c.extra?'남는 카드':(c.isNew?'NEW':'');   // v134 남는 카드 = 덱 한도(2장) 초과분 → 분해해서 가루로
+    tag.lastChild.className=c.dup||c.extra?'dup':'new';
     slot.appendChild(tag);
     const doFlip=()=>flipSlot(slot,c,p);
     slot.onclick=doFlip; slot.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); doFlip(); } };
@@ -2670,8 +2689,8 @@ function flipSlot(slot,c,p){
 }
 function finishPack(p){
   $('pkFlipAll').style.display='none';
-  const newN=p.cards.filter(c=>!c.dup).length, dupN=p.cards.length-newN;
-  $('pkInfo').textContent=`새 카드 ${newN}장`+(dupN?` · 중복 ${dupN}장 → +${fmt(p.refund)}골드 환급`:'')+(p.pityHit==='legend'?' · 🌟 전설 천장 확정!':p.pityHit==='epic'?' · ✨ 특급 천장 확정!':'');
+  const newN=p.cards.filter(c=>c.isNew).length, exN=p.cards.filter(c=>c.extra).length;
+  $('pkInfo').textContent=`새 카드 ${newN}장`+(exN?` · 남는 카드 ${exN}장 (카드 제작에서 분해 가능)`:'')+(p.pityHit==='legend'?' · 🌟 전설 천장 확정!':p.pityHit==='epic'?' · ✨ 특급 천장 확정!':'');
   const last=pk.i>=pk.r.packs.length-1, nx=$('pkNext');
   nx.textContent=last?(pk.r.packs.length>1?'결과 요약':'확인'):`다음 팩 (${pk.i+2}/${pk.r.packs.length})`;
   nx.style.display=''; nx.onclick=()=>{ if(!last){ pk.i++; showPack(); } else if(pk.r.packs.length>1 && !pk.summary){ showSummary(); } else closePacks(); };
@@ -2680,7 +2699,7 @@ function showSummary(){
   pk.summary=true;
   const all=pk.r.packs.flatMap(p=>p.cards), tally={};
   SHOP_RARITIES.forEach(r=>tally[r]={n:0,dup:0});
-  all.forEach(c=>{ tally[c.rarity].n++; if(c.dup) tally[c.rarity].dup++; });
+  all.forEach(c=>{ tally[c.rarity].n++; if(c.dup||c.extra) tally[c.rarity].dup++; });
   $('pkTitle').textContent=`${pk.r.packs.length}팩 결과`;
   const stage=$('pkStage'); stage.innerHTML='';
   const box=document.createElement('div'); box.className='pk-sum';
@@ -2688,7 +2707,7 @@ function showSummary(){
     const t=tally[r]; if(!t.n) return;
     const row=document.createElement('div'); row.className='pk-sum-row';
     row.innerHTML=`<span class="ed-rar r-${RARITY_ORDER.indexOf(r)}"></span><b></b><small></small>`;
-    row.firstChild.textContent=r; row.children[1].textContent=`${t.n}장`; row.lastChild.textContent=t.dup?`(중복 ${t.dup}장)`:'';
+    row.firstChild.textContent=r; row.children[1].textContent=`${t.n}장`; row.lastChild.textContent=t.dup?`(남는 카드 ${t.dup}장)`:'';
     box.appendChild(row);
   });
   const newCards=all.filter(c=>c.isNew);
@@ -2698,7 +2717,7 @@ function showSummary(){
     box.appendChild(nw);
   }
   stage.appendChild(box);
-  $('pkInfo').textContent=`${fmt(pk.r.spent)}골드 사용 · 중복 환급 +${fmt(pk.r.refund)}골드 · 보유 골드 ${fmt(Economy.get().gold)}`;
+  { const ex=pk.r.packs.flatMap(x=>x.cards).filter(c=>c.extra).length; $('pkInfo').textContent=`${fmt(pk.r.spent)}골드 사용`+(ex?` · 남는 카드 ${ex}장 → 🔨 카드 제작에서 일괄 추출`:'')+` · 보유 골드 ${fmt(Economy.get().gold)}`; }
   $('pkNext').textContent='확인';
 }
 function closePacks(){

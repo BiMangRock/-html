@@ -987,3 +987,13 @@ body.boss-portrait #aiAvatar>span{background-size:cover; background-position:cen
   .hero .hinfo .name{font-size:.68rem; line-height:1.1;} .hero .hinfo .mana{font-size:.6rem; line-height:1.15;} .hero .hinfo .pile{font-size:.52rem;}
   .hero-power{right:-30px;}
 }
+
+/* ===== v134 확인 창 · 일괄 추출 ===== */
+#confirmBox{position:fixed; inset:0; z-index:9500; background:rgba(10,8,18,.78); display:flex; align-items:center; justify-content:center; padding:1rem;}
+#confirmBox .cb-panel{width:min(420px,92vw); background:linear-gradient(180deg,#241f38,#181428); border:1px solid var(--gold-d); border-radius:12px; padding:1.1rem 1.2rem; box-shadow:0 10px 30px rgba(0,0,0,.6); animation:bubbleIn .2s ease-out;}
+#confirmBox .cb-panel.danger{border-color:#c0574a; box-shadow:0 0 0 1px #7a1f1f, 0 10px 30px rgba(0,0,0,.6);}
+#confirmBox h3{margin:0 0 .6rem; color:var(--gold); font-size:1.1rem;} #confirmBox .danger h3{color:#ff9a8a;}
+#confirmBox p{margin:0 0 1rem; color:var(--parch); line-height:1.55; white-space:pre-line; font-size:.92rem;}
+#confirmBox .cb-btns{display:flex; justify-content:flex-end; gap:.5rem;}
+#confirmBox .danger .cb-ok{background:#b3392c; color:#fff;}
+#craftExtra{background:#2b3f22; color:#d6ffc8; border-color:#5fa04a;}
