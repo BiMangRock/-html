@@ -90,7 +90,8 @@ function makeHandlers(pvp) {
   };
 }
 
-const core = createPvp({ loadDeck: pvpdb.loadDeck, settle: pvpdb.settle, statsOf: pvpdb.statsOf, log: (...a) => console.log('[pvp]', ...a) });
+const { PVP } = require(require('path').join(__dirname, '..', 'public', 'js', 'pvp.js'));   // v147
+const core = createPvp({ cfg: { introMs: PVP.INTRO_MS }, loadDeck: pvpdb.loadDeck, settle: pvpdb.settle, statsOf: pvpdb.statsOf, log: (...a) => console.log('[pvp]', ...a) });
 const h = makeHandlers(core);
 const router = express.Router();
 router.use('/pvp', requireAuth);

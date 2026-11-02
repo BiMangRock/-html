@@ -12,8 +12,23 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/intro.css">
 </head>
 <body>
+<!-- v147 로그인 직후 인트로 (intro.js). 로그인하고 들어올 때만 보이고, 아니면 바로 지워진다 -->
+<div id="introSplash" aria-hidden="true">
+  <div class="is-embers"></div>
+  <div class="is-stage">
+    <img class="is-logo ghost" alt=""><img class="is-logo top" alt=""><img class="is-logo bot" alt="">
+    <img class="is-slash" alt="">
+    <div class="is-spark"></div>
+    <div class="is-sword"><img alt=""></div>
+  </div>
+  <div class="is-flash"></div>
+  <div class="is-credit"><small>제작</small>소프트웨어 프로젝트 2부 8조</div>
+  <div class="is-skip">눌러서 건너뛰기</div>
+</div>
+<script src="/js/intro.js"></script>
 <svg id="arrowSvg"><defs><marker id="arrowhead" markerWidth="10" markerHeight="9" refX="7" refY="4.5" orient="auto"><polygon points="0 0,10 4.5,0 9" style="fill:var(--ember)"/></marker></defs>
 <line id="arrowLine" x1="0" y1="0" x2="0" y2="0" style="stroke:var(--ember); stroke-width:4; marker-end:url(#arrowhead);"/></svg>
 <div class="main">

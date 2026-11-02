@@ -82,6 +82,7 @@ const PvpClient = (() => {
       if (m.state !== 'queue') S.queuedAt = 0;
       renderScreen();
     } else if (m.t === 'match') {
+      m._at = Date.now();                                                 // v147 받은 시각 (연출로 늦게 처리돼도 남은 시간을 맞게 잰다)
       S.chain = S.chain.then(() => handleMatch(m)).catch(e => console.error('[pvp]', e));
     } else if (m.t === 'emote') {                                         // v132 상대 감정 표현 (v136 관전 중이면 양쪽 다)
       if (m.matchId === S.matchId) { const x = PROGRESS.EMOTES.find(e => e.id === m.id); if (x) showBubble(m.seat === MY ? MY : OPP, x.text); }
@@ -220,11 +221,19 @@ const PvpClient = (() => {
     render();
   }
   async function handleMatch(m) {
-    if (m.matchId !== S.matchId) { await Preload.ensure(); beginMatchUi(m); }   // v138 보통은 이미 받아 둔 상태 (새로고침해서 판에 다시 들어올 때만 로딩 화면)
+    if (m.matchId !== S.matchId) {
+      await Preload.ensure();                                            // v138 보통은 이미 받아 둔 상태 (새로고침해서 판에 다시 들어올 때만 로딩 화면)
+      const left = (m.introMs || 0) - (Date.now() - (m._at || Date.now()));
+      if (!m.spectate && m.phase === 'mulligan' && left > 800 && typeof MatchIntro !== 'undefined') {   // v147 「매칭 성공!」 → 서서히 판 화면으로
+        const mode = m.friendly ? '친구 대전' : m.ranked ? '🏆 랭크전' : '⚔️ 일반전';
+        await MatchIntro.play({ me: S.meName || '나', opp: m.opp.name, mode }, left, () => beginMatchUi(m));
+      } else beginMatchUi(m);
+    }
     S.phase = m.phase; S.turnSeat = m.turnSeat; S.timeouts = m.timeouts; S.maxTimeouts = m.maxTimeouts;
     S.oppOffAt = m.opp.online ? 0 : Date.now() - (m.oppOfflineMs || 0);
-    S.deadline = m.remainMs > 0 ? Date.now() + m.remainMs : 0;
-    S.mullDeadline = m.mulligan && m.mulligan.remainMs > 0 ? Date.now() + m.mulligan.remainMs : 0;
+    const at = m._at || Date.now();                                      // v147 서버가 보낸 남은 시간은 받은 순간 기준
+    S.deadline = m.remainMs > 0 ? at + m.remainMs : 0;
+    S.mullDeadline = m.mulligan && m.mulligan.remainMs > 0 ? at + m.mulligan.remainMs : 0;
     if (m.phase === 'mulligan') { view = m.view; syncShim(view); if (S.spectate) { ui.busy = true; render(); } else showMull(m); tickHud(); return; }   // v136 관전자는 멀리건 창 없이 기다린다
     hideMull();
     if (m.seq < S.lastSeq) return;                                       // 낡은 메시지

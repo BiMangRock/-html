@@ -5,7 +5,8 @@
   let mode = 'login';
 
   // 이미 로그인돼 있으면 바로 게임으로
-  fetch('/api/me').then(r => { if (r.ok) location.replace('/'); }).catch(() => {});
+  const intro = () => { try { sessionStorage.setItem('cardDuel.intro', '1'); } catch (_) {} };   // v147 메인 화면에서 인트로(칼 + 로고)를 한 번 보여 준다 (intro.js)
+  fetch('/api/me').then(r => { if (r.ok) { intro(); location.replace('/'); } }).catch(() => {});
 
   function setMode(m) {
     mode = m;
@@ -35,7 +36,7 @@
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { err.textContent = data.error || '문제가 생겼어요. 잠시 후 다시 해 주세요.'; return; }
-      location.replace('/');
+      intro(); location.replace('/');
     } catch (_) {
       err.textContent = '서버에 연결할 수 없어요.';
     } finally { go.disabled = false; }

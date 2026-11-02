@@ -1,0 +1,83 @@
+/* intro.css — v147 로그인 인트로 · 매칭 성공 화면 (intro.js) */
+
+/* ---------- 로그인 인트로 ---------- */
+#introSplash{position:fixed; inset:0; z-index:9900; background:#000; display:none; overflow:hidden; cursor:pointer;
+  -webkit-user-select:none; user-select:none; transition:opacity .55s ease;}
+#introSplash.on{display:block;}
+#introSplash.out{opacity:0; pointer-events:none;}
+#introSplash::before{content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse at 50% 45%, rgba(40,90,110,.35), rgba(0,0,0,0) 60%);}
+#introSplash .is-stage{position:absolute; inset:0;}
+#introSplash.boom .is-stage{animation:isShake .4s linear;}
+#introSplash .is-logo{position:absolute; left:50%; top:46%; height:min(66vh, 78vw, 620px); width:auto;
+  transform:translate(-50%,-50%); pointer-events:none;}
+#introSplash .is-logo.ghost{opacity:.07; filter:grayscale(1) brightness(.6);}
+#introSplash .is-logo.top, #introSplash .is-logo.bot{filter:drop-shadow(0 0 10px rgba(80,230,220,.35)); clip-path:inset(0 100% 0 0);}
+#introSplash.boom .is-logo.top, #introSplash.boom .is-logo.bot{animation:isGlow 1.6s ease-out;}
+#introSplash .is-sword{position:absolute; left:0; top:0; transform-origin:0 0; opacity:0; pointer-events:none; will-change:transform;}
+#introSplash .is-sword img{position:absolute; width:auto; filter:drop-shadow(0 0 12px rgba(90,170,255,.55));}
+#introSplash .is-spark{position:absolute; left:0; top:0; width:0; height:0; opacity:0; pointer-events:none;}
+#introSplash .is-spark::before{content:''; position:absolute; left:-22px; top:-22px; width:44px; height:44px; border-radius:50%;
+  background:radial-gradient(circle, #fff 0, #bff 18%, rgba(90,200,255,.6) 40%, rgba(90,200,255,0) 70%);
+  animation:isFlick .12s infinite alternate;}
+#introSplash .is-slash{position:absolute; left:50%; top:46%; height:min(80vh, 90vw, 760px); transform:translate(-50%,-50%) scale(.3) rotate(-10deg);
+  opacity:0; pointer-events:none; mix-blend-mode:screen;}
+#introSplash.boom .is-slash{animation:isSlash .9s ease-out forwards;}
+#introSplash .is-flash{position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none;}
+#introSplash.boom .is-flash{animation:isFlash .5s ease-out;}
+#introSplash .is-credit{position:absolute; left:0; right:0; bottom:max(5vh, env(safe-area-inset-bottom)); text-align:center;
+  color:#d9c48a; font-weight:700; letter-spacing:.12em; font-size:clamp(.8rem, 2.2vmin, 1.05rem); opacity:0; transform:translateY(8px);
+  transition:opacity .6s ease, transform .6s ease; text-shadow:0 0 8px rgba(0,0,0,.8);}
+#introSplash .is-credit small{display:block; margin-bottom:.3em; font-size:.75em; color:#8b8064; letter-spacing:.3em;}
+#introSplash.credit .is-credit{opacity:1; transform:none;}
+#introSplash .is-skip{position:absolute; right:14px; top:max(12px, env(safe-area-inset-top)); color:rgba(255,255,255,.35); font-size:.75rem;}
+#introSplash .is-embers{position:absolute; inset:0; pointer-events:none;
+  background-image:radial-gradient(2px 2px at 20% 80%, #ffb35c, transparent), radial-gradient(1.5px 1.5px at 70% 90%, #ffd27a, transparent),
+    radial-gradient(2px 2px at 40% 95%, #ff9a3c, transparent), radial-gradient(1.5px 1.5px at 85% 75%, #7fe8ff, transparent),
+    radial-gradient(1.5px 1.5px at 10% 60%, #ffcf70, transparent), radial-gradient(2px 2px at 55% 70%, #ffb35c, transparent);
+  animation:isEmbers 5s linear infinite; opacity:.7;}
+@keyframes isShake{0%,100%{transform:none} 20%{transform:translate(-8px,5px)} 40%{transform:translate(7px,-6px)} 60%{transform:translate(-5px,-3px)} 80%{transform:translate(4px,4px)}}
+@keyframes isGlow{0%{filter:drop-shadow(0 0 30px rgba(140,255,240,1)) brightness(1.8)} 100%{filter:drop-shadow(0 0 10px rgba(80,230,220,.35)) brightness(1)}}
+@keyframes isSlash{0%{opacity:0; transform:translate(-50%,-50%) scale(.3) rotate(-10deg)} 25%{opacity:1} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.25) rotate(6deg)}}
+@keyframes isFlash{0%{opacity:.85} 100%{opacity:0}}
+@keyframes isFlick{from{transform:scale(.8); opacity:.8} to{transform:scale(1.15); opacity:1}}
+@keyframes isEmbers{from{transform:translateY(0)} to{transform:translateY(-35vh)}}
+
+/* ---------- 매칭 성공 화면 ---------- */
+#matchIntro{position:fixed; inset:0; z-index:9800; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3vh;
+  opacity:0; transition:opacity .3s ease; color:#f3e6c2; -webkit-user-select:none; user-select:none;}
+#matchIntro.on{opacity:1;}
+#matchIntro.out{opacity:0; transition:opacity .5s ease; pointer-events:none;}
+#matchIntro .mi-bg{position:absolute; inset:-4%; background-size:cover; background-position:center; filter:blur(2px) brightness(.55); animation:miZoom 3s ease-out forwards;}
+#matchIntro .mi-shade{position:absolute; inset:0; background:radial-gradient(ellipse at center, rgba(0,0,0,.15), rgba(0,0,0,.75) 75%);}
+#matchIntro > *:not(.mi-bg):not(.mi-shade){position:relative;}
+#matchIntro .mi-title{font-size:clamp(1.8rem, 7vmin, 3.4rem); font-weight:900; letter-spacing:.08em; color:#ffd56a;
+  text-shadow:0 0 18px rgba(255,170,40,.8), 0 3px 0 #6b3a00; animation:miDrop .45s cubic-bezier(.2,1.6,.4,1) both;}
+#matchIntro .mi-mode{margin-top:-2vh; font-size:clamp(.8rem, 2.6vmin, 1.1rem); color:#cdbb8a; letter-spacing:.2em;}
+#matchIntro .mi-row{display:flex; align-items:center; justify-content:center; gap:4vw; width:100%;}
+#matchIntro .mi-side{display:flex; flex-direction:column; align-items:center; gap:.6rem; min-width:0; flex:1; max-width:34vw;}
+#matchIntro .mi-side.me{animation:miInL .45s cubic-bezier(.2,1,.3,1) .1s both;}
+#matchIntro .mi-side.opp{animation:miInR .45s cubic-bezier(.2,1,.3,1) .1s both;}
+#matchIntro .mi-av{width:clamp(64px, 17vmin, 120px); aspect-ratio:1; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:clamp(1.8rem, 8vmin, 3.4rem); font-weight:900; color:#fff; background:hsl(var(--ah) 55% 38%);
+  border:4px solid #c9a24a; box-shadow:0 0 0 3px #3a2a10, 0 0 24px rgba(255,190,80,.5);}
+#matchIntro .mi-name{font-size:clamp(1rem, 3.6vmin, 1.6rem); font-weight:800; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  text-shadow:0 2px 6px #000;}
+#matchIntro .mi-vs{position:relative; width:clamp(70px, 16vmin, 130px); aspect-ratio:1; display:flex; align-items:center; justify-content:center;}
+#matchIntro .mi-vs b{position:relative; font-size:clamp(2rem, 9vmin, 4.2rem); font-weight:900; font-style:italic; color:#fff;
+  text-shadow:0 0 14px rgba(255,120,30,.9), 0 0 2px #000; opacity:0;}
+#matchIntro .mi-fx{position:absolute; left:50%; top:50%; height:260%; transform:translate(-50%,-50%) scale(.2); opacity:0; mix-blend-mode:screen; pointer-events:none;}
+#matchIntro.slam .mi-vs b{animation:miSlam .35s cubic-bezier(.3,1.5,.5,1) both;}
+#matchIntro.slam .mi-fx{animation:miFx .9s ease-out both;}
+#matchIntro.slam .mi-row{animation:isShake .35s linear .05s;}
+#matchIntro .mi-sub{font-size:clamp(.75rem, 2.3vmin, 1rem); color:#a99b78; animation:miBlink 1.2s ease-in-out infinite;}
+@keyframes miZoom{from{transform:scale(1)} to{transform:scale(1.08)}}
+@keyframes miDrop{from{opacity:0; transform:translateY(-30px) scale(1.3)} to{opacity:1; transform:none}}
+@keyframes miInL{from{opacity:0; transform:translateX(-30vw)} to{opacity:1; transform:none}}
+@keyframes miInR{from{opacity:0; transform:translateX(30vw)} to{opacity:1; transform:none}}
+@keyframes miSlam{from{opacity:0; transform:scale(3)} to{opacity:1; transform:scale(1)}}
+@keyframes miFx{0%{opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(-20deg)} 30%{opacity:1} 100%{opacity:.25; transform:translate(-50%,-50%) scale(1) rotate(0)}}
+@keyframes miBlink{50%{opacity:.45}}
+@media (prefers-reduced-motion: reduce){
+  #introSplash.boom .is-stage, #matchIntro.slam .mi-row{animation:none;}
+}

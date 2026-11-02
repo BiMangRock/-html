@@ -68,6 +68,7 @@ function createPvp(opts = {}) {
     inviteMs: PVP.INVITE_MS || 30000,   // v136 친구 대전 신청이 유효한 시간
     maxSpectators: PVP.MAX_SPECTATORS || 10,   // v136 한 판을 동시에 관전할 수 있는 사람 수
     tickMs: 250,
+    introMs: 0,                         // v147 매칭 성공 연출 시간 (멀리건 시간에 더해 준다). 실제 서버는 server/pvp.js 에서 PVP.INTRO_MS 로 켠다
     ...(opts.cfg || {}),
   };
   const log = opts.log || (() => {});
@@ -194,7 +195,7 @@ function createPvp(opts = {}) {
     const m = {
       id: crypto.randomBytes(8).toString('hex'), ranked: mode === 'rank', friendly: mode === 'friend', spectators: new Map(), uids: order, names: order.map(uid => users.get(uid).username),
       state, decks, seq: 0, phase: 'mulligan', over: false, startedAt: now,
-      mull: [0, 1].map(s => ({ done: !(state.seats[s].startIds || []).length })), mullUntil: now + cfg.mulliganMs,
+      mull: [0, 1].map(s => ({ done: !(state.seats[s].startIds || []).length })), mullUntil: now + cfg.introMs + cfg.mulliganMs,
       deadline: null, timeouts: [0, 0], offline: [null, null], result: null,
       log: { v: 1, engine: E.VERSION, seed, decks: decks.map(d => d.slice()), heroPowers: heroPowers.slice(), names: order.map(uid => users.get(uid).username), ranked: mode === 'rank', friendly: mode === 'friend', steps: [] },   // v137 리플레이 기록
     };
@@ -215,6 +216,7 @@ function createPvp(opts = {}) {
       t: 'match', matchId: m.id, seat, ranked: !!m.ranked, friendly: !!m.friendly, spectators: m.spectators.size, phase: m.over ? 'over' : m.phase, seq: m.seq,
       opp: { name: m.names[opp], online: m.offline[opp] == null }, oppOfflineMs: m.offline[opp] == null ? 0 : now - m.offline[opp],
       mulligan: { done: m.mull[seat].done, oppDone: m.mull[opp].done, startIds: m.mull[seat].done ? [] : (st.seats[seat].startIds || []), remainMs: m.phase === 'mulligan' ? Math.max(0, m.mullUntil - now) : 0 },
+      introMs: m.phase === 'mulligan' && !m.over ? Math.max(0, m.startedAt + cfg.introMs - now) : 0,   // v147 남은 매칭 연출 시간 (재접속이면 보통 0)
       turnMs: cfg.turnMs, remainMs: (m.phase === 'play' && !m.over) ? Math.max(0, m.deadline - now) : 0, turnSeat: st.turn,
       timeouts: m.timeouts[seat], maxTimeouts: cfg.maxTimeouts,
       deck: m.decks[seat],                                        // 내 덱 구성 ("덱 보기" 창용). 상대 덱은 보내지 않는다

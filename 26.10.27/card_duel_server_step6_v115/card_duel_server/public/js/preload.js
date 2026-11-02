@@ -35,7 +35,7 @@ const Preload = (() => {
     try { if (typeof BossBook !== 'undefined') (BossBook.get() || []).forEach(b => { add(b && b.icon); (b && b.deck || []).forEach(n => { const c = typeof cardByName === 'function' && cardByName(n); if (c) add(c.art); }); }); } catch (_) {}
     // 판 화면에서 CSS·HTML 로 쓰는 그림 (style.css · index.html)
     ['fx_frozen.png', 'fx_holy_shield.png', 'fx_stealth.png', 'fx_taunt.png', 'stat_atk.webp', 'stat_hp.webp', 'deck_pile.webp',
-     'pvp/pvp_table.webp', 'pvp/avatar_frame.webp', 'pvp/timer_opp.webp', 'pvp/timer_mine.webp', 'pvp/timer_low.webp', 'pvp/rope.webp', 'pvp/rope_tile.webp']
+     'pvp/pvp_table.webp', 'pvp/avatar_frame.webp', 'pvp/timer_opp.webp', 'pvp/timer_mine.webp', 'pvp/timer_low.webp', 'pvp/rope.webp', 'pvp/rope_tile.webp', 'intro/tavern.webp', 'intro/slash.webp']
       .forEach(n => add('images/' + n));
     return [...s];
   }
