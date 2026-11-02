@@ -20,6 +20,14 @@ const PROGRESS = {
     { id: 'pvp1',     text: '유저 대전 1판 하기',               stat: 'pvp',     goal: 1,  gold: 60 },
     { id: 'adv1',     text: '모험 모드 보스전 1판 하기',         stat: 'adv',     goal: 1,  gold: 50 },
   ],
+  // ---- 첫 걸음 (v140): 튜토리얼 첫 완료 보상. 계정당 한 번만, 받으면 목록에서 사라진다. 일일 퀘스트 칸·바꾸기와 무관 ----
+  //  reward: {gold:N} 골드 / {legend:1} 아직 없는 전설 중 무작위 1장 (다 있으면 전체 전설 중 무작위). 모험·보스 전용 카드는 안 나옴
+  TUTORIALS: [
+    { id: 'basic',    name: '기본 튜토리얼', text: '기본 튜토리얼 완료하기', url: '/tutorial/index.html',
+      desc: '처음이라면 · 대사와 함께 마나·도발·주문·돌진 등 기본 규칙을 직접 해 보며 배웁니다', reward: { gold: 1000 }, rewardText: '1,000골드' },
+    { id: 'advanced', name: '고급 튜토리얼', text: '고급 튜토리얼 완료하기', url: '/tutorial/advanced.html', needs: 'basic',
+      desc: '기본을 익혔다면 · 죽음의 메아리·발견·동결·주문 공격력 등 심화 규칙을 배웁니다', reward: { legend: 1 }, rewardText: '무작위 전설 카드 1장' },
+  ],
   // 한 판에서 인정하는 최대치 (이상한 값을 막는 상한)
   STAT_CAP: { games: 1, wins: 1, spells: 999, minions: 999, attacks: 999, face: 9999, powers: 999, big: 999, pvp: 1, adv: 1 },   // v133 판당 상한 사실상 없음 (판 수·승리만 1)
   // ---- 감정 표현 ----

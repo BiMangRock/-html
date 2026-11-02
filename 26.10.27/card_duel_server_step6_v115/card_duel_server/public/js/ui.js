@@ -646,10 +646,79 @@ function toast(text, kind){                          // 화면 위쪽에 잠깐 
 
 // ---------- v132 일일 퀘스트 화면 ----------
 function updateQuestMenuDesc(){ const el=$('questMenuDesc'), p=window.ServerStore && ServerStore.progress; if(!el || !p) return;
-  const L=p.quests.list, done=L.filter(q=>q.done).length; el.textContent=`오늘 ${done}/${L.length} 완료 · ${L.filter(q=>!q.done).reduce((t,q)=>t+q.gold,0)}골드 남음`; }
+  const L=p.quests.list, done=L.filter(q=>q.done).length, ready=tutRewardsReady().length;
+  el.textContent=(ready?`🎁 첫 걸음 보상 ${ready}개 받기 · `:'')+`오늘 ${done}/${L.length} 완료 · ${L.filter(q=>!q.done).reduce((t,q)=>t+q.gold,0)}골드 남음`;
+  const bd=$('questBadge'); if(bd){ bd.hidden=!ready; bd.textContent=ready; } }
+
+// ---------- v140 튜토리얼 · 첫 걸음 (튜토리얼 첫 완료 보상, 계정당 한 번) ----------
+//  상태는 서버가 준다: ServerStore.progress.tutorial = {basic:'todo'|'ready'|'claimed', advanced:…}
+//  보상을 받는 곳은 퀘스트 화면의 「첫 걸음」 칸 하나뿐 (튜토리얼 화면의 [보상 받기] 도 같은 요청을 보낸다)
+const tutState=id=>{ const p=window.ServerStore && ServerStore.progress; return p && p.tutorial ? (p.tutorial[id]||'todo') : null; };
+const tutLocked=t=>!!(t.needs && tutState(t.needs)==='todo' && tutState(t.id)==='todo');   // 기본을 안 끝냈으면 고급은 잠금 (이미 끝낸 기록이 있으면 열어 둔다)
+const tutRewardsReady=()=>PROGRESS.TUTORIALS.filter(t=>tutState(t.id)==='ready');
+function updateTutorialMenuDesc(){
+  const el=$('tutMenuDesc'); if(!el || tutState('basic')==null) return;
+  const T=PROGRESS.TUTORIALS, left=T.filter(t=>tutState(t.id)!=='claimed'), ready=tutRewardsReady();
+  el.textContent = ready.length ? `🎁 받을 보상이 있어요 · ${ready.map(t=>t.rewardText).join(' · ')}`
+    : !left.length ? '모두 완료 · 언제든 다시 해 볼 수 있어요'
+    : T.every(t=>tutState(t.id)==='todo') ? '처음이라면 여기부터 · 첫 완료 보상 1,000골드 + 전설 카드'
+    : `${T.length-left.length}/${T.length} 완료 · 남은 보상: ${left.map(t=>t.rewardText).join(' · ')}`;
+  const bd=$('tutBadge'); if(bd){ bd.hidden=!ready.length; bd.textContent=ready.length; }
+}
+function openTutorials(){ showScreen('tutorial'); renderTutorials(); ServerStore.loadProgress().then(renderTutorials); }
+function renderTutorials(){
+  const box=$('tutList'); if(!box) return; box.innerHTML='';
+  if(tutState('basic')==null){ box.innerHTML='<p class="note">불러오는 중…</p>'; return; }
+  PROGRESS.TUTORIALS.forEach(t=>{
+    const st=tutState(t.id), lock=tutLocked(t);
+    const row=document.createElement('div'); row.className='tut-row'+(st==='claimed'?' done':'')+(lock?' locked':'');
+    row.innerHTML=`<div class="tut-main"><b></b><small class="tut-desc"></small><span class="tut-rew"></span></div><div class="tut-side"></div>`;
+    row.querySelector('b').textContent=(st==='claimed'||st==='ready'?'✔ ':lock?'🔒 ':'🎓 ')+t.name;
+    row.querySelector('.tut-desc').textContent=t.desc;
+    row.querySelector('.tut-rew').textContent= st==='claimed'?'첫 완료 보상 받음':`🎁 첫 완료 보상: ${t.rewardText}`;
+    const side=row.querySelector('.tut-side');
+    if(st==='ready'){ const c=document.createElement('button'); c.type='button'; c.className='tut-btn claim'; c.textContent='🎁 보상 받기'; c.onclick=()=>claimTutorial(t.id,c); side.appendChild(c); }
+    const go=document.createElement('button'); go.type='button'; go.className='tut-btn'+(st==='todo'&&!lock?' go':'');
+    go.textContent= lock?'기본 튜토리얼 먼저': st==='todo'?'시작 ▶':'다시 하기';
+    go.disabled=lock; go.onclick=()=>{ location.href=t.url; };
+    side.appendChild(go);
+    box.appendChild(row);
+  });
+}
+function renderFirstSteps(){
+  const wrap=$('firstSteps'), box=$('firstList'); if(!wrap || !box) return;
+  const list=PROGRESS.TUTORIALS.filter(t=>{ const st=tutState(t.id); return st && st!=='claimed'; });
+  wrap.hidden=!list.length; box.innerHTML='';
+  list.forEach(t=>{
+    const st=tutState(t.id), lock=tutLocked(t);
+    const row=document.createElement('div'); row.className='quest first'+(st==='ready'?' ready':'');
+    row.innerHTML=`<div class="q-main"><b></b><div class="q-bar"><i style="width:${st==='ready'?100:0}%"></i><span>${st==='ready'?1:0} / 1</span></div></div><div class="q-side"><span class="q-gold"></span></div>`;
+    row.querySelector('b').textContent=t.text; row.querySelector('.q-gold').textContent='🎁 '+t.rewardText;
+    const b=document.createElement('button'); b.type='button';
+    if(st==='ready'){ b.className='tut-btn claim'; b.textContent='받기'; b.onclick=()=>claimTutorial(t.id,b); }
+    else { b.className='tut-btn'; b.textContent=lock?'🔒 기본 먼저':'하러 가기'; b.disabled=lock; b.onclick=()=>{ location.href=t.url; }; }
+    row.querySelector('.q-side').appendChild(b);
+    box.appendChild(row);
+  });
+}
+async function claimTutorial(id, btn){
+  if(btn) btn.disabled=true;
+  const note=$('firstNote'); if(note) note.textContent='';
+  const r=await ServerStore.claimTutorial(id);
+  if(!r.ok){ if(btn) btn.disabled=false; if(note) note.textContent='⚠ '+r.error; toast('⚠ '+r.error); renderFirstSteps(); return; }
+  updateWallet(); updateQuestMenuDesc(); updateTutorialMenuDesc();
+  if($('screen-tutorial').classList.contains('show')) renderTutorials();
+  renderFirstSteps();
+  const rw=r.reward||{};
+  if(rw.gold) toast(`🎁 첫 걸음 보상! +${fmt(rw.gold)}골드`, 'gold');
+  if(rw.card) playPacks({ title:'🎁 고급 튜토리얼 완료 보상', packLabel:'전설 카드',
+    packs:[{ cards:[{ name:rw.card.name, rarity:rw.card.rarity, isNew:rw.card.isNew, dup:false, extra:false, refund:0 }], refund:0, pityHit:null }], spent:0,
+    info:()=>rw.card.isNew?`🌟 새 전설 카드 「${rw.card.name}」을(를) 얻었어요!`:`🌟 「${rw.card.name}」 · 이미 가진 카드라 한 장 더 쌓였어요 (모든 전설을 갖고 있어요)` });
+}
 function openQuests(){ showScreen('quests'); renderQuests(); ServerStore.loadProgress().then(renderQuests); }
 function renderQuests(){
   const box=$('questList'), p=ServerStore.progress; if(!box) return;
+  renderFirstSteps();
   if(!p){ box.innerHTML='<p class="note">불러오는 중…</p>'; return; }
   const q=p.quests; box.innerHTML='';
   q.list.forEach((x,i)=>{
@@ -2965,12 +3034,12 @@ function playPacks(r){
 }
 function showPack(){
   const p=pk.r.packs[pk.i], n=pk.r.packs.length;
-  $('pkTitle').textContent=n>1?`팩 ${pk.i+1} / ${n}`:'카드 팩';
+  $('pkTitle').textContent=pk.r.title||(n>1?`팩 ${pk.i+1} / ${n}`:'카드 팩');
   $('pkInfo').textContent=''; $('pkNext').style.display='none'; $('pkFlipAll').style.display='none';
   const modal=$('packModal'); modal.classList.remove('flash0','flash1','flash2','flash3');
   const stage=$('pkStage'); stage.innerHTML='';
   const pack=document.createElement('button'); pack.className='pk-pack'; pack.type='button';
-  pack.innerHTML='<i>✦</i><b>카드 팩</b><small>탭해서 열기</small>';
+  pack.innerHTML='<i>✦</i><b></b><small>탭해서 열기</small>'; pack.querySelector('b').textContent=pk.r.packLabel||'카드 팩';
   pack.onclick=()=>{
     pack.disabled=true; pack.classList.add('opening');
     setTimeout(()=>revealSlots(p), 750);
@@ -3011,7 +3080,8 @@ function flipSlot(slot,c,p){
 function finishPack(p){
   $('pkFlipAll').style.display='none';
   const newN=p.cards.filter(c=>c.isNew).length, exN=p.cards.filter(c=>c.extra).length;
-  $('pkInfo').textContent=`새 카드 ${newN}장`+(exN?` · 남는 카드 ${exN}장 (카드 제작에서 분해 가능)`:'')+(p.pityHit==='legend'?' · 🌟 전설 천장 확정!':p.pityHit==='epic'?' · ✨ 특급 천장 확정!':'');
+  if(pk.r.info){ $('pkInfo').textContent=pk.r.info(p); }
+  else $('pkInfo').textContent=`새 카드 ${newN}장`+(exN?` · 남는 카드 ${exN}장 (카드 제작에서 분해 가능)`:'')+(p.pityHit==='legend'?' · 🌟 전설 천장 확정!':p.pityHit==='epic'?' · ✨ 특급 천장 확정!':'');
   const last=pk.i>=pk.r.packs.length-1, nx=$('pkNext');
   nx.textContent=last?(pk.r.packs.length>1?'결과 요약':'확인'):`다음 팩 (${pk.i+2}/${pk.r.packs.length})`;
   nx.style.display=''; nx.onclick=()=>{ if(!last){ pk.i++; showPack(); } else if(pk.r.packs.length>1 && !pk.summary){ showSummary(); } else closePacks(); };
@@ -3042,7 +3112,9 @@ function showSummary(){
   $('pkNext').textContent='확인';
 }
 function closePacks(){
+  const reward=pk && pk.r && pk.r.title;            // v140 튜토리얼 보상 공개 연출은 상점과 무관 → 상점 새로고침 생략
   $('packModal').classList.remove('show','flash0','flash1','flash2','flash3'); $('pkStage').innerHTML=''; pk=null;
+  if(reward){ updateWallet(); updateDeckMenuDesc(); return; }
   renderShop(); ServerStore.loadShop().then(i=>{ if(i){ shopInfo=i; renderShop(); if($('shopHistory').style.display!=='none') renderShopHistory(); } });   // 최근 기록·천장 진행도를 서버 기준으로 새로 받는다
   updateWallet(); updateDeckMenuDesc(); updatePowerMenuDesc();
 }
@@ -3056,10 +3128,12 @@ Economy.load();
 buildDifficultyButtons();
 updateWallet();
 updateDeckMenuDesc(); updatePowerMenuDesc();
-if(window.ServerStore) ServerStore.onProgress=()=>{ updateQuestMenuDesc(); if($('screen-quests') && $('screen-quests').classList.contains('show')) renderQuests(); renderCraft(); };   // v132
+if(window.ServerStore) ServerStore.onProgress=()=>{ updateQuestMenuDesc(); updateTutorialMenuDesc(); if($('screen-quests') && $('screen-quests').classList.contains('show')) renderQuests(); if($('screen-tutorial') && $('screen-tutorial').classList.contains('show')) renderTutorials(); renderCraft(); };   // v132 · v140 첫 걸음
 { const f=Economy.takeForfeited();
   if(f>0){ const p=document.createElement('p'); p.className='notice warn'; p.textContent=`이전 판이 끝나기 전에 종료되어 배팅 ${fmt(f)}골드를 잃었습니다.`; $('screen-main').appendChild(p); } }
 showScreen('main');
+{ const h=location.hash;                             // v140 튜토리얼 완료 창의 「보상 받으러 가기」 → /#quests
+  if(h==='#quests'||h==='#tutorial'){ history.replaceState(null,'',location.pathname+location.search); h==='#quests'?openQuests():openTutorials(); } }
 });
 
 // ---------- v117 키워드 사전: 카드 문구는 짧게, 뜻은 마우스를 올렸을 때 크게 보이는 카드 옆에 ----------

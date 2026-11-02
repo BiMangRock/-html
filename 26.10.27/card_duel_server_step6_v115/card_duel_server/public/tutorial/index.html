@@ -202,6 +202,7 @@ button{font-family:inherit}
 .hc.drag-float.drop-ok{box-shadow:0 16px 36px rgba(0,0,0,.6),0 0 18px 4px var(--green)}
 body.dragging,body.dragging *{cursor:grabbing!important}
 .inspect.show.force{display:block!important;left:50%;right:auto;top:40%;transform:translate(-50%,-50%);width:min(78vw,300px);font-size:14px;z-index:80;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.tut-reward{margin:10px auto 0;padding:10px 12px;max-width:420px;border:1px solid var(--gold2);border-radius:10px;background:rgba(232,195,106,.08);text-align:center;line-height:1.5}.tut-reward:empty{display:none}
 </style>
 </head>
 <body>
@@ -4040,12 +4041,32 @@ function modal(html){ $('#modal').innerHTML=html; $('#over').classList.add('show
 function closeModal(){ $('#over').classList.remove('show'); }
 $('#over').onclick=e=>{ if(e.target.id==='over')closeModal(); };
 $('#gloss').onclick=()=>modal(`<button class="tbtn x" onclick="closeModal()">닫기</button><h3>규칙 도감</h3><dl>${GLOSS.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`);
+/* v140 첫 걸음: 끝까지 하면 서버에 완료를 남긴다 → 메인 메뉴 📜 퀘스트의 「첫 걸음」에서 보상을 받는다 (계정당 한 번) */
+const TUT_ID='basic', TUT_REWARD='1,000골드';
+let tutDone=null;
+function reportDone(){
+  tutDone={state:'saving'};
+  fetch('/api/tutorial/complete',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({tutorial:TUT_ID})})
+    .then(r=>r.status===401?{state:'login'}:r.ok?r.json().then(d=>({state:(d.state&&d.state[TUT_ID])||'ready'})):{state:'net'})
+    .catch(()=>({state:'net'})).then(x=>{ tutDone=x; paintReward(); });
+}
+function paintReward(){
+  const el=document.getElementById('tutReward'); if(!el || !tutDone) return;
+  const st=tutDone.state;
+  el.innerHTML = st==='ready' ? `🎁 <b>첫 완료 보상(${TUT_REWARD})</b>이 준비됐어요!<br><small>메인 메뉴 → 📜 퀘스트 → 🌱 첫 걸음에서 받을 수 있어요.</small><br><a class="cbtn" style="display:inline-block;margin-top:8px;text-decoration:none" href="/#quests">🎁 보상 받으러 가기</a>`
+    : st==='claimed' ? '<small>첫 완료 보상은 이미 받았어요.</small>'
+    : st==='login' ? `<small>로그인하고 끝내면 첫 완료 보상(${TUT_REWARD})을 받을 수 있어요. <a href="/login.html" style="color:var(--gold)">로그인</a></small>`
+    : st==='net' ? '<small>⚠ 서버에 연결하지 못해 완료 기록을 남기지 못했어요. 다시 끝내면 기록돼요.</small>'
+    : '<small>완료 기록 저장 중…</small>';
+}
 function showWin(){
+  reportDone();
   flushSay(); MOOD[1]='G4'; document.querySelectorAll('.hero[data-seat="1"] .av').forEach(i=>i.src=fxSrc('G4')); say([['G4','말도 안 돼… 내가… 스톰윈드 따위에게…!'],['J2','스톰윈드의 승리예요! 수고했어요, 지휘관님.']]);
   renderChap(); $('#ctitle').textContent='승리!';  $('#ctask').style.display='none'; $('#cbadge').textContent='완료'; $('#cnext').style.display='none';
-  setTimeout(()=>modal(`<div class="vict"><img src="images/fx_victory.png" alt=""><h3>튜토리얼 완료!</h3>
+  setTimeout(()=>{ modal(`<div class="vict"><img src="images/fx_victory.png" alt=""><h3>튜토리얼 완료!</h3>
   <ul><li><b>마나</b>는 매 턴 1씩 늘고, 카드를 내는 데 씁니다.</li><li><b>전투의 함성</b>은 낼 때 한 번 발동합니다.</li><li>하수인은 낸 다음 턴부터 공격하고, <b>속공</b>은 하수인만, <b>돌진</b>은 영웅까지 바로 공격합니다.</li><li><b>도발</b>은 먼저 처리해야 하고, <b>보호막</b>은 피해를 한 번 막아 줍니다.</li><li><b>주문</b>은 효과만 쓰고 사라집니다.</li></ul>
-  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn" style="flex:none" onclick="closeModal();init()">다시 하기</button></div></div>`),900);
+  <div id="tutReward" class="tut-reward"></div>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn" style="flex:none" onclick="closeModal();init()">다시 하기</button><a class="cbtn" style="flex:none;text-decoration:none" href="advanced.html">고급 튜토리얼 ▶</a></div></div>`); paintReward(); },900);
 }
 
 

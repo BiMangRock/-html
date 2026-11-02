@@ -1,7 +1,8 @@
 // collection.js — 카드 희귀도 순서 · 스타터 카드 · 덱 보유 검사 (브라우저·서버 공용)
 // 희귀도 자체는 cards.js 의 각 카드(rarity)에 적혀 있다. 바꾸고 싶으면 거기서 고친다.
 const RARITY_ORDER = ['일반', '희귀', '특급', '전설'];
-const STARTER_COMMON_COPIES = 2;      // 새 계정: 일반 등급 카드는 전부 이만큼씩 지급 (추천 덱 카드는 등급과 상관없이 덱에 필요한 만큼 추가)
+const STARTER_COMMON_COPIES = 1;      // 새 계정: 고른 일반 카드를 이만큼씩 지급 (추천 덱 카드는 등급과 상관없이 덱에 필요한 만큼 추가)
+const STARTER_COMMON_SHARE = 0.5;     // v140 새 계정이 받는 일반 카드 종류 비율 (전체 일반 카드 중 절반). 나머지는 팩·제작으로 모은다
 
 // ---------- 카드 사용 범위 (v117, cards.js 의 scope) ----------
 const CARD_SCOPE_LABEL = { normal: '', adventure: '모험 전용', boss: '보스 전용' };
@@ -19,9 +20,20 @@ function validateDeckScope(names, pool, deckMode) {
 }
 
 // 새 계정이 받는 카드: { 카드이름: 장수 }  (일반 카드만)
+//  v140: 일반 카드 전부(2장씩) → 절반만 1장씩.  고르는 법 (같은 카드 목록이면 항상 같은 결과):
+//   1) 추천 덱에 들어가는 일반 카드는 꼭 넣는다  2) 나머지는 비용 순으로 줄 세워 하나 걸러 하나씩 → 비용이 고르게 섞인다
+function starterCommons(pool, deckList) {
+  const commons = pool.filter(c => c.rarity === '일반' && cardScope(c) === 'normal' && !c.unlock && c.type);
+  const want = Math.round(commons.length * STARTER_COMMON_SHARE), inDeck = new Set(deckList);
+  const picked = commons.filter(c => inDeck.has(c.name)).map(c => c.name);
+  const rest = commons.filter(c => !inDeck.has(c.name)).map((c, i) => ({ c, i })).sort((a, b) => (a.c.cost - b.c.cost) || (a.i - b.i)).map(x => x.c.name);
+  const left = Math.max(0, want - picked.length), step = rest.length / Math.max(1, left);
+  for (let k = 0; k < left && k < rest.length; k++) picked.push(rest[Math.floor(k * step)]);
+  return picked;
+}
 function starterCollection(pool, deckList) {
   const col = {};
-  pool.forEach(c => { if (c.rarity === '일반' && cardScope(c) === 'normal' && !c.unlock) col[c.name] = STARTER_COMMON_COPIES; });
+  starterCommons(pool, deckList).forEach(n => { col[n] = STARTER_COMMON_COPIES; });
   const need = {}; deckList.forEach(n => { need[n] = (need[n] || 0) + 1; });
   for (const n of Object.keys(need)) col[n] = Math.max(col[n] || 0, need[n]);
   return col;
@@ -33,4 +45,4 @@ function validateDeckOwned(names, owned) {
   for (const n of Object.keys(need)) if (((owned && owned[n]) || 0) < need[n]) return `보유하지 않은 카드가 있습니다: ${n}`;
   return null;
 }
-if (typeof module !== 'undefined') { module.exports = { RARITY_ORDER, STARTER_COMMON_COPIES, starterCollection, validateDeckOwned, CARD_SCOPE_LABEL, cardScope, validateDeckScope }; }
+if (typeof module !== 'undefined') { module.exports = { RARITY_ORDER, STARTER_COMMON_COPIES, STARTER_COMMON_SHARE, starterCommons, starterCollection, validateDeckOwned, CARD_SCOPE_LABEL, cardScope, validateDeckScope }; }

@@ -1,6 +1,7 @@
 // test-saves.js — 3단계 저장 API 확인: 계정별 분리 · 값 검증 · 충돌 감지 (임시 DB 사용)
 process.env.DB_PATH = ':memory:';
 const assert = require('assert');
+const Col = require(require('path').join(__dirname, '..', 'public', 'js', 'collection.js'));
 const http = require('http');
 const path = require('path');
 const express = require('express');
@@ -61,7 +62,9 @@ const server = http.createServer(app).listen(0, async () => {
     r = await A('GET', '/api/save'); const col = r.data.collection;
     const commons = E.CARD_POOL.filter(c => c.rarity === '일반' && !c.scope);                 // v117: 모험·보스 전용 카드는 스타터로 주지 않는다
     assert.ok(E.CARD_POOL.filter(c => c.scope).every(c => !col[c.name]), '보스·모험 전용 카드는 스타터에 없음');
-    assert.ok(commons.every(c => col[c.name] >= 2), '일반 카드는 전부 2장 이상 지급');
+    { const got = commons.filter(c => col[c.name] >= 1).length, want = Math.round(commons.filter(c => !c.unlock).length * Col.STARTER_COMMON_SHARE);   // v140: 일반 카드는 절반만 1장씩
+      assert.strictEqual(got, want, `일반 카드 ${want}종 지급 (실제 ${got})`);
+      assert.ok(commons.filter(c => col[c.name] && !deck.includes(c.name)).every(c => col[c.name] === Col.STARTER_COMMON_COPIES), '덱 밖 일반 카드는 1장씩'); }
     assert.ok(deck.every(n => col[n] >= 1), '추천 덱 카드는 등급과 상관없이 보유');
     assert.strictEqual(col[LEGEND], undefined, '전설은 스타터에 없음');
     r = await A('PUT', '/api/deck', { deck: legendDeck }); assert.strictEqual(r.status, 400, '미보유 카드가 든 덱은 거부'); assert.ok(/보유/.test(r.data.error));

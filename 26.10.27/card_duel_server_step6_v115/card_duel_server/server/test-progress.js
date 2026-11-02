@@ -33,15 +33,17 @@ const server = http.createServer(app).listen(0, async () => {
     r = await call('POST', '/api/disenchant', { name: used, count: col0[used] }); assert.strictEqual(r.status, 400, '덱에 쓰는 카드');
     // 덱에 안 쓰는 일반 카드 분해
     const free = Object.keys(col0).find(n => !deck.includes(n) && craftableCard(E.CARD_POOL.find(c => c.name === n)));
-    r = await call('POST', '/api/disenchant', { name: free, count: 2 }); assert.strictEqual(r.status, 200, JSON.stringify(r.data));
-    assert.strictEqual(r.data.dust, PROGRESS.DISENCHANT['일반'] * 2); assert(!r.data.collection[free]);
+    const freeN = col0[free];                                               // v140 스타터 일반 카드는 1장씩
+    r = await call('POST', '/api/disenchant', { name: free, count: freeN }); assert.strictEqual(r.status, 200, JSON.stringify(r.data));
+    assert.strictEqual(r.data.dust, PROGRESS.DISENCHANT['일반'] * freeN); assert(!r.data.collection[free]);
     // 가루를 넣어 두고 제작
     db.prepare('UPDATE player_progress SET dust=5000').run();
     r = await call('POST', '/api/craft', { name: '데스윙' }); assert.strictEqual(r.status, 200); assert.strictEqual(r.data.collection['데스윙'], 1); assert.strictEqual(r.data.dust, 5000 - 1600);
     r = await call('POST', '/api/craft', { name: '데스윙' }); r = await call('POST', '/api/craft', { name: '데스윙' }); assert.strictEqual(r.status, 400, '2장 넘게는 못 만듦');
     r = await call('POST', '/api/craft', { name: '학사모' }); assert.strictEqual(r.status, 400);
     // 남는 카드 한꺼번에 분해
-    db.prepare("UPDATE collection SET count=5 WHERE card_name=?").run(free === '들쥐' ? '책벌레' : '들쥐');
+    { const uid = db.prepare("SELECT id FROM users WHERE username='crafter1'").get().id, n = free === '들쥐' ? '책벌레' : '들쥐';   // v140 스타터에 없을 수도 있어서 넣어 둔다
+      db.prepare("INSERT INTO collection(user_id,card_name,count) VALUES (?,?,5) ON CONFLICT(user_id,card_name) DO UPDATE SET count=5").run(uid, n); }
     r = await call('POST', '/api/disenchant-extra'); assert.strictEqual(r.status, 200); assert(r.data.count >= 3, JSON.stringify(r.data));
     // 퀘스트: 진행 · 완료 골드
     db.prepare("UPDATE player_progress SET quests_json=?").run(JSON.stringify([{ id: 'play3', prog: 0, done: false }, { id: 'spell10', prog: 0, done: false }, { id: 'win2', prog: 0, done: false }]));

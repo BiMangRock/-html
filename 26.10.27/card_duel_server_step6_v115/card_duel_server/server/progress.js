@@ -12,6 +12,7 @@ const JS = path.join(__dirname, '..', 'public', 'js');
 const { PROGRESS, craftableCard, cleanStats } = require(path.join(JS, 'progress.js'));
 const { Economy } = require(path.join(JS, 'economy.js'));
 const { CONFIG, defaultDeckList } = require(path.join(JS, 'engine.js'));
+const { tutorialState } = require('./tutorial');             // v140 첫 걸음 (튜토리얼 첫 완료 보상)
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS player_progress (
@@ -57,7 +58,7 @@ const questsOut = r => ({
   day: r.day, rerollsLeft: Math.max(0, PROGRESS.REROLLS - r.rerolls), gamesLeft: PROGRESS.MAX_GAMES_PER_DAY > 0 ? Math.max(0, PROGRESS.MAX_GAMES_PER_DAY - r.games) : null,   // null = 제한 없음
   list: r.quests.map(q => { const d = qdef(q.id); return { id: q.id, text: d.text, goal: d.goal, gold: d.gold, prog: Math.min(d.goal, q.prog), done: !!q.done }; }),
 });
-const progressOut = uid => { const r = rowOf(uid); return { dust: r.dust, quests: questsOut(r) }; };
+const progressOut = uid => { const r = rowOf(uid); return { dust: r.dust, quests: questsOut(r), tutorial: tutorialState(uid) }; };
 
 const router = express.Router();
 router.use(requireAuth);
