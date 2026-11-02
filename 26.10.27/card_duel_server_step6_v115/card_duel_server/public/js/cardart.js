@@ -1,5 +1,17 @@
 // cardart.js (v140) — 카드 이름 → 그림 파일. 메인 게임(ui.js)과 튜토리얼이 같이 쓴다. (원래 ui.js 안에 있던 표)
 const CARD_ART = {
+  // v146 엔진이 만드는 토큰·생성 카드 (cards.js 에 없는 이름이라 여기서 이름으로 연결)
+  "동전": "images/token_coin.jpg",
+  "당근마켓 정산금": "images/ynu/ynu_tok_carrot_coin.jpg",
+  "철학 지문": "images/ynu/ynu_tok_text_philosophy.jpg",
+  "경제 지문": "images/ynu/ynu_tok_text_economy.jpg",
+  "양자역학 지문": "images/ynu/ynu_tok_text_quantum.jpg",
+  "만취한 손님": "images/ynu/ynu_tok_drunk_guest.jpg",
+  "PC방 올빼미": "images/ynu/ynu_tok_pc_owl.jpg",
+  "밤샘 개발자": "images/ynu/ynu_tok_night_dev.jpg",
+  "메가커피 1L 아메리카노": "images/ynu/ynu_tok_mega_coffee.jpg",
+  "에어팟 노이즈 캔슬링": "images/ynu/ynu_tok_airpods.jpg",
+  "전원 A+ 확정": "images/ynu/ynu_tok_all_a_plus.jpg",
   "피의 기록관 말라코르": "images/art_malakor.jpg",
   "거머리 어미 발토라": "images/art_valtora.jpg",
   "피의 소용돌이": "images/art_vortex.jpg",

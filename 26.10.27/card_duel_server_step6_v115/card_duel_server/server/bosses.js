@@ -7,7 +7,7 @@ const db = require('./db');
 const { requireAuth, requireAdmin } = require('./auth');
 const JS = path.join(__dirname, '..', 'public', 'js');
 const { validateDeckList, HERO_POWERS: E_HP } = require(path.join(JS, 'engine.js'));
-const { BOSS_DEFAULT, advCleanFields, advCleanIcon } = require(path.join(JS, 'adventure.js'));
+const { BOSS_DEFAULT, advCleanFields, advCleanIcon, advBossIcon } = require(path.join(JS, 'adventure.js'));
 
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_BOSSES = 60;
@@ -28,7 +28,7 @@ function cleanBoss(b, i) {
   return {
     id: b.id,
     name: String(b.name || '이름 없음').slice(0, 20),
-    icon: advCleanIcon(b.icon),                // v117: 이모지 또는 images/… 그림 경로
+    icon: advBossIcon(b),                      // v117: 이모지 또는 images/… 그림 경로 · v146 이모지면 기본 초상화(BOSS_ICON_IMG)
     desc: String(b.desc || '').slice(0, 80),
     cheats: [...new Set((Array.isArray(b.cheats) ? b.cheats : []).map(x => String(x).slice(0, 40)))].slice(0, 30),
     reward: Math.max(0, Math.min(1000000, Math.floor(Number(b.reward) || 0))),

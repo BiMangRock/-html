@@ -2233,7 +2233,8 @@ const bossReward=b=>b.reward>0 ? b.reward : rankInfo(bossRank(b))[3];
 const bossCheatList=b=>(b.cheats||[]).map(id=>CHEATS.find(c=>c.id===id)).filter(Boolean);
 const bossMods=b=>{ const m={}; bossCheatList(b).forEach(c=>{ m[c.id]=cheatValue(c,0); }); return m; };
 const BossBook = (() => {
-  const clean=b=>({id:String(b.id), name:String(b.name||'이름 없음').slice(0,20), icon:advCleanIcon(b.icon), desc:String(b.desc||'').slice(0,80),
+  // v146 icon: advBossIcon — 아이콘이 아직 이모지인 보스는 BOSS_ICON_IMG 의 기본 초상화를 쓴다 (adventure.js)
+  const clean=b=>({id:String(b.id), name:String(b.name||'이름 없음').slice(0,20), icon:advBossIcon(b), desc:String(b.desc||'').slice(0,80),
     cheats:[...new Set((Array.isArray(b.cheats)?b.cheats:[]).map(String))].filter(id=>CHEATS.some(c=>c.id===id)), reward:Math.max(0,Math.min(1000000,Math.floor(Number(b.reward)||0))), tier:(b.tier==='high'||(b.tier==null&&b.bot==='model'))?'high':'mid',
     bot:(b.tier==='high'||(b.tier==null&&b.bot==='model'))?'model':(b.bot==='rule'?'rule':'rule2'), model:String(b.model||''), heroPower:HERO_POWERS[b.heroPower]?b.heroPower:'',   // v131
     deck:Array.isArray(b.deck)?b.deck.map(String):[], ...advCleanFields(b)});     // v117: chapter · stage · rewardCards
@@ -2557,7 +2558,7 @@ function openAdventure(rank){
   views.forEach(v=>{
     const t=document.createElement('button'); t.className='adv-ch'+(advView===v?' on':'');
     if(v==='free'){ const of=all.filter(b=>!b.chapter); t.innerHTML=`<span class="ic">⚔️</span><b>자유 보스전</b><small>${of.filter(b=>AdventureBook.has(b.id)).length}/${of.length} 클리어</small>`; }
-    else { const info=advChapterInfo(v), of=advChapterBosses(all,v), run=runOf(v); t.innerHTML=`<span class="ic">${escHtml(info.icon)}</span><b>${escHtml(info.name)}</b><small>${run?`재학 중 ${(run.cleared||[]).length}/${of.length}`:'입학 전'}</small>`; }
+    else { const info=advChapterInfo(v), of=advChapterBosses(all,v), run=runOf(v); t.innerHTML=`<span class="ic">${info.img?`<img class="ch-img" src="${escHtml(info.img)}" alt="">`:escHtml(info.icon)}</span><b>${escHtml(info.name)}</b><small>${run?`재학 중 ${(run.cleared||[]).length}/${of.length}`:'입학 전'}</small>`; }
     t.onclick=()=>{ advView=v; openAdventure(); }; ct.appendChild(t);
   });
   ct.style.display=views.length>1?'':'none';
@@ -2577,7 +2578,7 @@ function openAdventure(rank){
     tabs.style.display='none';
     const info=advChapterInfo(advView), list=advChapterBosses(all, advView), run=runOf(advView), done=run?(run.cleared||[]).length:0, next=advRunNext(all, advView, run);
     $('advChapterDesc').style.display='';
-    $('advChapterDesc').innerHTML=`<b>${escHtml(info.icon)} ${escHtml(info.name)}</b> <span class="prog">${run?`${done} / ${list.length}`:'입학 전'}</span><br><small>${escHtml(info.desc||'')}</small><div class="adv-bar"><i style="width:${list.length?Math.round(done/list.length*100):0}%"></i></div>`+
+    $('advChapterDesc').innerHTML=`<b>${info.img?`<img class="ch-img sm" src="${escHtml(info.img)}" alt="">`:escHtml(info.icon)} ${escHtml(info.name)}</b> <span class="prog">${run?`${done} / ${list.length}`:'입학 전'}</span><br><small>${escHtml(info.desc||'')}</small><div class="adv-bar"><i style="width:${list.length?Math.round(done/list.length*100):0}%"></i></div>`+
       (run ? `<div class="run-box"><b>📖 재학 중</b> · 잠긴 덱 ${run.deck.length}장${next?` · 다음 상대: ${escHtml(next.name)}`:''}<br><small>보스에게 지면 입학이 끝나고 처음부터 다시 시작해요. 고른 보상 카드는 이 덱에 바로 더해져요.</small>`+
              `<div class="run-btns"><button type="button" onclick="showRunDeck('${advView}')">🗒 잠긴 덱 보기</button><button type="button" class="drop" onclick="dropRun('${advView}')">자퇴하기</button></div></div>`
            : `<div class="run-box"><button type="button" class="enroll" onclick="enrollRun('${advView}')">🎓 입학하기</button><br><small>${AdvDeckBook.has()?'모험 덱':'일반 덱'} 30장(일반 카드만)으로 입학해요. <b>입학하면 덱을 바꿀 수 없어요.</b> 모험 전용 카드는 단계를 깰 때마다 보상으로 덱에 더해지고, 입학이 끝나면 사라져요. 보스에게 지면 처음부터 다시.</small></div>`);

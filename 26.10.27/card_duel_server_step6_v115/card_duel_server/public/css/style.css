@@ -1282,3 +1282,7 @@ button.end-turn.armed{background:var(--ember); color:#fff; border-color:var(--em
 #logPanel h3{display:flex; align-items:center; gap:.4rem;}
 #logPanel .log-opt{margin-left:auto; display:inline-flex; align-items:center; gap:.25rem; font-family:inherit; font-size:.68rem; font-weight:400; color:var(--parch-d); cursor:pointer; white-space:nowrap;}
 #logPanel .log-opt input{margin:0; accent-color:var(--gold); cursor:pointer;}
+
+/* v146 챕터 아이콘 그림 */
+.adv-ch .ic .ch-img{width:2.4rem; height:2.4rem; object-fit:cover; object-position:center 40%; border-radius:50%; border:2px solid var(--gold-d); display:block; margin:0 auto;}
+.ch-img.sm{width:1.4rem; height:1.4rem; object-fit:cover; object-position:center 40%; border-radius:50%; vertical-align:-.3em; border:1px solid var(--gold-d);}
