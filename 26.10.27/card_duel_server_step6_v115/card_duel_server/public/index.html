@@ -124,7 +124,7 @@
     <button class="menu-btn" onclick="openShop()">🛒 상점<span class="desc" id="shopMenuDesc">카드 팩을 열어 새 카드를 모읍니다 · 남는 카드는 분해해 가루로</span></button>
     <button class="menu-btn" onclick="openGuide()">📖 가이드<span class="desc">초보자용 · 효과 설명(애니메이션) · 카드 읽는 법 · 게임 규칙</span></button>
     <button class="menu-btn" onclick="openDeckList()">📚 내 덱<span class="desc" id="deckMenuDesc"></span></button>
-    <button class="menu-btn" onclick="Friends.open()">👥 친구<b class="fr-badge" id="friendBadge" hidden></b><span class="desc" id="friendMenuDesc">친구 추가 · 친구와 대전 · 친구 판 관전 · 닉네임</span></button>
+    <button class="menu-btn" onclick="Friends.open()">👥 친구<b class="fr-badge" id="friendBadge" hidden></b><span class="desc" id="friendMenuDesc">친구 추가 · 채팅 · 친구와 대전 · 친구 판 관전</span></button>
     <button class="menu-btn" onclick="showScreen('power')">🔮 영웅 능력<span class="desc" id="powerMenuDesc"></span></button>
     <button class="menu-btn" onclick="openQuests()">📜 퀘스트<b class="fr-badge" id="questBadge" hidden></b><span class="desc" id="questMenuDesc">매일 새 퀘스트 · 끝내면 골드</span></button>
     <button class="menu-btn" onclick="openCraft()">🔨 카드 제작<span class="desc" id="craftMenuDesc">카드를 분해해 가루를 모으고, 원하는 카드를 만듭니다</span></button>
@@ -294,12 +294,11 @@
     <h3>👥 친구</h3>
     <div class="fr-box">
       <div class="fr-me"><span>내 아이디 <b id="frMyId">-</b></span><span>보이는 이름 <b id="frMyName">-</b></span></div>
-      <form class="fr-row" id="frNickForm" autocomplete="off">
+      <form class="fr-row" id="frNickForm" autocomplete="off" hidden>
         <input id="frNick" maxlength="12" placeholder="닉네임 (2~12자 · 한글·영문·숫자·_)">
-        <button type="submit" class="end-turn">닉네임 저장</button>
-        <button type="button" class="end-turn sub" id="frNickClear" title="닉네임을 지우면 아이디로 보여요">지우기</button>
+        <button type="submit" class="end-turn" id="frNickSave">닉네임 정하기</button>
       </form>
-      <p class="fr-note">닉네임은 대전 상대·친구·순위표에 보이는 이름이에요. 같은 닉네임은 한 명만 쓸 수 있어요.</p>
+      <p class="fr-note" id="frNickNote">닉네임은 대전 상대·친구·순위표에 보이는 이름이에요. 한 번 정하면 바꿀 수 없어요.</p>
     </div>
     <div class="fr-box">
       <form class="fr-row" id="frAddForm" autocomplete="off">
@@ -311,7 +310,7 @@
     <div class="fr-section" id="frIncomingSec" hidden><h4>📩 받은 친구 요청</h4><div class="fr-list" id="frIncoming"></div></div>
     <div class="fr-section"><h4>친구 <small id="frCount"></small></h4><div class="fr-list" id="frList"><p class="fr-empty">불러오는 중…</p></div></div>
     <div class="fr-section" id="frOutgoingSec" hidden><h4>📤 보낸 요청 (기다리는 중)</h4><div class="fr-list" id="frOutgoing"></div></div>
-    <p class="notice">⚔ 친구 대전은 연습용이라 골드·랭크·전적·일일 퀘스트에 반영되지 않아요. 👁 관전할 때는 양쪽 손패가 보이지 않아요.</p>
+    <p class="notice">💬 채팅은 친구끼리만 할 수 있고, 친구를 삭제하면 대화도 지워져요. ⚔ 친구 대전은 연습용이라 골드·랭크·전적·일일 퀘스트에 반영되지 않아요. 👁 관전할 때는 양쪽 손패가 보이지 않아요.</p>
     <button class="menu-btn back" onclick="Friends.close()">뒤로</button>
   </div>
   <div class="screen" id="screen-difficulty">

@@ -17,22 +17,21 @@ const until = async (f, ms = 5000, what = '') => { const t0 = Date.now(); while 
 const mkUser = name => Number(db.prepare('INSERT INTO users(username,pw_hash,created_at) VALUES (?,?,?)').run(name, 'x', Date.now()).lastInsertRowid);
 
 (async () => {
-  // ===== 닉네임 =====
+  // ===== 닉네임 (v141 한 번 정하면 못 바꿈) =====
   const A = mkUser('alice'), B = mkUser('bob'), C = mkUser('carol');
+  assert.ok(!F.setNickname(B, 'ALICE').ok, '남의 아이디와 같은 닉네임 금지 (대소문자 무시)');
+  assert.ok(!F.setNickname(B, 'a').ok, '너무 짧음'); assert.ok(!F.setNickname(B, '공백 있음').ok, '공백 금지'); assert.ok(!F.setNickname(B, 'x'.repeat(13)).ok, '너무 김');
   assert.ok(F.setNickname(A, '앨리스').ok);
   assert.strictEqual(F.userRow(A).nickname, '앨리스');
+  let nr = F.setNickname(A, '앨리스2'); assert.ok(!nr.ok && nr.locked, '한 번 정하면 바꿀 수 없다');
+  assert.ok(!F.setNickname(A, null).ok, '지울 수도 없다'); assert.strictEqual(F.userRow(A).nickname, '앨리스');
   assert.ok(!F.setNickname(B, '앨리스').ok, '같은 닉네임은 한 명만');
-  assert.ok(!F.setNickname(B, 'ALICE').ok, '남의 아이디와 같은 닉네임 금지 (대소문자 무시)');
-  assert.ok(F.setNickname(A, 'alice').ok, '내 아이디와 같은 닉네임은 괜찮다');
-  assert.ok(F.setNickname(A, '앨리스').ok);
-  assert.ok(!F.setNickname(B, 'a').ok, '너무 짧음'); assert.ok(!F.setNickname(B, '공백 있음').ok, '공백 금지'); assert.ok(!F.setNickname(B, 'x'.repeat(13)).ok, '너무 김');
   assert.ok(F.setNickname(B, 'Bobby').ok); assert.ok(!F.setNickname(C, 'bobby').ok, '대소문자만 다른 닉네임도 중복');
-  assert.ok(F.setNickname(B, null).ok); assert.strictEqual(F.userRow(B).nickname, null, '닉네임 지우기');
-  assert.ok(F.setNickname(C, 'bobby').ok, '지운 닉네임은 다른 사람이 쓸 수 있다');
+  assert.ok(F.setNickname(C, 'carol').ok, '내 아이디와 같은 닉네임은 괜찮다');
   assert.throws(() => db.prepare('UPDATE users SET nickname=? WHERE id=?').run('BOBBY', A), /UNIQUE/, 'DB 인덱스도 중복을 막는다');
   assert.ok(F.nicknameTaken('앨리스') && !F.nicknameTaken('없는닉'));
-  assert.strictEqual(F.findUser('앨리스').id, A, '닉네임으로 찾기'); assert.strictEqual(F.findUser('BOB').id, B, '아이디로 찾기');
-  console.log('✔ 닉네임 (중복 금지 · 아이디 사칭 금지 · 지우기)');
+  assert.strictEqual(F.findUser('앨리스').id, A, '닉네임으로 찾기'); assert.strictEqual(F.findUser('BOB').id, B, '아이디로 찾기'); assert.strictEqual(F.findUser('bobby').id, B);
+  console.log('✔ 닉네임 (한 번만 · 중복 금지 · 아이디 사칭 금지)');
 
   // ===== 친구 요청 =====
   let r = F.sendRequest(A, 'bob'); assert.ok(r.ok && r.status === 'sent');
@@ -51,9 +50,28 @@ const mkUser = name => Number(db.prepare('INSERT INTO users(username,pw_hash,cre
   // 취소
   assert.ok(F.sendRequest(C, 'bob').ok); assert.ok(F.cancelRequest(C, B).ok); assert.strictEqual(F.listOf(B).incoming.length, 0); assert.ok(!F.cancelRequest(C, B).ok);
   // 서로 보내면 바로 친구
-  assert.ok(F.sendRequest(C, 'alice').ok); r = F.sendRequest(A, 'bobby'); assert.ok(r.ok && r.status === 'accepted'); assert.ok(F.areFriends(A, C));
+  assert.ok(F.sendRequest(C, 'alice').ok); r = F.sendRequest(A, 'carol'); assert.ok(r.ok && r.status === 'accepted'); assert.ok(F.areFriends(A, C));
+  // ===== v141 채팅 (DB) =====
+  let cr = F.sendChat(A, C, '  안녕\r\n\n\n\n반가워\u0007  '); assert.ok(cr.ok); assert.strictEqual(cr.msg.text, '안녕\n\n반가워', '공백·제어 문자 정리');
+  assert.ok(!F.sendChat(A, B + 1000, 'x').ok, '없는 사람'); assert.ok(!F.sendChat(B, C, '안녕').ok, '친구가 아니면 못 보냄');
+  assert.ok(!F.sendChat(A, C, '   ').ok, '빈 메시지'); assert.ok(!F.sendChat(A, C, 'x'.repeat(F.CHAT.MAX_LEN + 1)).ok, '너무 긺');
+  assert.ok(F.sendChat(A, C, '가'.repeat(F.CHAT.MAX_LEN)).ok, '최대 길이는 된다');
+  assert.ok(F.sendChat(C, A, '응 나도').ok);
+  assert.deepStrictEqual(F.unreadCounts(C), { [A]: 2 }); assert.deepStrictEqual(F.unreadCounts(A), { [C]: 1 });
+  assert.strictEqual(F.listOf(C).friends.find(f => f.id === A).unread, 2, '친구 목록에 안 읽은 수');
+  let h = F.chatHistory(C, A); assert.ok(h.ok && !h.more); assert.deepStrictEqual(h.messages.map(m => m.from), [A, A, C], '오래된 것이 앞');
+  assert.ok(!F.chatHistory(B, C).ok, '친구가 아니면 대화를 못 본다');
+  assert.strictEqual(F.markRead(C, A, h.messages[0].id), 1, '여기까지만 읽음'); assert.deepStrictEqual(F.unreadCounts(C), { [A]: 1 });
+  assert.strictEqual(F.markRead(C, A), 1); assert.deepStrictEqual(F.unreadCounts(C), {}); assert.strictEqual(F.markRead(C, A), 0);
+  for (let i = 0; i < F.CHAT.PAGE + 5; i++) F.sendChat(A, C, '메시지 ' + i);
+  h = F.chatHistory(C, A); assert.strictEqual(h.messages.length, F.CHAT.PAGE); assert.ok(h.more); assert.strictEqual(h.messages[h.messages.length - 1].text, '메시지 ' + (F.CHAT.PAGE + 4));
+  const h2 = F.chatHistory(C, A, h.messages[0].id); assert.strictEqual(h2.messages.length, 8); assert.ok(!h2.more, '더 옛날 것 불러오기');
+  const keep = F.CHAT.KEEP; F.CHAT.KEEP = 20; F.sendChat(A, C, '마지막'); F.CHAT.KEEP = keep;
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM friend_messages').get().n, 20, '오래된 메시지는 지운다');
+  console.log('✔ 채팅 (친구만 · 정리 · 길이 제한 · 안 읽음 · 읽음 처리 · 페이지 · 보관 개수)');
   // 삭제
-  assert.ok(F.removeFriend(C, A).ok); assert.ok(!F.areFriends(A, C) && !F.areFriends(C, A)); assert.ok(!F.removeFriend(C, A).ok);
+  assert.ok(F.removeFriend(C, A).ok);
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM friend_messages').get().n, 0, '친구를 끊으면 대화도 지운다'); assert.ok(!F.areFriends(A, C) && !F.areFriends(C, A)); assert.ok(!F.removeFriend(C, A).ok);
   console.log('✔ 친구 요청 · 수락 · 거절 · 취소 · 서로 요청 · 삭제');
 
   // ===== 친구 대전 보상 없음 (DB) =====
@@ -146,7 +164,7 @@ const mkUser = name => Number(db.prepare('INSERT INTO users(username,pw_hash,cre
       const sc = rr.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0];
       return { status: rr.status, data: await rr.json().catch(() => ({})) };
     };
-    u.signup = () => u.call('POST', '/api/signup', { username: name, password: 'password123' });
+    u.signup = nick => u.call('POST', '/api/signup', { username: name, nickname: nick || name, password: 'password123' });
     u.stream = async () => {
       const rr = await fetch(base + '/api/pvp/stream', { headers: { cookie }, signal: u.ac.signal });
       (async () => { const rd = rr.body.getReader(), dec = new TextDecoder(); let buf = '';
@@ -157,11 +175,17 @@ const mkUser = name => Number(db.prepare('INSERT INTO users(username,pw_hash,cre
   };
   try {
     const X = client('httpx'), Y = client('httpy'), Z = client('httpz');
-    await X.signup(); await Y.signup(); await Z.signup();
-    assert.strictEqual((await X.call('PUT', '/api/profile/nickname', { nickname: '엑스맨' })).status, 200);
+    assert.strictEqual((await X.signup('엑스맨')).status, 201); await Y.signup();
+    assert.strictEqual((await Z.signup('엑스맨')).status, 409, '같은 닉네임으로 가입 불가');
+    assert.strictEqual((await Z.call('POST', '/api/signup', { username: '엑스맨', nickname: '제트', password: 'password123' })).status, 409, '남의 닉네임으로 가입 불가');
+    assert.strictEqual((await Z.signup('제트')).status, 201);
+    assert.strictEqual((await X.call('PUT', '/api/profile/nickname', { nickname: '엑스맨2' })).status, 409, '가입 때 정한 닉네임은 못 바꿈');
+    // 닉네임 없이 만든 옛 계정: 한 번만 정할 수 있다
+    db.prepare('UPDATE users SET nickname=NULL WHERE username=?').run('httpy');
     assert.strictEqual((await Y.call('PUT', '/api/profile/nickname', { nickname: '엑스맨' })).status, 409, '중복 닉네임 409');
     assert.strictEqual((await Y.call('PUT', '/api/profile/nickname', { nickname: 'httpx' })).status, 409, '남의 아이디 409');
-    assert.strictEqual((await Z.call('POST', '/api/signup', { username: '엑스맨', password: 'password123' })).status, 409, '남의 닉네임으로 가입 불가');
+    assert.strictEqual((await Y.call('PUT', '/api/profile/nickname', { nickname: 'httpy' })).status, 200, '옛 계정은 한 번 정할 수 있다');
+    assert.strictEqual((await Y.call('PUT', '/api/profile/nickname', { nickname: '와이' })).status, 409, '두 번은 안 됨');
     assert.strictEqual((await X.call('GET', '/api/me')).data.user.name, '엑스맨', '/api/me 에 닉네임');
     await X.stream(); await Y.stream();
     let q = await X.call('POST', '/api/friends/request', { to: 'httpy' }); assert.strictEqual(q.status, 200); assert.strictEqual(q.data.status, 'sent');
@@ -182,9 +206,25 @@ const mkUser = name => Number(db.prepare('INSERT INTO users(username,pw_hash,cre
     assert.strictEqual(Y.msgs.find(m => m.t === 'match').opp.name, '엑스맨', '대전 상대 이름은 닉네임');
     assert.strictEqual((await Z.call('POST', '/api/pvp/spectate', { friendId: xid })).status, 400, '친구가 아니면 관전 불가');
     q = await Y.call('GET', '/api/friends'); assert.strictEqual(q.data.friends[0].state, 'match');
+    // v141 채팅 (HTTP · 실시간)
+    const zid = (await Z.call('GET', '/api/me')).data.user.id;
+    assert.strictEqual((await X.call('POST', '/api/chat/send', { to: zid, text: '안녕' })).status, 403, '친구가 아니면 403');
+    assert.strictEqual((await Z.call('GET', '/api/chat/' + xid)).status, 403, '친구가 아니면 대화 못 봄');
+    assert.strictEqual((await X.call('POST', '/api/chat/send', { to: yid, text: '' })).status, 400, '빈 메시지 400');
+    q = await X.call('POST', '/api/chat/send', { to: yid, text: '<b>안녕</b> 대전 재밌다' }); assert.strictEqual(q.status, 200);
+    await until(() => Y.msgs.some(m => m.t === 'chat' && m.msg.text === '<b>안녕</b> 대전 재밌다' && m.from.name === '엑스맨'), 2000, '채팅 실시간 도착');
+    await until(() => X.msgs.some(m => m.t === 'chat' && m.mine), 2000, '내 다른 탭에도');
+    q = await Y.call('GET', '/api/friends'); assert.strictEqual(q.data.friends[0].unread, 1, '안 읽은 수');
+    q = await Y.call('GET', '/api/chat/' + xid); assert.strictEqual(q.status, 200); assert.strictEqual(q.data.messages.length, 1); assert.strictEqual(q.data.friend.name, '엑스맨');
+    assert.strictEqual((await Y.call('POST', '/api/chat/read', { id: xid })).data.read, 1);
+    await until(() => X.msgs.some(m => m.t === 'chatRead' && m.by === yid), 2000, '읽음 알림');
+    assert.strictEqual((await Y.call('GET', '/api/friends')).data.friends[0].unread, 0);
+    let limited = 0; for (let i = 0; i < 25; i++) if ((await Y.call('POST', '/api/chat/send', { to: xid, text: 'spam' + i })).status === 429) limited++;
+    assert.ok(limited > 0, '너무 빨리 보내면 429');
     assert.strictEqual((await X.call('POST', '/api/friends/remove', { id: yid })).status, 200);
+    assert.strictEqual((await X.call('GET', '/api/chat/' + yid)).status, 403, '친구를 끊으면 대화도 못 봄');
     assert.strictEqual((await X.call('GET', '/api/friends')).data.friends.length, 0);
-    console.log('✔ HTTP: 닉네임 · 친구 요청/수락 · 실시간 알림 · 친구 대전 신청 · 권한 확인');
+    console.log('✔ HTTP: 가입 닉네임 · 닉네임 잠금 · 친구 요청/수락 · 실시간 알림 · 친구 대전 신청 · 채팅 · 권한 확인');
   } finally { server.closeAllConnections && server.closeAllConnections(); server.close(); pvpMod.core.shutdown(); }
   console.log('✔ 친구 테스트 통과');
   process.exit(0);

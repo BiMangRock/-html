@@ -176,7 +176,7 @@ const turnClient = cs => cs.find(c => c.last.turnSeat === c.last.seat);
       const sc = res.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0];
       return { status: res.status, data: await res.json().catch(() => ({})) };
     };
-    u.signup = () => u.call('POST', '/api/signup', { username: name, password: 'password123' });
+    u.signup = () => u.call('POST', '/api/signup', { username: name, nickname: name, password: 'password123' });
     u.stream = async () => {
       const res = await fetch(base + '/api/pvp/stream', { headers: { cookie }, signal: u.ac.signal });
       assert.strictEqual(res.status, 200); assert.ok(/text\/event-stream/.test(res.headers.get('content-type')));

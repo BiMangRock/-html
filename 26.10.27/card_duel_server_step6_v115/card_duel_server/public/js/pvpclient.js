@@ -87,7 +87,7 @@ const PvpClient = (() => {
       if (m.matchId === S.matchId) { const x = PROGRESS.EMOTES.find(e => e.id === m.id); if (x) showBubble(m.seat === MY ? MY : OPP, x.text); }
     } else if (m.t === 'spectators') {                                    // v136 내 판을 보는 사람 수
       if (m.matchId === S.matchId) { S.specCount = m.count || 0; setBadge(); }
-    } else if (['invite', 'inviteSent', 'inviteGone', 'friends'].includes(m.t)) {   // v136 친구 · 친구 대전 신청 → friends.js
+    } else if (['invite', 'inviteSent', 'inviteGone', 'friends', 'chat', 'chatRead'].includes(m.t)) {   // v136 친구 · 친구 대전 신청 · v141 채팅 → friends.js
       if (typeof Friends !== 'undefined') Friends.onMsg(m);
     } else if (m.t === 'presence') {
       if (m.matchId === S.matchId) { S.oppOffAt = m.oppOnline ? 0 : Date.now() - (m.oppOfflineMs || 0); S.reconnectMs = m.reconnectMs || S.reconnectMs; tickHud(); }

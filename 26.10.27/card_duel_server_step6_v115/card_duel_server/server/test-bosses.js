@@ -27,8 +27,8 @@ const server = http.createServer(app).listen(0, async () => {
     }; };
   const dev = mk(), user = mk(), anon = mk();
   try {
-    await dev('POST', '/api/signup', { username: 'devuser1', password: 'password123' });
-    await user('POST', '/api/signup', { username: 'normal1', password: 'password123' });
+    await dev('POST', '/api/signup', { username: 'devuser1', nickname: 'devuser1', password: 'password123' });
+    await user('POST', '/api/signup', { username: 'normal1', nickname: 'normal1', password: 'password123' });
     dbRaw.prepare("UPDATE users SET is_admin=1 WHERE username='devuser1'").run();
 
     const deck = E.defaultDeckList();

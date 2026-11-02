@@ -5,7 +5,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const db = require('./db');
-const { nicknameTaken } = require('./friends-db');   // v136 남의 닉네임과 같은 아이디로는 가입 못 함 (사칭 방지)
+const { nicknameTaken, checkNickname } = require('./friends-db');   // v136 남의 닉네임과 같은 아이디로는 가입 못 함 (사칭 방지) · v141 가입할 때 닉네임도 정한다
 
 const COOKIE_NAME = 'cd_session';
 const SESSION_MS = 30 * 24 * 3600 * 1000;           // 30일
@@ -110,23 +110,30 @@ router.use((req, res, next) => {
 router.post('/signup', async (req, res, next) => {
   try {
     const { username, password } = req.body || {};
+    const nickname = typeof (req.body || {}).nickname === 'string' ? req.body.nickname.trim() : '';
     const bad = validateCredentials(username, password);
     if (bad) return res.status(400).json({ error: bad });
+    if (!nickname) return res.status(400).json({ error: '닉네임을 정해 주세요. (한 번 정하면 바꿀 수 없어요)' });
+    const badNick = checkNickname(-1, nickname);                // 남의 닉네임·아이디와 겹치면 안 됨 (내 아이디와 같은 건 괜찮다)
+    if (badNick) return res.status(badNick.includes('이미') || badNick.includes('같은') ? 409 : 400).json({ error: badNick });
     if (signupByIp.blocked(req.ip)) return res.status(429).json({ error: '가입 시도가 너무 많아요. 잠시 후 다시 해 주세요.' });
     signupByIp.add(req.ip);
-    if (db.prepare('SELECT 1 FROM users WHERE username=?').get(username) || nicknameTaken(username))
+    if (db.prepare('SELECT 1 FROM users WHERE username=? COLLATE NOCASE').get(username) || nicknameTaken(username))
       return res.status(409).json({ error: '이미 사용 중인 아이디예요.' });
+    if (nickname.toLowerCase() !== username.toLowerCase() && db.prepare('SELECT 1 FROM users WHERE username=? COLLATE NOCASE').get(nickname))
+      return res.status(409).json({ error: '다른 사람의 아이디와 같은 닉네임은 쓸 수 없어요.' });
     const pw_hash = await hashPassword(password);
     let id;
     try {
-      id = db.prepare('INSERT INTO users(username,pw_hash,created_at,last_login) VALUES (?,?,?,?)')
-        .run(username, pw_hash, Date.now(), Date.now()).lastInsertRowid;
-    } catch (e) {                                          // 동시에 같은 아이디로 가입한 경우
-      if (/UNIQUE constraint|constraint failed/i.test(String(e.message))) return res.status(409).json({ error: '이미 사용 중인 아이디예요.' });
+      id = db.prepare('INSERT INTO users(username,pw_hash,created_at,last_login,nickname) VALUES (?,?,?,?,?)')
+        .run(username, pw_hash, Date.now(), Date.now(), nickname).lastInsertRowid;
+    } catch (e) {                                          // 동시에 같은 아이디·닉네임으로 가입한 경우
+      if (/UNIQUE constraint|constraint failed/i.test(String(e.message)))
+        return res.status(409).json({ error: /nickname/i.test(String(e.message)) ? '이미 다른 사람이 쓰는 닉네임이에요.' : '이미 사용 중인 아이디예요.' });
       throw e;
     }
     setCookie(req, res, createSession(Number(id)));
-    res.status(201).json({ user: { id: Number(id), username } });
+    res.status(201).json({ user: { id: Number(id), username, nickname, name: nickname } });
   } catch (e) { next(e); }
 });
 

@@ -40,7 +40,7 @@ const server = http.createServer(app).listen(0, async () => {
   };
   try {
     let r = await call('POST', '/api/tutorial/complete', { tutorial: 'basic' }); assert.strictEqual(r.status, 401, '로그인 필요');
-    await call('POST', '/api/signup', { username: 'newbie1', password: 'password1' });
+    await call('POST', '/api/signup', { username: 'newbie1', nickname: 'newbie1', password: 'password1' });
     r = await call('GET', '/api/save'); let rev = r.data.wallet.rev; const gold0 = r.data.wallet.gold;
     const ALL = st => Object.fromEntries(PROGRESS.TUTORIALS.map(t => [t.id, st]));
     r = await call('GET', '/api/progress'); assert.deepStrictEqual(r.data.tutorial, ALL('todo'));
@@ -80,7 +80,7 @@ const server = http.createServer(app).listen(0, async () => {
     r = await call('POST', '/api/tutorial/claim', { tutorial: 'advanced' }); assert.strictEqual(r.status, 400, '두 번 못 받음');
 
     // 다른 계정: 전설을 다 갖고 있으면 그중 하나 (한 장 더)
-    cookie = ''; await call('POST', '/api/signup', { username: 'rich01', password: 'password1' }); await call('GET', '/api/save');
+    cookie = ''; await call('POST', '/api/signup', { username: 'rich01', nickname: 'rich01', password: 'password1' }); await call('GET', '/api/save');
     const uid = db.prepare("SELECT id FROM users WHERE username='rich01'").get().id;
     const ins = db.prepare('INSERT INTO collection(user_id,card_name,count) VALUES (?,?,2) ON CONFLICT(user_id,card_name) DO UPDATE SET count=2');
     tutorial.LEGENDS.forEach(c => ins.run(uid, c.name));

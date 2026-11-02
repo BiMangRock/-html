@@ -202,4 +202,20 @@ CREATE TABLE IF NOT EXISTS replay_owners (
 CREATE INDEX IF NOT EXISTS idx_replay_owner_time ON replay_owners(user_id, created_at);
 `);
 
+// v141 친구 채팅: 친구끼리 1:1 메시지. 두 사람 사이마다 최근 CHAT.KEEP 개만 남긴다 (friends-db.js)
+//  pair_key = "작은id:큰id" → 두 사람의 대화를 한 번에 찾는다. read_at 이 NULL 이면 받는 사람이 아직 안 읽음
+db.exec(`
+CREATE TABLE IF NOT EXISTS friend_messages (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  pair_key    TEXT    NOT NULL,
+  from_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body        TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  read_at     INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_fmsg_pair   ON friend_messages(pair_key, id);
+CREATE INDEX IF NOT EXISTS idx_fmsg_unread ON friend_messages(to_id, read_at);
+`);
+
 module.exports = db;

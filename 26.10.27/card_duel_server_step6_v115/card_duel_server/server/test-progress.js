@@ -23,7 +23,7 @@ const server = http.createServer(app).listen(0, async () => {
     const sc = res.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0]; return { status: res.status, data: await res.json().catch(() => ({})) };
   };
   try {
-    await call('POST', '/api/signup', { username: 'crafter1', password: 'password1' });
+    await call('POST', '/api/signup', { username: 'crafter1', nickname: 'crafter1', password: 'password1' });
     let r = await call('GET', '/api/save'); const col0 = r.data.collection; let rev = r.data.wallet.rev, gold = r.data.wallet.gold;
     r = await call('GET', '/api/progress'); assert.strictEqual(r.data.dust, 0); assert.strictEqual(r.data.quests.list.length, PROGRESS.PER_DAY);
     // 제작: 가루 부족

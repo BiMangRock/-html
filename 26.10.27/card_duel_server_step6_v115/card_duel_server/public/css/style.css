@@ -1188,3 +1188,70 @@ body.mt-on #mtCoach{display:flex;}
 .mt-wbtns{display:flex; gap:.4rem; justify-content:center; margin-top:.5rem; flex-wrap:wrap;}
 .mt-wbtns button{border-radius:8px; padding:.45rem .8rem; font-weight:800; cursor:pointer; border:1px solid #6b5428; background:#2b241b; color:#f3e9d6;}
 .mt-wbtns .mt-claim{background:linear-gradient(180deg,#e8c36a,#b98d2f); color:#2a1d05; border-color:#ffe39a;}
+
+/* ---------- v141 친구 채팅 · 닉네임 잠금 ---------- */
+.fr-warn{color:#e0b44c;}
+.fr-chat{position:relative;}
+.fr-unread{display:inline-block; margin-left:.3rem; min-width:1.1rem; padding:0 .3rem; border-radius:999px; background:#c0392b; color:#fff; font-size:.68rem; line-height:1.1rem; text-align:center;}
+.fr-toast .ft-chat{white-space:pre-wrap; word-break:break-word; color:var(--parch); font-size:.8rem;}
+#chatPanel{position:fixed; right:12px; bottom:12px; z-index:99980; width:min(23rem, calc(100vw - 24px)); height:min(32rem, calc(100vh - 24px)); height:min(32rem, calc(100dvh - 24px));
+  display:flex; flex-direction:column; border:1px solid var(--gold); border-radius:12px; background:linear-gradient(180deg,#221d38,#15122a); color:var(--parch);
+  box-shadow:0 0 18px rgba(201,162,39,.3), 0 8px 28px #000c; overflow:hidden; font-family:var(--font-u, system-ui, sans-serif);}
+#chatPanel[hidden]{display:none;}
+#chatPanel .cp-head{display:flex; align-items:center; gap:.5rem; padding:.55rem .7rem; border-bottom:1px solid rgba(201,162,39,.35); background:rgba(0,0,0,.25);}
+#chatPanel .cp-who{flex:1; min-width:0; display:flex; flex-direction:column;}
+#chatPanel .cp-name{color:var(--gold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#chatPanel .cp-st{font-size:.7rem; color:var(--parch-d);}
+#chatPanel .cp-st.idle,#chatPanel .cp-st.queue,#chatPanel .cp-st.spectate{color:#8fd19e;}
+#chatPanel .cp-st.match{color:#e0a526;}
+#chatPanel .cp-x{background:none; border:none; color:var(--parch-d); font-size:1.1rem; cursor:pointer; padding:.2rem .45rem; border-radius:6px;}
+#chatPanel .cp-x:hover{background:rgba(255,255,255,.08); color:var(--parch);}
+#chatPanel .cp-body{flex:1; overflow-y:auto; padding:.5rem .6rem; overscroll-behavior:contain;}
+#chatPanel .cp-more{display:block; margin:0 auto .5rem; background:none; border:1px solid rgba(201,162,39,.4); color:var(--parch-d); border-radius:999px; font-size:.72rem; padding:.2rem .7rem; cursor:pointer;}
+#chatPanel .cp-list{display:flex; flex-direction:column; gap:.3rem;}
+#chatPanel .cp-empty{text-align:center; color:var(--parch-d); font-size:.8rem; margin-top:2rem;}
+#chatPanel .cp-day{align-self:center; font-size:.68rem; color:var(--parch-d); background:rgba(0,0,0,.3); padding:.1rem .6rem; border-radius:999px; margin:.4rem 0 .2rem;}
+#chatPanel .cp-msg{display:flex; align-items:flex-end; gap:.3rem; max-width:100%;}
+#chatPanel .cp-msg.mine{flex-direction:row-reverse;}
+#chatPanel .cp-bub{max-width:78%; padding:.4rem .6rem; border-radius:12px 12px 12px 3px; background:#2f2a4a; border:1px solid rgba(255,255,255,.06); white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; font-size:.86rem; line-height:1.35; text-align:left;}
+#chatPanel .cp-msg.mine .cp-bub{border-radius:12px 12px 3px 12px; background:linear-gradient(180deg,#5a4a1c,#43380f); border-color:rgba(201,162,39,.4);}
+#chatPanel .cp-msg.pending{opacity:.6;}
+#chatPanel .cp-time{font-size:.62rem; color:var(--parch-d); white-space:nowrap; display:flex; flex-direction:column; align-items:flex-end;}
+#chatPanel .cp-msg:not(.mine) .cp-time{align-items:flex-start;}
+#chatPanel .cp-read{color:#e0b44c;}
+#chatPanel .cp-err{margin:0; padding:.3rem .7rem; font-size:.75rem; color:#ff8f84; background:rgba(139,42,34,.25);}
+#chatPanel .cp-err[hidden]{display:none;}
+#chatPanel .cp-form{display:flex; gap:.4rem; padding:.5rem .6rem .35rem; border-top:1px solid rgba(201,162,39,.25);}
+#chatPanel textarea{flex:1; min-width:0; resize:none; max-height:120px; padding:.45rem .6rem; border-radius:8px; border:1px solid var(--gold-d); background:#120f1e; color:var(--parch); font:inherit; font-size:16px; line-height:1.3;}
+#chatPanel textarea:focus{outline:none; border-color:var(--gold);}
+#chatPanel .cp-form .end-turn{padding:.4rem .8rem; font-size:.82rem; align-self:flex-end;}
+#chatPanel .cp-count{font-size:.65rem; color:var(--parch-d); text-align:right; padding:0 .7rem .3rem; min-height:.3rem;}
+@media (max-width:640px){
+  #chatPanel{left:0; right:0; bottom:0; top:0; width:auto; height:auto; border-radius:0; border:none;}
+}
+/* 닉네임이 없는 옛 계정: 닉네임 정하기 창 */
+#nickGate{position:fixed; inset:0; z-index:99995; display:flex; align-items:center; justify-content:center; padding:1rem; background:rgba(8,6,16,.82);}
+#nickGate .ng-panel{width:min(24rem, 100%); padding:1.2rem 1.2rem 1rem; border:1px solid var(--gold); border-radius:12px; background:linear-gradient(180deg,#241f38,#181428); color:var(--parch); box-shadow:0 10px 40px #000c;}
+#nickGate h3{margin:0 0 .6rem; color:var(--gold); text-align:center;}
+#nickGate p{font-size:.84rem; color:var(--parch-d); margin:.4rem 0;}
+#nickGate p b{color:var(--parch);}
+#nickGate input{width:100%; box-sizing:border-box; padding:.6rem .7rem; font-size:1rem; border-radius:8px; border:1px solid var(--gold-d); background:#100e1a; color:var(--parch); margin:.3rem 0;}
+#nickGate .ng-warn{color:#e0b44c;}
+#nickGate .ng-err{color:#ff8f84; min-height:1.1rem;}
+#nickGate .end-turn{width:100%; padding:.6rem; font-size:.95rem;}
+#frNickForm[hidden]{display:none;}
+#chatPanel .cp-more[hidden]{display:none;}
+
+/* ---------- v142 영웅 능력 설명 창 (꾹 누르기 · 마우스 올리기) ---------- */
+#cardPreview .hp-card{position:relative; width:210px; box-sizing:border-box; padding:16px 14px 14px; border-radius:16px; text-align:center;
+  background:linear-gradient(180deg,#2b2546,#191530); border:2px solid var(--gold); color:var(--parch); box-shadow:0 12px 34px rgba(0,0,0,.65), 0 0 18px rgba(201,162,39,.35);}
+#cardPreview .hp-card.used{filter:saturate(.55);}
+#cardPreview .hpc-cost{position:absolute; top:-14px; left:50%; transform:translateX(-50%); width:36px; height:36px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#7fd3ff,#1f6fb4 70%);
+  border:2px solid #cfe9ff; color:#fff; font-weight:800; font-size:1.15rem; line-height:32px; text-shadow:0 1px 2px #000; box-shadow:0 2px 6px #000a;}
+#cardPreview .hpc-art{width:112px; height:112px; margin:6px auto 8px; border-radius:50%; border:3px solid var(--gold-d); background:#120f1e center/cover no-repeat;
+  display:flex; align-items:flex-end; justify-content:flex-end; box-shadow:inset 0 0 18px rgba(0,0,0,.6);}
+#cardPreview .hpc-icon{font-size:1.7rem; line-height:1; margin:0 2px 2px 0; filter:drop-shadow(0 2px 3px #000);}
+#cardPreview .hpc-kind{font-size:.7rem; letter-spacing:.08em; color:var(--parch-d);}
+#cardPreview .hpc-name{font-size:1.15rem; font-weight:700; color:var(--gold); margin:.15rem 0 .45rem;}
+#cardPreview .hpc-text{font-size:.92rem; line-height:1.4; padding:.5rem .55rem; border-radius:10px; background:rgba(237,227,200,.92); color:#2a2117;}
+#cardPreview .hpc-used{margin-top:.5rem; font-size:.76rem; color:#e0a526;}

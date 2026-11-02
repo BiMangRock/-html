@@ -29,7 +29,7 @@ const server = http.createServer(app).listen(0, async () => {
     assert((await DeckCode.decode('CD1.zzzz', E.CARD_POOL)).error); assert((await DeckCode.decode('안녕', E.CARD_POOL)).error);
     console.log('✔ 덱 코드', code.length + '자');
 
-    await call('POST', '/api/signup', { username: 'decker1', password: 'password1' });
+    await call('POST', '/api/signup', { username: 'decker1', nickname: 'decker1', password: 'password1' });
     let r = await call('GET', '/api/decks');
     assert.strictEqual(r.data.slots.length, 1, '처음엔 1번 "내 덱"'); assert.strictEqual(r.data.active, 1); assert.deepStrictEqual(r.data.slots[0].deck, def);
     // 새 덱 (미완성 · 없는 카드 포함도 저장 가능)

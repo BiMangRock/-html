@@ -68,7 +68,7 @@ const server = http.createServer(app).listen(0, async () => {
     const sc = res.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0]; return { status: res.status, data: await res.json().catch(() => ({})) }; }; };
   const dev = mk(), user = mk();
   try {
-    await dev('POST', '/api/signup', { username: 'devx1', password: 'password1' }); await user('POST', '/api/signup', { username: 'userx1', password: 'password1' });
+    await dev('POST', '/api/signup', { username: 'devx1', nickname: 'devx1', password: 'password1' }); await user('POST', '/api/signup', { username: 'userx1', nickname: 'userx1', password: 'password1' });
     db.prepare("UPDATE users SET is_admin=1 WHERE username='devx1'").run();
     const deck = E.defaultDeckList(); const boss = (id, extra) => ({ id, name: '보스 ' + id, icon: '🎓', desc: '', cheats: [], tier: 'mid', bot: 'rule2', model: '', deck, ...extra });
     let r = await dev('PUT', '/api/bosses', { bosses: [boss('y1', { chapter: 'ynu', stage: 1 }), boss('y4', { chapter: 'ynu', stage: 2, rewardCards: ['학사모', '학사모'] })] });

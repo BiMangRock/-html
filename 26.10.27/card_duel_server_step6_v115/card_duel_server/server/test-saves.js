@@ -34,8 +34,8 @@ const server = http.createServer(app).listen(0, async () => {
   const legendDeck = [LEGEND, LEGEND, ...deck.slice(2)];
   try {
     let r = await A('GET', '/api/save'); assert.strictEqual(r.status, 401, '로그인 전엔 401');
-    await A('POST', '/api/signup', { username: 'alice01', password: 'password123' });
-    await B('POST', '/api/signup', { username: 'bob0001', password: 'password123' });
+    await A('POST', '/api/signup', { username: 'alice01', nickname: 'alice01', password: 'password123' });
+    await B('POST', '/api/signup', { username: 'bob0001', nickname: 'bob0001', password: 'password123' });
 
     r = await A('GET', '/api/save'); assert.strictEqual(r.status, 200);
     assert.strictEqual(r.data.wallet.gold, 100, '새 계정은 시작 골드 100'); assert.strictEqual(r.data.deck, null); assert.deepStrictEqual(r.data.adventure.cleared, {});
@@ -83,7 +83,7 @@ const server = http.createServer(app).listen(0, async () => {
     r = await A('POST', '/api/adventure/clear', { bossId: '../x; drop' }); assert.strictEqual(r.status, 400, '이상한 보스 번호 거부');
 
     // 다시 불러오기 (새 로그인) — 저장된 값 그대로
-    r = await A2('POST', '/api/login', { username: 'alice01', password: 'password123' }); assert.strictEqual(r.status, 200);
+    r = await A2('POST', '/api/login', { username: 'alice01', nickname: 'alice01', password: 'password123' }); assert.strictEqual(r.status, 200);
     r = await A2('GET', '/api/save');
     assert.strictEqual(r.data.wallet.gold, 0); assert.deepStrictEqual(r.data.deck, deck); assert.ok(r.data.adventure.cleared.boss1, '보스1 클리어 유지');
 

@@ -861,7 +861,8 @@ function renderPower(id, hp, usable, selected){
   b.style.display='';
   b.classList.toggle('used', !!hp.used); b.classList.toggle('usable', !!usable); b.classList.toggle('selected', !!selected);
   b.innerHTML=`<span class="hp-icon">${hp.icon}</span><span class="hp-cost">${hp.cost}</span>`;
-  b.dataset.tip=`${hp.name} (${hp.cost}) — ${hp.text}${hp.used?' · 이번 턴 사용함':''}`; b.title=b.dataset.tip;
+  b.dataset.tip=`${hp.name} (${hp.cost}) — ${hp.text}${hp.used?' · 이번 턴 사용함':''}`; b.removeAttribute('title');
+  b._hp=hp;   // v142 마우스를 올리거나(PC) 꾹 누르면(폰) 카드처럼 큰 설명 창 (아래 미리보기)
 }
 function usePower(e){
   if(e) e.stopPropagation();
@@ -876,6 +877,7 @@ function usePower(e){
   ui.pending={cardId:-2, entries};
   logLine(`${hp.icon} ${hp.name}: 대상을 선택하세요.`);
   render();
+  const b=$('myPower'); if(b) startArrow(b, true);   // v142 대상 지정: 영웅 능력에서 화살표 (PC는 마우스를 따라간다 · 폰은 끌어서 쓰면 손가락을 따라간다)
 }
 function isPendingTarget(t){ return !!ui.pending && ui.pending.entries.some(a=>tkey(a.target)===tkey(t)); }
 function resolvePending(t){
@@ -892,10 +894,25 @@ document.addEventListener('click', e=>{
 }, true);
 
 // ---------- v129 하수인 자리 고르기 ----------
-function placeIndexAt(x){                       // 화면 x 좌표 → 놓을 자리 (내 하수인들의 가운데를 기준으로)
-  const cards=[...zoneEl(MY).querySelectorAll('.card:not(.place-ghost)')];
-  for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(x < r.left+r.width/2) return i; }
-  return cards.length;
+// v142 화면 x 좌표 → 놓을 자리. 카드 좌표(getBoundingClientRect)를 쓰지 않고 "그 점에 무엇이 있는지"(elementFromPoint)로 찾는다.
+//  폰 가로 화면은 카드에 CSS zoom 을 걸어 줄이는데, 일부 브라우저(아이폰 Safari·옛 안드로이드 브라우저)는 zoom 걸린 카드의 좌표를
+//  틀리게 알려 줘서 늘 맨 오른쪽(또는 맨 왼쪽)에 놓였다. 히트 테스트는 어느 브라우저에서나 실제 화면과 같다.
+//  미리보기 카드(place-ghost)는 pointer-events:none 이라 빈 칸처럼 취급된다 → 그 위에 있으면 자리가 그대로 유지된다 (떨림 없음)
+function placeIndexAt(x){
+  const pz=zoneEl(MY), real=[...pz.querySelectorAll('.card:not(.place-ghost)')];
+  if(!real.length) return 0;
+  const zr=pz.getBoundingClientRect(), y=zr.top+zr.height/2;     // 칸 자체에는 zoom 이 없어서 좌표가 정확하다
+  const hit=px=>{ const el=document.elementFromPoint(px, y), c=el && el.closest && el.closest('.card');
+    return c && pz.contains(c) && !c.classList.contains('place-ghost') ? c : null; };
+  const c=hit(x);
+  if(c){                                                          // 하수인 위: 그 카드의 왼쪽 절반이면 앞, 오른쪽 절반이면 뒤
+    const i=real.indexOf(c); let dl=0, dr=0;
+    while(dl<400 && hit(x-dl-3)===c) dl+=3;
+    while(dr<400 && hit(x+dr+3)===c) dr+=3;
+    return dl<=dr ? i : i+1;
+  }
+  for(let px=x; px<=Math.max(zr.right, x)+2; px+=5){ const h=hit(px); if(h) return real.indexOf(h); }   // 빈 곳: 오른쪽에서 처음 만나는 하수인 앞
+  return real.length;
 }
 function moveGhost(pos){                        // 다시 그리지 않고 미리보기 카드만 옮긴다
   const pz=zoneEl(MY), g=pz.querySelector('.place-ghost'); if(!g) return;
@@ -1009,13 +1026,13 @@ function outsideCancel(e){
   if(e.target.closest && (e.target.closest('.card')||e.target.closest('#aiHero')||e.target.closest('#playerHero'))) return;
   ui.selected=null; stopArrow(); render();
 }
-function startArrow(attackerEl){
+function startArrow(attackerEl, center){
   $('arrowSvg').style.display='block';
   document.addEventListener('mousemove', onArrowMove);
   document.addEventListener('touchmove', onArrowTouchMove, {passive:false});
   document.addEventListener('click', outsideCancel, true);
-  const r=attackerEl.getBoundingClientRect();
-  drawArrow(r.left+r.width/2, r.top, r.left+r.width/2, r.top);
+  const r=attackerEl.getBoundingClientRect(), y=center ? r.top+r.height/2 : r.top;
+  drawArrow(r.left+r.width/2, y, r.left+r.width/2, y);
 }
 function stopArrow(){
   $('arrowSvg').style.display='none';
@@ -1025,7 +1042,9 @@ function stopArrow(){
 }
 function onArrowMove(e){ moveArrowTip(e.clientX, e.clientY); }
 function onArrowTouchMove(e){ if(e.touches[0]){ moveArrowTip(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }
+const powerAiming=()=>!!(ui.pending && ui.pending.cardId===-2);   // v142 영웅 능력 대상 고르는 중
 function moveArrowTip(x,y){
+  if(powerAiming()){ const b=$('myPower'); if(!b) return; const r=b.getBoundingClientRect(); drawArrow(r.left+r.width/2, r.top+r.height/2, x, y); return; }
   if(ui.selected===null) return;
   const el=ui.selected==='hero' ? $('playerHero') : zoneEl(MY).querySelector(`.card[data-id="${ui.selected}"]`); if(!el) return;
   const r=el.getBoundingClientRect();
@@ -1061,9 +1080,9 @@ const Drag=(function(){
   const overBoard=(x,y)=>{ const b=document.querySelector('.board'); return !!b && inRect(b.getBoundingClientRect(),x,y) && !inRect($('hand').getBoundingClientRect(),x,y); };
   const handCardEl=id=>$('hand').querySelector(`.card[data-id="${id}"]`);
   function anchorPoint(){                                    // 화살표가 시작하는 곳
-    const el = st.kind==='attack' ? (st.id==='hero' ? $('playerHero') : zoneEl(MY).querySelector(`.card[data-id="${st.id}"]`)) : handCardEl(st.id);
+    const el = st.kind==='power' ? $('myPower') : st.kind==='attack' ? (st.id==='hero' ? $('playerHero') : zoneEl(MY).querySelector(`.card[data-id="${st.id}"]`)) : handCardEl(st.id);
     if(!el) return {x:st.x0, y:st.y0};
-    const r=el.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+(st.kind==='attack'?0:r.height*.3)};
+    const r=el.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+(st.kind==='attack'?0:st.kind==='power'?r.height/2:r.height*.3)};
   }
   function arrowTo(x,y){ const a=anchorPoint(); $('arrowSvg').style.display='block'; drawArrow(a.x, a.y, x, y); }
   function hideArrow(){ $('arrowSvg').style.display='none'; }
@@ -1073,6 +1092,12 @@ const Drag=(function(){
     if(st || (e.pointerType==='mouse' && e.button!==0) || !canAct() || ui.lpShown) return;
     const t=e.target; if(!t.closest) return;
     const hc=t.closest('#hand .card[data-id]'), bc=t.closest('#playerZone .card[data-id]'), he=t.closest('#playerHero');
+    if(t.closest('#myPower')){                                // v142 영웅 능력: 대상이 있으면 끌어서 화살표로 조준
+      if(ui.pending || ui.place) return;
+      const pe=view.legal.filter(a=>a.type==='HERO_POWER');
+      if(pe.length && pe.some(a=>a.target)) st={kind:'power', entries:pe, x0:e.clientX, y0:e.clientY, pid:e.pointerId};
+      return;
+    }
     if(t.closest('.hero-power, .emote-menu')) return;
     if(hc && !hc.classList.contains('draw-ghost')){
       if(ui.pending || ui.place) return;                      // 이미 탭으로 고르는 중이면 끌기는 쓰지 않는다
@@ -1090,6 +1115,10 @@ const Drag=(function(){
     st.started=true; ui.dragging=true; document.body.classList.add('dragging-cards');
     if(st.kind==='attack'){
       stopArrow(); ui.selected=st.id; ui.place=null; ui.pending=null; render();
+      return;
+    }
+    if(st.kind==='power'){                                      // v142 영웅 능력 조준
+      stopArrow(); ui.selected=null; ui.place=null; st.mode='aim'; ui.pending={cardId:-2, entries:st.entries}; render();
       return;
     }
     const c=st.card, entries=view.legal.filter(a=>a.type==='PLAY_CARD' && a.cardId===c.id);
@@ -1317,6 +1346,7 @@ function render(){
   const active = v.turn===MY && !v.over && !ui.busy;
   const legal = active ? v.legal : [];
   const pending = ui.pending;
+  if(!ui.dragging && ui.selected===null && !powerAiming() && $('arrowSvg').style.display==='block') stopArrow();   // v142 대상 고르기가 끝나거나 취소되면 화살표도 치운다
 
   { const pile=$('myDeckPile'); if(pile){ $('myDeckPileCnt').textContent=me.deckCount; pile.classList.toggle('empty', me.deckCount===0); pile.title=`내 덱 — ${me.deckCount}장 남음 (눌러서 보기)`; } }   // v129 왼쪽 덱 더미
   if(ui.place && (!active || !me.hand.some(c=>c.id===ui.place.cardId))) ui.place=null;   // 내 턴이 아니게 됐거나 카드가 없어지면 자리 고르기 취소
@@ -2938,10 +2968,24 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
     let card=null; try{ card=cardDetail.cardOf(el); }catch(_){}
     place(el, cl, el.textContent||'', false, card);
   }
+  // v142 영웅 능력도 카드처럼: 그림·비용·이름·효과 + 키워드 설명 (PC: 마우스 올리기 / 폰: 꾹 누르기)
+  function powerNode(hp){
+    const n=document.createElement('div'); n.className='hp-card'+(hp.used?' used':'');
+    const nm=typeof HERO_PORTRAIT!=='undefined' && HERO_PORTRAIT[hp.id], c=nm && cardByName(nm), art=c && cardArt(c);
+    n.innerHTML=`<div class="hpc-cost"></div><div class="hpc-art"><span class="hpc-icon"></span></div><div class="hpc-kind">영웅 능력</div><div class="hpc-name"></div><div class="hpc-text"></div>${hp.used?'<div class="hpc-used">이번 턴에 사용함</div>':''}`;
+    if(art) n.querySelector('.hpc-art').style.backgroundImage=`url("${art}")`;
+    n.querySelector('.hpc-cost').textContent=hp.cost; n.querySelector('.hpc-icon').textContent=hp.icon||'';
+    n.querySelector('.hpc-name').textContent=hp.name||''; n.querySelector('.hpc-text').textContent=hp.text||'';
+    return n;
+  }
+  function showPower(el){ const hp=el && el._hp; if(!hp) return; cur=el; place(el, powerNode(hp), hp.text||'', false, null); }
   const target=e=>{ const c=e.target.closest && e.target.closest('.card'); return (!c || c.closest(SKIP) || c.classList.contains('card-back') || !c.querySelector('.cname')) ? null : c; };
   document.addEventListener('mouseover', e=>{
     if(ui.dragging){ if(cur) hide(); return; }                                             // v139 끄는 중에는 미리보기를 띄우지 않는다
     if(!hover) return;                                                                      // v139 터치 기기는 길게 누르기로 본다 (아래)
+    const pw=e.target.closest && e.target.closest('.hero-power');                          // v142 영웅 능력
+    if(pw){ if(pw!==cur) showPower(pw); return; }
+    if(cur && cur.classList && cur.classList.contains('hero-power')){ hide(); }
     const c=target(e); if(!c){ if(cur && !(cur.dataset && cur.dataset.card)) hide(); return; }
     if(c!==cur) show(c);
   });
@@ -2952,6 +2996,8 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
   document.addEventListener('pointerdown', e=>{
     clearTimeout(lpTimer); lpAt=null; lpEat=0;
     if(e.pointerType==='mouse') return;
+    const pw=e.target.closest && e.target.closest('.hero-power');                          // v142 영웅 능력 꾹 누르기
+    if(pw && pw._hp){ lpAt={x:e.clientX, y:e.clientY}; lpTimer=setTimeout(()=>{ ui.lpShown=true; if(window.Drag) Drag.cancel(); showPower(pw); }, 430); return; }
     const c=lpTarget(e); if(!c) return;
     lpAt={x:e.clientX, y:e.clientY};
     lpTimer=setTimeout(()=>{ ui.lpShown=true; if(window.Drag) Drag.cancel(); show(c); }, 430);
@@ -2961,7 +3007,7 @@ function keywordNotes(text){ const out=[]; for(const [k,d] of KEYWORD_HELP){ if(
   document.addEventListener('pointerup', lpEnd, true);
   document.addEventListener('pointercancel', lpEnd, true);
   window.addEventListener('click', e=>{ if(Date.now()-lpEat<600){ lpEat=0; e.stopPropagation(); e.preventDefault(); } }, true);
-  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.card')) e.preventDefault(); });
+  document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.card, .hero-power')){ e.preventDefault(); e.stopPropagation(); } }, true);
   // v117 전투 기록: 카드 이름이 들어 있는 줄에 마우스를 올리면 그 카드를 띄운다 (기록 창은 오른쪽이라 왼쪽에)
   document.addEventListener('mouseover', e=>{
     const li=e.target.closest && e.target.closest('#logList [data-card]');

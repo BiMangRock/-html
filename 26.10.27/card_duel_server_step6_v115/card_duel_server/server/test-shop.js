@@ -103,8 +103,8 @@ const server = http.createServer(app).listen(0, async () => {
   try {
     let r = await A('GET', '/api/shop'); assert.strictEqual(r.status, 401, '로그인 전엔 401');
     r = await A('POST', '/api/shop/open', { count: 1, rev: 1 }); assert.strictEqual(r.status, 401);
-    await A('POST', '/api/signup', { username: 'alice01', password: 'password123' });
-    await B('POST', '/api/signup', { username: 'bob0001', password: 'password123' });
+    await A('POST', '/api/signup', { username: 'alice01', nickname: 'alice01', password: 'password123' });
+    await B('POST', '/api/signup', { username: 'bob0001', nickname: 'bob0001', password: 'password123' });
 
     r = await A('GET', '/api/shop'); assert.strictEqual(r.status, 200);
     assert.strictEqual(r.data.price, 100); assert.strictEqual(r.data.packSize, 5); assert.deepStrictEqual(r.data.history, []);
