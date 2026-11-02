@@ -1255,3 +1255,8 @@ body.mt-on #mtCoach{display:flex;}
 #cardPreview .hpc-name{font-size:1.15rem; font-weight:700; color:var(--gold); margin:.15rem 0 .45rem;}
 #cardPreview .hpc-text{font-size:.92rem; line-height:1.4; padding:.5rem .55rem; border-radius:10px; background:rgba(237,227,200,.92); color:#2a2117;}
 #cardPreview .hpc-used{margin-top:.5rem; font-size:.76rem; color:#e0a526;}
+
+/* v144 가이드는 튜토리얼 화면 맨 밑에 (메인 메뉴에서는 뺌) */
+.tut-guide{margin-top:1.1rem; padding-top:.8rem; border-top:1px dashed var(--gold-d);}
+.tut-guide-h{margin:0 0 .45rem; font-weight:700; text-align:center;}
+.tut-guide-h small{display:block; font-weight:400; opacity:.75; font-size:.8em; margin-top:.15rem;}

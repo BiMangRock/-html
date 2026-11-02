@@ -95,7 +95,7 @@ const CARD_POOL = [
   {type:'spell', name:"등산용 간식", cost:2, rarity:'일반', school:['자연'], effect:{type:'snack', value:2}},                                         // v32: 다음 턴에만 마나 +2
   {type:'spell', name:"키틴질 껍질", cost:2, rarity:'일반', school:['자연'], effect:{type:'carapace', value:4}},                                     // v32: 방어도 +4, 내 다음 턴 시작에 +4 더 (속성은 말씀에 없어 자연으로 정함)
   {type:'spell', name:"퇴비 만들기", cost:2, rarity:'일반', school:['자연'], effect:{type:'compost', value:1}},                                       // v32: 내 하수인 전체에 죽음의 메아리: 카드 1장 뽑기
-  {type:'spell', name:"새로운 경지", cost:3, rarity:'일반', school:['자연'], effect:{type:'ascend', value:3}},                                       // v35: 최대 마나 +3 (10 초과 가능) 후 빈 마나 수정 1개 (10 상한). 속성은 말씀에 없어 자연으로 정함
+  {type:'spell', name:"새로운 경지", cost:3, rarity:'일반', school:['자연'], effect:{type:'ascend', value:3}},                                       // v144: 최대 마나 +3 (10 초과 가능, 즉시) 후 빈 마나 수정 1개 (10 상한). 속성은 자연
   {type:'spell', name:"숲의 영혼",   cost:3, rarity:'일반', school:['자연'], effect:{type:'forestSoul', value:1}},                                   // v35: 내 하수인 전체에 죽음의 메아리: 2/2 나무정령 소환
   {type:'spell', name:"야생의 포효", cost:3, rarity:'일반', school:['자연'], effect:{type:'roar', value:2}},                                         // v35: 이번 턴 내 하수인 전체 공격력 +2 (영웅은 공격하지 않으므로 하수인만). 속성은 자연으로 정함
   {type:'spell', name:"휘둘러치기", cost:3, rarity:'일반', school:['자연'], effect:{type:'cleave', value:4, other:1}},                               // v38: 적 하나에 피해 4, 다른 모든 적에게 피해 1 (속성은 자연으로 정함)

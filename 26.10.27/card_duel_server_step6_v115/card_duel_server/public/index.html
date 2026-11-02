@@ -120,9 +120,8 @@
     <h2>카드 결투</h2>
     <p class="sub">턴제 카드 대전</p>
     <button class="menu-btn primary" onclick="showScreen('mode')">게임 시작</button>
-    <button class="menu-btn" onclick="openTutorials()">🎓 튜토리얼<b class="fr-badge" id="tutBadge" hidden></b><span class="desc" id="tutMenuDesc">처음이라면 여기부터 · 첫 완료 보상 1,000골드 + 전설 카드</span></button>
+    <button class="menu-btn" onclick="openTutorials()">🎓 튜토리얼<b class="fr-badge" id="tutBadge" hidden></b><span class="desc" id="tutMenuDesc">처음이라면 여기부터 · 첫 완료 보상 1,000골드 + 전설 카드 · 📖 가이드는 맨 밑</span></button>
     <button class="menu-btn" onclick="openShop()">🛒 상점<span class="desc" id="shopMenuDesc">카드 팩을 열어 새 카드를 모읍니다 · 남는 카드는 분해해 가루로</span></button>
-    <button class="menu-btn" onclick="openGuide()">📖 가이드<span class="desc">초보자용 · 효과 설명(애니메이션) · 카드 읽는 법 · 게임 규칙</span></button>
     <button class="menu-btn" onclick="openDeckList()">📚 내 덱<span class="desc" id="deckMenuDesc"></span></button>
     <button class="menu-btn" onclick="Friends.open()">👥 친구<b class="fr-badge" id="friendBadge" hidden></b><span class="desc" id="friendMenuDesc">친구 추가 · 채팅 · 친구와 대전 · 친구 판 관전</span></button>
     <button class="menu-btn" onclick="showScreen('power')">🔮 영웅 능력<span class="desc" id="powerMenuDesc"></span></button>
@@ -153,7 +152,7 @@
     <h3>📖 가이드</h3>
     <div class="g-tabs"><button class="on" data-t="fx">효과 설명</button><button data-t="card">카드 읽는 법</button><button data-t="rule">게임 규칙</button><button data-t="mode">🎮 모드</button></div>
     <div class="g-body" id="guideBody"></div>
-    <button class="menu-btn back" onclick="showScreen('main')">← 돌아가기</button>
+    <button class="menu-btn back" onclick="showScreen('tutorial'); renderTutorials()">← 튜토리얼로</button>
   </div>
   <div class="screen" id="screen-test">
     <h3>테스트</h3>
@@ -232,8 +231,11 @@
     <h3>🎓 튜토리얼</h3>
     <p class="sub">직접 해 보며 규칙을 배웁니다. 처음 끝내면 보상을 한 번 받을 수 있어요.</p>
     <div class="tut-list" id="tutList"></div>
-    <button class="menu-btn" onclick="openGuide()">📖 가이드<span class="desc">튜토리얼에 없는 효과·키워드·모드 설명은 여기서 찾아보세요</span></button>
     <button class="menu-btn back" onclick="showScreen('main')">뒤로</button>
+    <div class="tut-guide">
+      <p class="tut-guide-h">📖 가이드 <small>튜토리얼을 깨지 않아도 언제든 볼 수 있어요</small></p>
+      <button class="menu-btn" onclick="openGuide()">📖 가이드 열기<span class="desc">효과 설명(애니메이션) · 카드 읽는 법 · 게임 규칙 · 🎮 모드</span></button>
+    </div>
   </div>
   <div class="screen" id="screen-quests">
     <div class="first-steps" id="firstSteps" hidden>

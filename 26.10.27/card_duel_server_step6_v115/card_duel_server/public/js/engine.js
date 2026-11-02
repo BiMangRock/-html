@@ -943,9 +943,9 @@ const SPELL_FX = {
             spellWorth:(c,view)=> view.me.board.length>=2 && view.me.hand.length<=7 ? 3.5 : 0,
             ruleUse:(view,acts)=> acts.length && view.me.board.length>=3 && view.me.hand.length<=7 ? acts[0] : null },
   // ---- v35 ----
-  ascend: { text:v=>`내 최대 마나가 총 ${v} 증가합니다. 지금 당장은 빈 마나 수정 1개만 얻고, 나머지 ${v-1}는 다음 턴 시작에 더해집니다`, rank:-0.6,
-            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], v=c.effect.value; P.maxMana+=1; P.ascendNext=(P.ascendNext||0)+(v-1);     // v94: 총 +v, 즉시 빈 수정 1개 / 나머지는 다음 턴 시작. 증가는 10 제한 없음
-              ev.push({type:'ascend', seat, amount:1, later:v-1, now:P.maxMana, src}); },
+  ascend: { text:v=>`최대 마나가 ${v} 증가합니다. 빈 마나 수정을 1개 얻습니다`, rank:-0.6,
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], v=c.effect.value; P.maxMana+=v; const b=P.maxMana; addMax(P, 1);     // v144: 최대 마나 +v (10 제한 없음, 즉시) → 빈 마나 수정 1개 (10까지). 둘 다 빈 칸이라 이번 턴 마나는 그대로
+              ev.push({type:'ascend', seat, amount:v, crystal:P.maxMana-b, now:P.maxMana, src}); },
             spellWorth:(c,view)=> view.me.maxMana<=7 ? 4 : 0,
             ruleUse:(view,acts)=> acts.length && view.me.maxMana<=7 ? acts[0] : null },
   forestSoul:{ text:()=>`내 하수인 전체에 "죽음의 메아리: 2/2 나무정령 소환"을 부여한다`, rank:2.8,
@@ -1942,7 +1942,7 @@ const SPELL_TEXT = {
   execute:  v=>`공격력 ${v} 이상인 적 하수인 처치. 보호막 무시`,
   freeze:   ()=>`적 하수인 하나를 얼린다. 다음 턴 공격 불가`,
   bloom:    v=>`이번 턴 마나 ${v} 획득`,
-  ascend:   v=>`최대 마나 총 ${v} 증가. 지금 빈 마나 수정 1개, 나머지 ${v-1}는 다음 턴 시작`,
+  ascend:   v=>`최대 마나 ${v} 증가, 빈 마나 수정 1개`,
   shrink:   v=>`내 덱 하수인의 비용과 공격력이 ${v}만큼 감소`,
   roar:     v=>`이번 턴 내 하수인의 공격력 +${v}`,
   crystal:  v=>`빈 마나 수정 ${v}개 획득`,
@@ -2093,7 +2093,7 @@ function mulliganHand(s, seat, ids){                            // v77 멀리건
 function startTurn(s, seat, ev){
   const P=s.seats[seat];
   s.turn=seat; s.turnNo++;
-  if(P.ascendNext){ P.maxMana+=P.ascendNext; P.ascendNext=0; }   // v94 새로운 경지: 예약된 최대 마나 증가
+  if(P.ascendNext){ P.maxMana+=P.ascendNext; P.ascendNext=0; }   // v94 새로운 경지(옛 방식): 예약된 최대 마나 증가 — v144부터 새로 쌓이지 않음, 옛 저장 판 호환용
   addMax(P, 1);   // 마나는 플레이어별로 따로 관리 (v35: 최대 마나가 10을 넘은 상태면 깎지 않고 그대로)
   const md=P.mods||{};
   P.turns=(P.turns||0)+1;                              // 이 좌석이 진행한 턴 수

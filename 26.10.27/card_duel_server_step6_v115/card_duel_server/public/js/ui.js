@@ -131,7 +131,8 @@ function eventText(ev){
     case 'nextMana': return `${who(ev.src.seat)} ${ev.src.name}: 다음 턴에만 마나 수정 ${ev.amount}개 획득`;
     case 'armorLater': return `${who(ev.src.seat)} ${ev.src.name}: 다음 턴 시작에 방어도 +${ev.amount} 예약`;
     case 'compost': return `${who(ev.src.seat)} ${ev.src.name}: 하수인 ${ev.count}기에게 죽음의 메아리 부여`;
-    case 'ascend': return `${who(ev.src.seat)} ${ev.src.name}: 빈 마나 수정 +${ev.amount} (최대 마나 ${ev.now}), 다음 턴 시작에 최대 마나 +${ev.later}`;
+    case 'ascend': return ev.later!=null ? `${who(ev.src.seat)} ${ev.src.name}: 빈 마나 수정 +${ev.amount} (최대 마나 ${ev.now}), 다음 턴 시작에 최대 마나 +${ev.later}`   // 옛 리플레이
+      : `${who(ev.src.seat)} ${ev.src.name}: 최대 마나 +${ev.amount}`+(ev.crystal?`, 빈 마나 수정 +${ev.crystal}`:' (빈 마나 수정은 이미 10이라 못 얻음)')+` → 최대 마나 ${ev.now}`;
     case 'forestSoul': return `${who(ev.src.seat)} ${ev.src.name}: 하수인 ${ev.count}기에게 죽음의 메아리 부여`;
     case 'recycle': return `${who(ev.src.seat)} ${ev.src.name}: 손패 ${ev.count}장을 덱에 섞고, 덱의 모든 카드 비용 -${ev.amount}`;
     case 'shrink': return `${who(ev.src.seat)} ${ev.src.name}: 덱의 하수인 ${ev.count}장의 비용·공격력 -${ev.amount}`;
@@ -665,6 +666,7 @@ function updateTutorialMenuDesc(){
     : !left.length ? '모두 완료 · 언제든 다시 해 볼 수 있어요'
     : T.every(t=>tutState(t.id)==='todo') ? '처음이라면 여기부터 · 1~5부 · 첫 완료 보상 1,000골드 + 카드 4장'
     : `${T.length-left.length}/${T.length} 완료 · 다음: ${tutLabel(left[0])} (${left[0].rewardText})`;
+  el.textContent += ' · 📖 가이드는 맨 밑';   // v144 가이드는 튜토리얼 화면 맨 밑으로 옮김
   const bd=$('tutBadge'); if(bd){ bd.hidden=!ready.length; bd.textContent=ready.length; }
 }
 function openTutorials(){ showScreen('tutorial'); renderTutorials(); ServerStore.loadProgress().then(renderTutorials); }
@@ -1927,7 +1929,7 @@ const ModeIntro=(function(){
       box.innerHTML=`<div class="mi-card"><div class="mi-top"><b>${TITLE[key]}</b><button type="button" class="mi-skip">건너뛰기</button></div>
         <div class="gp-head"><span>${i+1} / ${pages.length}</span><b>${p.t}</b></div><div class="gp-stage">${p.s}</div><div class="gp-text">${p.x}</div>
         <div class="gp-nav"><button type="button" class="mi-prev" ${i?'':'disabled'}>◀ 이전</button>${gdots(i,pages.length)}<button type="button" class="mi-next">${last?'시작하기 ✔':'다음 ▶'}</button></div>
-        <p class="mi-foot">📖 가이드 → 🎮 모드 탭에서 언제든 다시 볼 수 있어요.</p></div>`;
+        <p class="mi-foot">🎓 튜토리얼 → 맨 밑 📖 가이드 → 🎮 모드 탭에서 언제든 다시 볼 수 있어요.</p></div>`;
       box.querySelector('.mi-skip').onclick=close;
       box.querySelector('.mi-prev').onclick=()=>{ if(i>0){ i--; draw(); } };
       box.querySelector('.mi-next').onclick=()=>{ if(last) close(); else { i++; draw(); } };
