@@ -21,12 +21,20 @@ const PROGRESS = {
     { id: 'adv1',     text: '모험 모드 보스전 1판 하기',         stat: 'adv',     goal: 1,  gold: 50 },
   ],
   // ---- 첫 걸음 (v140): 튜토리얼 첫 완료 보상. 계정당 한 번만, 받으면 목록에서 사라진다. 일일 퀘스트 칸·바꾸기와 무관 ----
-  //  reward: {gold:N} 골드 / {legend:1} 아직 없는 전설 중 무작위 1장 (다 있으면 전체 전설 중 무작위). 모험·보스 전용 카드는 안 나옴
+  //  reward: {gold:N} 골드 / {rarity:'전설'} 그 등급에서 아직 없는 카드 중 무작위 1장 (다 있으면 그 등급 전체 중 무작위)
+  //          {odds:{희귀:60, 특급:30, 전설:10}} 등급을 먼저 확률로 뽑고 같은 방식으로 1장. 모험·보스 전용 카드는 안 나옴
+  //  needs: 이 튜토리얼을 끝내야 열린다 (화면에서 잠금)
   TUTORIALS: [
     { id: 'basic',    name: '기본 튜토리얼', text: '기본 튜토리얼 완료하기', url: '/tutorial/index.html',
       desc: '처음이라면 · 대사와 함께 마나·도발·주문·돌진 등 기본 규칙을 직접 해 보며 배웁니다', reward: { gold: 1000 }, rewardText: '1,000골드' },
     { id: 'advanced', name: '고급 튜토리얼', text: '고급 튜토리얼 완료하기', url: '/tutorial/advanced.html', needs: 'basic',
-      desc: '기본을 익혔다면 · 죽음의 메아리·발견·동결·주문 공격력 등 심화 규칙을 배웁니다', reward: { legend: 1 }, rewardText: '무작위 전설 카드 1장' },
+      desc: '기본을 익혔다면 · 죽음의 메아리·발견·동결·주문 공격력 등 심화 규칙을 배웁니다', reward: { rarity: '전설' }, rewardText: '무작위 전설 카드 1장' },
+    { id: 'part1',    name: '실전 기본', text: '실전 기본 튜토리얼 완료하기', url: '/tutorial/part1.html', needs: 'advanced',
+      desc: '실제 대전처럼 · 선공·후공과 동전, 멀리건, 영웅 능력, 방어도, 하수인 놓을 자리를 배웁니다', reward: { rarity: '희귀' }, rewardText: '무작위 희귀 카드 1장' },
+    { id: 'part2',    name: '키워드', text: '키워드 튜토리얼 완료하기', url: '/tutorial/part2.html', needs: 'part1',
+      desc: '모면·생명력 흡수·환생·은신·독성·과부하·침묵·변신·선택·이중 주문·잔상·룬·질풍을 직접 써 봅니다', reward: { rarity: '특급' }, rewardText: '무작위 특급 카드 1장' },
+    { id: 'menu',     name: '메뉴 둘러보기', text: '메뉴 둘러보기 튜토리얼 완료하기', url: '/#tour', needs: 'part2',
+      desc: '게임 밖 기능 · 덱 만들기와 덱 슬롯, 상점, 카드 제작, 퀘스트, 각 모드를 제이나와 함께 둘러봅니다', reward: { odds: { '희귀': 60, '특급': 30, '전설': 10 } }, rewardText: '무작위 희귀·특급·전설 카드 1장' },
   ],
   // 한 판에서 인정하는 최대치 (이상한 값을 막는 상한)
   STAT_CAP: { games: 1, wins: 1, spells: 999, minions: 999, attacks: 999, face: 9999, powers: 999, big: 999, pvp: 1, adv: 1 },   // v133 판당 상한 사실상 없음 (판 수·승리만 1)

@@ -42,7 +42,8 @@ const server = http.createServer(app).listen(0, async () => {
     let r = await call('POST', '/api/tutorial/complete', { tutorial: 'basic' }); assert.strictEqual(r.status, 401, '로그인 필요');
     await call('POST', '/api/signup', { username: 'newbie1', password: 'password1' });
     r = await call('GET', '/api/save'); let rev = r.data.wallet.rev; const gold0 = r.data.wallet.gold;
-    r = await call('GET', '/api/progress'); assert.deepStrictEqual(r.data.tutorial, { basic: 'todo', advanced: 'todo' });
+    const ALL = st => Object.fromEntries(PROGRESS.TUTORIALS.map(t => [t.id, st]));
+    r = await call('GET', '/api/progress'); assert.deepStrictEqual(r.data.tutorial, ALL('todo'));
 
     // 끝내기 전에는 못 받음 · 없는 튜토리얼
     r = await call('POST', '/api/tutorial/claim', { tutorial: 'basic', rev }); assert.strictEqual(r.status, 400, '완료 전');
@@ -66,7 +67,16 @@ const server = http.createServer(app).listen(0, async () => {
     const card = r.data.reward.card; assert(card && card.rarity === '전설' && card.isNew, JSON.stringify(r.data.reward));
     assert(!owned0[card.name] && r.data.collection[card.name] === 1, '새 전설 1장');
     assert(tutorial.LEGENDS.some(c => c.name === card.name), '모험·보스 전용 아님');
-    assert.deepStrictEqual(r.data.tutorial, { basic: 'claimed', advanced: 'claimed' });
+    assert.strictEqual(r.data.tutorial.basic, 'claimed'); assert.strictEqual(r.data.tutorial.advanced, 'claimed');
+    // 3부 희귀 · 4부 특급 · 5부 희귀~전설
+    for (const [id, rar] of [['part1', ['희귀']], ['part2', ['특급']], ['menu', ['희귀', '특급', '전설']]]) {
+      r = await call('POST', '/api/tutorial/complete', { tutorial: id }); assert(r.data.rewardText, '보상 문구');
+      r = await call('POST', '/api/tutorial/claim', { tutorial: id }); assert.strictEqual(r.status, 200, id + JSON.stringify(r.data));
+      const c = r.data.reward.card; assert(c && rar.includes(c.rarity) && c.isNew, id + ' ' + JSON.stringify(c));
+      assert(tutorial.POOLS[c.rarity].some(x => x.name === c.name), '모험·보스 전용 아님');
+      r = await call('POST', '/api/tutorial/claim', { tutorial: id }); assert.strictEqual(r.status, 400, id + ' 두 번 못 받음');
+    }
+    assert.deepStrictEqual(r.data.tutorial || (await call('GET', '/api/progress')).data.tutorial, ALL('claimed'));
     r = await call('POST', '/api/tutorial/claim', { tutorial: 'advanced' }); assert.strictEqual(r.status, 400, '두 번 못 받음');
 
     // 다른 계정: 전설을 다 갖고 있으면 그중 하나 (한 장 더)
@@ -78,7 +88,9 @@ const server = http.createServer(app).listen(0, async () => {
     r = await call('POST', '/api/tutorial/claim', { tutorial: 'advanced' }); assert.strictEqual(r.status, 200);
     assert.strictEqual(r.data.reward.card.isNew, false); assert.strictEqual(r.data.collection[r.data.reward.card.name], 3);
     assert.strictEqual(r.data.tutorial.basic, 'todo', '기본은 따로 (고급만 끝낸 계정)');
-    assert.strictEqual(PROGRESS.TUTORIALS.length, 2);
+    assert.strictEqual(PROGRESS.TUTORIALS.length, 5);
+    { const cnt = {}; for (let i = 0; i < 100; i++) { const x = tutorial.rollRarity({ odds: { '희귀': 60, '특급': 30, '전설': 10 } }, n => i % n); cnt[x] = (cnt[x] || 0) + 1; }
+      assert.deepStrictEqual(cnt, { '희귀': 60, '특급': 30, '전설': 10 }, '확률표대로 (고르게 돌리면 정확히 60/30/10)'); }
     console.log('✔ 튜토리얼 첫 완료 보상 API');
     console.log('✔ 튜토리얼 보상 테스트 통과');
   } catch (e) { console.error('✘ 실패:', e); process.exitCode = 1; }

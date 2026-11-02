@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>스톰윈드 vs 호드 · 4부 · 키워드</title>
+<link rel="stylesheet" href="tut.css">
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <h1>스톰윈드 vs 호드 · <span id="ttl">4부 · 키워드</span></h1>
+    <div class="chap" id="chap"></div>
+    <span class="chapname" id="chapname"></span>
+    <button class="tbtn" id="gloss">규칙 도감</button>
+    <button class="tbtn" id="restart">처음부터</button>
+    <a class="tbtn" id="home" href="/#tutorial">메뉴로</a>
+  </div>
+  <div class="layout">
+    <aside class="coach" id="coach">
+      <span class="badge" id="cbadge"></span>
+      <h2 id="ctitle"></h2>
+      <div class="body" id="cbody"></div>
+      <div class="task" id="ctask"></div>
+      <div class="err" id="cerr"></div>
+      <div class="nudge" id="cnudge"></div>
+      <div class="actions"><button class="cbtn" id="cnext">다음</button></div>
+    </aside>
+    <main class="stage" id="stage">
+      <div class="row" id="eRow">
+        <div class="sidecol" id="eSide"></div>
+        <div style="flex:1"></div>
+        <div class="sidecol" id="eInfo"></div>
+      </div>
+      <div class="board" id="eBoard"></div>
+      <div class="mid"><span class="turn" id="turnLbl"></span><button class="endb" id="endBtn">턴 종료</button></div>
+      <div class="board" id="mBoard"></div>
+      <div class="me-wrap">
+        <div class="sidecol" id="mSide"></div>
+        <div class="hand" id="hand"></div>
+        <div class="sidecol" id="mInfo"></div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="fxl" id="fxl"></div>
+<div class="inspect" id="inspect"></div>
+<div class="over" id="over"><div class="modal" id="modal"></div></div>
+<!-- 규칙은 실제 게임 엔진을 그대로 쓴다 (기본·고급 튜토리얼은 옛 엔진 사본을 품고 있지만, 3·4부는 영웅 능력·멀리건·키워드 때문에 최신 엔진이 필요) -->
+<script src="/js/cards.js"></script>
+<script src="/js/engine.js"></script>
+<script src="/js/cardart.js"></script>
+<script src="tut-logic.js"></script>
+<script src="part2.js"></script>
+<script src="tut-core.js"></script>
+</body>
+</html>

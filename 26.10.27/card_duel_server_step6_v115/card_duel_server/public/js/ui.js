@@ -656,13 +656,15 @@ function updateQuestMenuDesc(){ const el=$('questMenuDesc'), p=window.ServerStor
 const tutState=id=>{ const p=window.ServerStore && ServerStore.progress; return p && p.tutorial ? (p.tutorial[id]||'todo') : null; };
 const tutLocked=t=>!!(t.needs && tutState(t.needs)==='todo' && tutState(t.id)==='todo');   // 기본을 안 끝냈으면 고급은 잠금 (이미 끝낸 기록이 있으면 열어 둔다)
 const tutRewardsReady=()=>PROGRESS.TUTORIALS.filter(t=>tutState(t.id)==='ready');
+const tutLabel=t=>`${PROGRESS.TUTORIALS.indexOf(t)+1}부 · ${t.name}`;
+const tutGo=t=>{ if(t.id==='menu'){ if(typeof MenuTour!=='undefined') MenuTour.start(); } else location.href=t.url; };   // 5부 메뉴 둘러보기는 이 화면 위에서 진행
 function updateTutorialMenuDesc(){
   const el=$('tutMenuDesc'); if(!el || tutState('basic')==null) return;
   const T=PROGRESS.TUTORIALS, left=T.filter(t=>tutState(t.id)!=='claimed'), ready=tutRewardsReady();
   el.textContent = ready.length ? `🎁 받을 보상이 있어요 · ${ready.map(t=>t.rewardText).join(' · ')}`
     : !left.length ? '모두 완료 · 언제든 다시 해 볼 수 있어요'
-    : T.every(t=>tutState(t.id)==='todo') ? '처음이라면 여기부터 · 첫 완료 보상 1,000골드 + 전설 카드'
-    : `${T.length-left.length}/${T.length} 완료 · 남은 보상: ${left.map(t=>t.rewardText).join(' · ')}`;
+    : T.every(t=>tutState(t.id)==='todo') ? '처음이라면 여기부터 · 1~5부 · 첫 완료 보상 1,000골드 + 카드 4장'
+    : `${T.length-left.length}/${T.length} 완료 · 다음: ${tutLabel(left[0])} (${left[0].rewardText})`;
   const bd=$('tutBadge'); if(bd){ bd.hidden=!ready.length; bd.textContent=ready.length; }
 }
 function openTutorials(){ showScreen('tutorial'); renderTutorials(); ServerStore.loadProgress().then(renderTutorials); }
@@ -673,14 +675,14 @@ function renderTutorials(){
     const st=tutState(t.id), lock=tutLocked(t);
     const row=document.createElement('div'); row.className='tut-row'+(st==='claimed'?' done':'')+(lock?' locked':'');
     row.innerHTML=`<div class="tut-main"><b></b><small class="tut-desc"></small><span class="tut-rew"></span></div><div class="tut-side"></div>`;
-    row.querySelector('b').textContent=(st==='claimed'||st==='ready'?'✔ ':lock?'🔒 ':'🎓 ')+t.name;
+    row.querySelector('b').textContent=(st==='claimed'||st==='ready'?'✔ ':lock?'🔒 ':'🎓 ')+tutLabel(t);
     row.querySelector('.tut-desc').textContent=t.desc;
     row.querySelector('.tut-rew').textContent= st==='claimed'?'첫 완료 보상 받음':`🎁 첫 완료 보상: ${t.rewardText}`;
     const side=row.querySelector('.tut-side');
     if(st==='ready'){ const c=document.createElement('button'); c.type='button'; c.className='tut-btn claim'; c.textContent='🎁 보상 받기'; c.onclick=()=>claimTutorial(t.id,c); side.appendChild(c); }
     const go=document.createElement('button'); go.type='button'; go.className='tut-btn'+(st==='todo'&&!lock?' go':'');
-    go.textContent= lock?'기본 튜토리얼 먼저': st==='todo'?'시작 ▶':'다시 하기';
-    go.disabled=lock; go.onclick=()=>{ location.href=t.url; };
+    go.textContent= lock?`${PROGRESS.TUTORIALS.findIndex(x=>x.id===t.needs)+1}부 먼저`: st==='todo'?'시작 ▶':'다시 하기';
+    go.disabled=lock; go.onclick=()=>tutGo(t);
     side.appendChild(go);
     box.appendChild(row);
   });
@@ -693,10 +695,10 @@ function renderFirstSteps(){
     const st=tutState(t.id), lock=tutLocked(t);
     const row=document.createElement('div'); row.className='quest first'+(st==='ready'?' ready':'');
     row.innerHTML=`<div class="q-main"><b></b><div class="q-bar"><i style="width:${st==='ready'?100:0}%"></i><span>${st==='ready'?1:0} / 1</span></div></div><div class="q-side"><span class="q-gold"></span></div>`;
-    row.querySelector('b').textContent=t.text; row.querySelector('.q-gold').textContent='🎁 '+t.rewardText;
+    row.querySelector('b').textContent=`${tutLabel(t)} 완료하기`; row.querySelector('.q-gold').textContent='🎁 '+t.rewardText;
     const b=document.createElement('button'); b.type='button';
     if(st==='ready'){ b.className='tut-btn claim'; b.textContent='받기'; b.onclick=()=>claimTutorial(t.id,b); }
-    else { b.className='tut-btn'; b.textContent=lock?'🔒 기본 먼저':'하러 가기'; b.disabled=lock; b.onclick=()=>{ location.href=t.url; }; }
+    else { b.className='tut-btn'; b.textContent=lock?`🔒 ${PROGRESS.TUTORIALS.findIndex(x=>x.id===t.needs)+1}부 먼저`:'하러 가기'; b.disabled=lock; b.onclick=()=>tutGo(t); }
     row.querySelector('.q-side').appendChild(b);
     box.appendChild(row);
   });
@@ -711,9 +713,10 @@ async function claimTutorial(id, btn){
   renderFirstSteps();
   const rw=r.reward||{};
   if(rw.gold) toast(`🎁 첫 걸음 보상! +${fmt(rw.gold)}골드`, 'gold');
-  if(rw.card) playPacks({ title:'🎁 고급 튜토리얼 완료 보상', packLabel:'전설 카드',
-    packs:[{ cards:[{ name:rw.card.name, rarity:rw.card.rarity, isNew:rw.card.isNew, dup:false, extra:false, refund:0 }], refund:0, pityHit:null }], spent:0,
-    info:()=>rw.card.isNew?`🌟 새 전설 카드 「${rw.card.name}」을(를) 얻었어요!`:`🌟 「${rw.card.name}」 · 이미 가진 카드라 한 장 더 쌓였어요 (모든 전설을 갖고 있어요)` });
+  if(rw.card){ const t=PROGRESS.TUTORIALS.find(x=>x.id===id), rar=rw.card.rarity;
+    playPacks({ title:`🎁 ${tutLabel(t)} 완료 보상`, packLabel:t.reward.odds?'희귀 이상 카드':`${rar} 카드`,
+      packs:[{ cards:[{ name:rw.card.name, rarity:rar, isNew:rw.card.isNew, dup:false, extra:false, refund:0 }], refund:0, pityHit:null }], spent:0,
+      info:()=>rw.card.isNew?`${rar==='전설'?'🌟':'✨'} 새 ${rar} 카드 「${rw.card.name}」을(를) 얻었어요!`:`「${rw.card.name}」 · 이미 가진 카드라 한 장 더 쌓였어요 (그 등급 카드를 모두 갖고 있어요)` }); }
 }
 function openQuests(){ showScreen('quests'); renderQuests(); ServerStore.loadProgress().then(renderQuests); }
 function renderQuests(){
@@ -1165,319 +1168,7 @@ window.Drag=Drag;
 // 사용자가 제공한 스크린샷에서 추출한 하수인 이미지를 로컬 파일로 사용합니다. 인터넷 연결이 필요 없습니다.
 // v117: cards.js 의 카드에 art:'images/…' 를 적으면 아래 표에 없어도 그 그림을 쓴다
 const cardArt = c => CARD_ART[c.name] || c.art || (typeof cardByName==='function' && (cardByName(c.name)||{}).art) || (c.origName && (CARD_ART[c.origName] || (cardByName(c.origName)||{}).art)) || '';   // v118 석박통합 연구원: 원래 하수인 그림
-const CARD_ART = {
-  "피의 기록관 말라코르": "images/art_malakor.jpg",
-  "거머리 어미 발토라": "images/art_valtora.jpg",
-  "피의 소용돌이": "images/art_vortex.jpg",
-  "시초자": "images/art_originator.jpg",
-  "전장의 강령술사": "images/art_necro.jpg",
-  "소리치는 요들러": "images/art_yodler.jpg",
-  "악성 공포물": "images/art_horror.jpg",
-  "어둠가시 바느질꾼": "images/art_seamster.jpg",
-  "시체 폭발": "images/art_corpseblast.jpg",
-  "불어오른 거머리": "images/token_leech.jpg",   // v95: 피의 역병·흉측한 허물이 소환하는 0/2 토큰
-  "흉측한 허물": "images/minion_01.jpg",
-  "혈기술사": "images/card_85.png",
-  "마우와 파우": "images/card_86.png",
-  "그훈": "images/card_87.png",
-  "분노의 여사제": "images/card_88.png",
-  "신화의 공포": "images/card_89.png",
-  "타락심장 심문관": "images/card_90_0.png",
-  "고대의 공허 사냥개": "images/card_90_1.png",
-  "분열하는 점액": "images/card_i2_98.png",
-  "대마법학자 롬메스": "images/card_0.png",
-  "일식": "images/card_1.jpg",
-  "고대의 축복": "images/card_2.jpg",
-  "숲의 지원군": "images/card_3.jpg",
-  "금단의 과일": "images/card_4.jpg",
-  "번개 개화": "images/card_5.jpg",
-  "생물학 프로젝트": "images/card_6.jpg",
-  "대지의 비늘": "images/card_9.jpg",
-  "급속 성장": "images/card_10.jpg",
-  "등산용 간식": "images/card_11.jpg",
-  "새로운 경지": "images/card_13.jpg",
-  "숲의 영혼": "images/card_14.jpg",
-  "야생의 포효": "images/card_15.jpg",
-  "휘둘러치기": "images/card_16.jpg",
-  "줄이기": "images/card_17.jpg",
-  "흉포한 울음소리": "images/card_18.jpg",
-  "대지의 수호": "images/card_19.jpg",
-  "육성": "images/card_20.jpg",
-  "딱정벌레술": "images/card_21.jpg",
-  "숨겨진 오아시스": "images/card_22.jpg",
-  "영원의 불화살": "images/card_25.jpg",
-  "아달의 수호자": "images/card_26.jpg",
-  "시간대 수선": "images/card_27.jpg",
-  "가시가 돋친 탈것": "images/card_29.jpg",
-  "분파": "images/card_30.jpg",
-  "저지해라!": "images/card_31.jpg",
-  "아마라의 이야기": "images/card_32.jpg",
-  "데자뷔": "images/card_33.jpg",
-  "번개 폭풍": "images/card_34.jpg",
-  "뒤틀린 황천": "images/card_35.jpg",
-  "일거리가 있다던데": "images/card_36.jpg",
-  "물 공급지": "images/card_37.jpg",
-  "적자생존": "images/card_39.jpg",
-  "야생의 선물": "images/card_40.jpg",
-  "궁극의 역병": "images/card_41.jpg",
-  "퍼져나가는 역병": "images/card_42.jpg",
-  "톨비르 대적": "images/card_43.jpg",
-  "되감기": "images/card_45.jpg",
-  "극한 반복": "images/card_46.jpg",
-  "박학다식": "images/card_47.jpg",
-  "마나 흡수": "images/card_48.jpg",
-  "열광의 덱": "images/card_49.jpg",
-  "점화": "images/card_50.jpg",
-  "얼음 회오리": "images/card_51.jpg",
-  "초신성": "images/card_52.jpg",
-  "은하계 투영 구슬": "images/card_53.jpg",
-  "왕의 축복": "images/card_54.jpg",
-  "망자 되살리기": "images/card_55.jpg",
-  "방부 의식": "images/card_56.jpg",
-  "유령 출몰": "images/card_57.jpg",
-  "빛폭탄": "images/card_58.jpg",
-  "영혼의 절규": "images/card_59.jpg",
-  "패거리": "images/card_60.jpg",
-  "소멸": "images/card_61.jpg",
-  "파괴의 정기": "images/card_62.jpg",
-  "선조의 부름": "images/card_63.jpg",
-  "용의자 줄 세우기": "images/card_64.jpg",
-  "방패 올리기": "images/card_65.jpg",
-  "태양샘": "images/card_66.jpg",
-  "흡혈": "images/card_82.jpg",
-  "피의 역병": "images/card_83.jpg",
-  "공기 누출": "images/card_84.jpg",
-  "교도소 마나스톰": "images/card_67.png",
-  "대마법사 안토니다스": "images/card_68.png",
-  "속임수 토템": "images/card_69.png",
-  "대마법사 바르고스": "images/card_75.png",
-  "로데브": "images/card_76.png",
-  "원한 맺힌 소환사": "images/card_77.png",
-  "가젯잔 경매인": "images/card_78.png",
-  "비전 거인": "images/card_79.png",
-  "노움 쩝쩝이": "images/card_80.png",
-  "별 관측자": "images/card_91.png",
-  "지저왕": "images/card_92.png",
-  "지진발": "images/card_93.png",
-  "하드로녹스": "images/card_94.png",
-  "아비아나": "images/card_95.png",
-  "티란투스": "images/card_96.png",
-  "잊힌 왕 쿤": "images/card_97.png",
-  "방패병": "images/card_104.png",
-  "키틴질 껍질": "images/card_12_0.jpg",
-  "퇴비 만들기": "images/card_12_1.jpg",
-  "요그사론": "images/card_i3_0.png",
-  "대지 정령": "images/card_i3_1.png",
-  "떠돌이 치유사": "images/card_i3_2.png",
-  "매의 눈 궁수": "images/card_i3_4.png",
-  "탈란지의 최후의 저항": "images/card_i3_5.jpg",
-  "엄폐": "images/card_i3_6.jpg",
-  "혼돈의 주문서": "images/card_i3_7.jpg",
-  "철벽 소집": "images/card_i3_8.jpg",
-  "치유의 빛": "images/card_i3_9.jpg",
-  "사냥개 떼": "images/card_i3_10.jpg",
-  "냉혹한 겨울": "images/card_i3_11.jpg",
-  "눈보라": "images/card_i3_12.jpg",
-  "매서운 한파": "images/card_i3_13.jpg",
-  "화염구": "images/card_i3_14.jpg",
-  "첫 번째 불꽃": "images/card_i3_15.jpg",
-  "불꽃 화살": "images/card_i3_16.jpg",
-  "비전 수호자": "images/card_i3_17.jpg",
-  "주문술사의 흐름": "images/card_i3_18.jpg",
-  "주머니 차원": "images/card_i3_19.jpg",
-  "신비술사의 고서": "images/card_i3_20.jpg",
-  "변이": "images/card_i3_21.jpg",
-  "복제": "images/card_i3_22.jpg",
-  "지식의 서": "images/card_i3_23.jpg",
-  "들쥐": "images/card_i2_101.png",
-  "은빛 신병": "images/card_i2_99.png",
-  "책벌레": "images/card_i2_100.png",
-  "날쌘 척후병": "images/card_i2_103.png",
-  "성소의 수습사제": "images/card_i2_105.png",
-  "시간의 마법사": "images/art_time_mage.jpg",
-  "벼락 마법사": "images/art_lightning_mage.jpg",
-  "늙은 사자": "images/art_old_lion.jpg",
-  "불사조": "images/art_phoenix.jpg",
-  "빛의 수호자": "images/art_light_guardian.jpg",
-  "용병대장": "images/art_mercenary_captain.jpg",
-  "돌 골렘": "images/art_stone_golem.jpg",
-  "강철 파수대장": "images/art_steel_sentinel.jpg",
-  "수정 골렘": "images/art_crystal_golem.jpg",
-  "부족의 주술사": "images/art_tribal_shaman.jpg",
-  "화염 정령": "images/art_fire_spirit.jpg",
-  "숲 늑대": "images/art_forest_wolf.jpg",
-  "빛나는 파수병": "images/art_radiant_sentry.jpg",
-  "훈련 교관": "images/art_drill_instructor.jpg",
-  "약초꾼": "images/art_herbalist.jpg",
-  "견습 검사": "images/art_apprentice_swordsman.jpg",
-  "돌담 견습병": "images/art_stonewall_apprentice.jpg",
-  "고대의 수호룡": "images/art_ancient_guardian_dragon.jpg",
-  "신비한 양초맨": "images/art_candle_kobold.jpg",
-  "명암의 사도": "images/art_light_shadow_apostle.jpg",
-  "유물 수집가": "images/art_relic_collector.jpg",
-  "회귀의 사서": "images/art_recurrence_librarian.jpg",
-  "주문 직조사": "images/art_spell_weaver.jpg",
-  "서리 거인": "images/art_frost_giant.jpg",
-  "고대 용": "images/art_ancient_dragon.jpg",
-  "심판관": "images/art_judge.jpg",
-  "폭풍 부르는 자": "images/art_storm_caller.jpg",
-  "침묵": "images/spell_silence.jpg",
-  "공중활강": "images/spell_glider_swarm.jpg",
-  "대폭발": "images/spell_big_explosion.jpg",
-  "불의 비": "images/spell_fire_rain.jpg",
-  "불꽃 점괘": "images/spell_flame_omen.jpg",
-  "냉기 돌풍": "images/spell_frost_gust.jpg",
-  "처형": "images/spell_execute.jpg",
-  "대마법 보호막": "images/spell_antimagic_shell.jpg",
-  "덱 탐색": "images/spell_deck_search.jpg",
-  "피의 서약": "images/spell_blood_pact.jpg",
-  "회수": "images/spell_recall.jpg",
-  "강화": "images/spell_empower.jpg",
-  "서리": "images/spell_frost.jpg",
-  "급습": "images/spell_ambush.jpg",
-  "번개": "images/spell_lightning.jpg",
-  "주문 발견": "images/spell_spell_discover.jpg",
-  "수호의 장벽": "images/spell_guardian_barrier.jpg",
-  "뱀사육사": "images/art113_002.png",
-  "공허의 영혼": "images/art113_003.png",
-  "카인 선퓨리": "images/art113_004.png",
-  "강철나무 골렘": "images/art113_005.png",
-  "여름의 평화수호자": "images/art113_006.png",
-  "늘푸른 수사슴": "images/art113_007.png",
-  "재생의 드루이드": "images/art113_008.png",
-  "토이란투스": "images/art113_009.png",
-  "날개 달린 수호자": "images/art113_010.png",
-  "실탄 장전": "images/art113_011.png",
-  "성게 가시": "images/art113_012.png",
-  "사스퀙": "images/art113_014.png",
-  "골드린": "images/art113_015L.png",
-  "왕 크루쉬": "images/art113_015R.png",
-  "밴조사우루스": "images/art113_016L.png",
-  "에메리스": "images/art113_016R.png",
-  "불꽃꼬리 전사": "images/art113_017.png",
-  "주문사수": "images/art113_018.png",
-  "깊은물 기원사": "images/art113_019.png",
-  "바르덴 던그래스프": "images/art113_020.png",
-  "요그사론의 종복": "images/art113_021.png",
-  "진눈깨비 스케이터": "images/art113_022.png",
-  "시프": "images/art113_024.png",
-  "회색 현자 앵무새": "images/art113_025.png",
-  "대규모 변이": "images/art113_026.png",
-  "용소환사 알라나": "images/art113_027.png",
-  "화염용": "images/art113_028.png",
-  "불굴의 토레스": "images/art113_029.png",
-  "태양지기 타림": "images/art113_030.png",
-  "성기사 에드릭": "images/art113_031.png",
-  "안녕극단": "images/art113_032.png",
-  "정신의 창조술사": "images/art113_033.png",
-  "세데크 장막직공": "images/art113_034.png",
-  "생각 훔치기": "images/art113_035.png",
-  "영혼 채찍": "images/art113_036.png",
-  "정신 분열": "images/art113_037.png",
-  "천상의 정신": "images/art113_038.png",
-  "대주교 베네딕투스": "images/art113_039.png",
-  "암흑의 정수": "images/art113_040.png",
-  "그훈의 피": "images/art113_041.png",
-  "흑요석 석상": "images/art113_042.png",
-  "대규모 부활": "images/art113_043.png",
-  "무덤괴수": "images/art113_044.png",
-  "칼날 부채": "images/art113_045.png",
-  "타르막": "images/art113_046.png",
-  "얼굴 수집가": "images/art113_047.png",
-  "소냐 워터댄서": "images/art113_048.png",
-  "엘프 음악가": "images/art113_049.png",
-  "무역왕 갤리윅스": "images/art113_050.png",
-  "전력 질주": "images/art113_051.png",
-  "환영의 물약": "images/art113_052.png",
-  "오메가 조립 시설": "images/art113_053.png",
-  "겁에 질린 조합원": "images/art113_054.png",
-  "용의 포효": "images/art113_055.png",
-  "대장군 분": "images/art113_056.png",
-  "앙심": "images/art113_058.png",
-  "다리우스 크롤리": "images/art113_059.png",
-  "대지조각가 이프": "images/art113_060.png",
-  "토르톨라": "images/art113_061.png",
-  "문제아": "images/art113_062.png",
-  "두억시니": "images/art113_063.png",
-  "해일": "images/art113_064.png",
-  "걸어 다니는 샘": "images/art113_065.png",
-  "눈사태 수호자": "images/art113_066.png",
-  "퇴화": "images/art113_067.png",
-  "불안정한 진화": "images/art113_068.png",
-  "깊은무쇠 트로그": "images/art113_069.png",
-  "교단 수련사": "images/art113_070.png",
-  "보석 박힌 딱정벌레": "images/art113_071.png",
-  "비겁한 밀고자": "images/art113_072.png",
-  "안녕로봇": "images/art113_073.png",
-  "데스윙": "images/art113_074.png",
-  "광염의 피락": "images/art113_075.png",
-  "해방된 분노 이샤라즈": "images/art113_076.png",
-  "허기진 포식자": "images/art113_077.png",
-  "부상당한 크발디르": "images/art113_078.png",
-  "부정한 알": "images/art113_079.png",
-  "불안정한 프로토타입": "images/art113_080.png",
-  "검 제작의 대가": "images/art113_081.png",
-  "공작 켈레세스": "images/art113_082.png",
-  "곰팡이술사": "images/art113_083.png",
-  "깔깔대는 발명가": "images/art113_084.png",
-  "기사대장": "images/art113_086.png",
-  "누더기골렘": "images/art113_087.png",
-  "공격대장": "images/art113_088.png",
-  "공중급수체": "images/art113_089.png",
-  "나무정령": "images/art113_090.png",
-  "지하군주": "images/art113_091.png",
-  "마력 깃든 까마귀": "images/art113_092.png",
-  "부화장 도우미": "images/art113_093.png",
-  "비명익룡 알": "images/art113_094.png",
-  "엘룬의 예언자": "images/art113_095.png",
-  "오늘의 월척": "images/art113_096.png",
-  "브롤 베어맨틀": "images/art113_097.png",
-  "그물거미": "images/art113_098.png",
-  "여명회 파수병": "images/art113_099.png",
-  "채광 사상자": "images/art113_100.png",
-  "평등": "images/art113_101.png",
-  "대사제 데칼": "images/art113_102.png",
-  "병력 소집": "images/art113_103.png",
-  "신의 은총": "images/art113_104.png",
-  "거품로봇": "images/art113_105.png",
-  "창심장 파수병": "images/art113_106.png",
-  "부두 토템": "images/art113_107.png",
-  "거대한 토템 아이스오르": "images/art113_108.png",
-  "불꽃의 토템": "images/art113_109.png",
-  "물 공급 토템": "images/art113_110.png",
-  "스테레오 토템": "images/art113_111.png",
-  "죄악석 토템": "images/art113_112.png",
-  "토템 골렘": "images/art113_113.png",
-  "돌장인": "images/art113_114.png",
-  "칼바람 폭풍소환사": "images/art113_115.png",
-  "바람의 군주 알아키르": "images/art113_116.png",
-  "왕궁정원사": "images/art113_117.png",
-  "독사 떼": "images/art113_118.png",
-  "치명적인 독사": "images/art113_119.png",
-  "피어오르는 연꽃": "images/art113_120.png",
-  "양": "images/art113_121.png",
-  "질주 사냥개": "images/art113_122.png",
-  "딱정벌레": "images/art113_123.png",
-  "새끼 비명익룡": "images/art113_124.png",
-  "활강병": "images/art113_125.png",
-  "이름 없는 하수인": "images/art113_126.png",
-  "보초병": "images/art113_127.png",
-  "병사": "images/art113_128.png",
-  "되살아난 보병": "images/art113_129.png",
-  "지렁이": "images/art113_130.png",
-  "언데드 닭": "images/art113_131.png",
-  "불량배": "images/art113_132.png",
-  "언데드": "images/art113_133.png",
-  "용": "images/art113_134.png",
-  "기계": "images/art113_135.png",
-  "다 자란 비명익룡": "images/art113_136.png",
-  "취약한 구울": "images/art113_137.png",
-  "구울": "images/art113_138.png",
-  "스테고돈": "images/art113_139.png",
-  "비전 골렘": "images/art113_140.png",
-  "은빛 성기사단 신병": "images/art113_141.png",
-  "고대정령": "images/art113_142.png"
-};
+// CARD_ART 표는 v140 부터 public/js/cardart.js 에 있다 (튜토리얼과 같이 쓰려고 분리)
 // ---------- v130 필드 하수인: 하스스톤처럼 타원 초상화 + 공격력(칼)·체력(핏방울)만. 설명은 마우스를 올리거나(터치는 꾹 누르기) 보면 된다 ----------
 //  카드 자체는 cardEl 그대로 만들고(미리보기·상세 창이 전체 카드를 쓰도록), 필드에서는 CSS(.zone .card)로 앞면 글을 숨긴다.
 //  여기서는 스탯 색(강화 초록 · 피해 빨강)과 작은 키워드 아이콘만 붙인다.
@@ -2982,7 +2673,7 @@ function renderShop(){
     const nm=document.createElement('span'); nm.className='ed-rar r-'+RARITY_ORDER.indexOf(r); nm.textContent=r;
     const pc=document.createElement('span'); pc.className='sr-pc'; pc.textContent=`${shopRatePercent(r)}%`;
     const own=document.createElement('span'); own.className='sr-own'; own.textContent=`수집 ${have}/${all.length}`;
-    const rf=document.createElement('span'); rf.className='sr-rf'; rf.textContent=`중복 +${SHOP.REFUND[r]}💰`;
+    const rf=document.createElement('span'); rf.className='sr-rf'; rf.textContent=`분해 +${PROGRESS.DISENCHANT[r]} 가루`; rf.title='남는 카드(덱 한도 초과분)를 분해하면 받는 가루';   // v140: 중복 골드 환급은 없어졌다 (예전 SHOP.REFUND 를 읽다가 화면이 멈추던 버그)
     row.append(nm,pc,own,rf); box.appendChild(row);
   });
   const left=info?info.pity.left:null;
@@ -3133,7 +2824,7 @@ if(window.ServerStore) ServerStore.onProgress=()=>{ updateQuestMenuDesc(); updat
   if(f>0){ const p=document.createElement('p'); p.className='notice warn'; p.textContent=`이전 판이 끝나기 전에 종료되어 배팅 ${fmt(f)}골드를 잃었습니다.`; $('screen-main').appendChild(p); } }
 showScreen('main');
 { const h=location.hash;                             // v140 튜토리얼 완료 창의 「보상 받으러 가기」 → /#quests
-  if(h==='#quests'||h==='#tutorial'){ history.replaceState(null,'',location.pathname+location.search); h==='#quests'?openQuests():openTutorials(); } }
+  if(h==='#quests'||h==='#tutorial'||h==='#tour'){ history.replaceState(null,'',location.pathname+location.search); if(h==='#quests') openQuests(); else if(h==='#tour' && typeof MenuTour!=='undefined') MenuTour.start(); else openTutorials(); } }
 });
 
 // ---------- v117 키워드 사전: 카드 문구는 짧게, 뜻은 마우스를 올렸을 때 크게 보이는 카드 옆에 ----------

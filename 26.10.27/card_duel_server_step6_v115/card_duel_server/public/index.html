@@ -121,7 +121,7 @@
     <p class="sub">턴제 카드 대전</p>
     <button class="menu-btn primary" onclick="showScreen('mode')">게임 시작</button>
     <button class="menu-btn" onclick="openTutorials()">🎓 튜토리얼<b class="fr-badge" id="tutBadge" hidden></b><span class="desc" id="tutMenuDesc">처음이라면 여기부터 · 첫 완료 보상 1,000골드 + 전설 카드</span></button>
-    <button class="menu-btn" onclick="openShop()">🛒 상점<span class="desc" id="shopMenuDesc">카드 팩을 열어 새 카드를 모읍니다 · 중복 카드는 골드로 환급</span></button>
+    <button class="menu-btn" onclick="openShop()">🛒 상점<span class="desc" id="shopMenuDesc">카드 팩을 열어 새 카드를 모읍니다 · 남는 카드는 분해해 가루로</span></button>
     <button class="menu-btn" onclick="openGuide()">📖 가이드<span class="desc">초보자용 · 효과 설명(애니메이션) · 카드 읽는 법 · 게임 규칙</span></button>
     <button class="menu-btn" onclick="openDeckList()">📚 내 덱<span class="desc" id="deckMenuDesc"></span></button>
     <button class="menu-btn" onclick="Friends.open()">👥 친구<b class="fr-badge" id="friendBadge" hidden></b><span class="desc" id="friendMenuDesc">친구 추가 · 친구와 대전 · 친구 판 관전 · 닉네임</span></button>
@@ -376,7 +376,9 @@
 <script src="/js/serverstore.js"></script>
 <script src="/js/cardtext.js"></script>
 <script src="/js/preload.js"></script>
+<script src="/js/cardart.js"></script>
 <script src="/js/ui.js"></script>
+<script src="/js/menutour.js"></script>
 <script src="/js/pvpclient.js"></script>
 <script src="/js/friends.js"></script>
 <script src="/js/replay.js"></script>

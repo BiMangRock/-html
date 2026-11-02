@@ -2,7 +2,7 @@
 //  - 튜토리얼 페이지가 끝나면 POST /api/tutorial/complete 로 "완료"를 기록한다 (계정당 한 번, 이후 다시 해도 그대로)
 //  - 보상은 메인 화면(일일 퀘스트 화면의 「첫 걸음」 칸)에서 POST /api/tutorial/claim 으로 받는다 → 계정당 한 번만
 //    · 골드 보상은 지갑 저장 번호(rev)를 확인하고 넣는다 (일일 퀘스트·상점과 같은 방식)
-//    · 전설 보상은 아직 없는 전설 중 무작위 1장 (다 있으면 전체 전설 중 무작위). 모험·보스 전용·잠금 카드는 제외
+//    · 카드 보상은 정해진 등급(또는 확률로 뽑은 등급)에서 아직 없는 카드 중 무작위 1장 (다 있으면 그 등급 전체 중 무작위). 모험·보스 전용·잠금 카드는 제외
 //  - TODO(다음 단계): complete 요청에 튜토리얼 진행 기록을 같이 보내서 검사하기. 지금은 요청만 오면 완료로 본다
 const path = require('path');
 const crypto = require('crypto');
@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS tutorial_progress (
 `);
 
 const tdef = id => PROGRESS.TUTORIALS.find(t => t.id === id);
-const LEGENDS = CARD_POOL.filter(c => c.rarity === '전설' && craftableCard(c));
+const POOLS = {};                                            // 등급 → 보상으로 줄 수 있는 카드 (상점·제작과 같은 기준: 모험·보스 전용·잠금 카드 제외)
+for (const c of CARD_POOL) if (craftableCard(c)) (POOLS[c.rarity] = POOLS[c.rarity] || []).push(c);
+const LEGENDS = POOLS['전설'] || [];
 
 // 계정의 튜토리얼 상태: { basic: 'todo'|'ready'|'claimed', advanced: ... }
 function tutorialState(uid) {
@@ -37,12 +39,20 @@ function tutorialState(uid) {
   }
   return out;
 }
-// 줄 전설 카드 고르기 (owned: 내 컬렉션)
-function pickLegend(owned, rnd = n => crypto.randomInt(n)) {
-  if (!LEGENDS.length) return null;
-  const fresh = LEGENDS.filter(c => !(owned[c.name] > 0));
-  const pool = fresh.length ? fresh : LEGENDS;
+const rndInt = n => crypto.randomInt(n);
+// 그 등급에서 줄 카드 고르기 (owned: 내 컬렉션). 아직 없는 카드 우선, 다 있으면 등급 전체에서
+function pickCard(rarity, owned, rnd = rndInt) {
+  const all = POOLS[rarity] || []; if (!all.length) return null;
+  const fresh = all.filter(c => !(owned[c.name] > 0)), pool = fresh.length ? fresh : all;
   return pool[rnd(pool.length)];
+}
+const pickLegend = (owned, rnd) => pickCard('전설', owned, rnd);
+// 보상 등급 정하기: {rarity} 그대로 / {odds:{등급:가중치}} 확률로
+function rollRarity(reward, rnd = rndInt) {
+  if (reward.rarity) return reward.rarity;
+  const L = Object.entries(reward.odds || {}), total = L.reduce((t, [, w]) => t + w, 0);
+  let x = rnd(total); for (const [r, w] of L) { if (x < w) return r; x -= w; }
+  return L.length ? L[L.length - 1][0] : null;
 }
 
 const router = express.Router();
@@ -54,7 +64,7 @@ router.post('/tutorial/complete', (req, res) => {
   const uid = req.user.id, id = String((req.body || {}).tutorial || '');
   if (!tdef(id)) return res.status(400).json({ error: '없는 튜토리얼이에요.' });
   const r = db.prepare('INSERT OR IGNORE INTO tutorial_progress(user_id,tutorial,completed_at) VALUES (?,?,?)').run(uid, id, Date.now());
-  res.json({ ok: true, first: r.changes > 0, state: tutorialState(uid) });
+  res.json({ ok: true, first: r.changes > 0, state: tutorialState(uid), rewardText: tdef(id).rewardText });
 });
 
 // 보상 받기 {tutorial, rev}. 응답 {ok, reward:{gold}|{card:{name,rarity,isNew}}, wallet, collection, dust, quests, tutorial}
@@ -75,9 +85,9 @@ router.post('/tutorial/claim', (req, res) => {
       const upd = db.prepare('UPDATE wallets SET gold=gold+?, rev=rev+1, updated_at=? WHERE user_id=? AND rev=?').run(t.reward.gold, Date.now(), uid, w.rev);
       if (!upd.changes) throw new Error('wallet changed');
       reward = { gold: t.reward.gold };
-    } else if (t.reward.legend) {
-      const owned = collectionOf(uid), c = pickLegend(owned);
-      if (!c) throw new Error('전설 카드가 없어요');
+    } else if (t.reward.rarity || t.reward.odds) {
+      const owned = collectionOf(uid), c = pickCard(rollRarity(t.reward), owned);
+      if (!c) throw new Error('보상 카드가 없어요');
       db.prepare(`INSERT INTO collection(user_id,card_name,count) VALUES (?,?,1) ON CONFLICT(user_id,card_name) DO UPDATE SET count=count+1`).run(uid, c.name);
       reward = { card: { name: c.name, rarity: c.rarity, isNew: !(owned[c.name] > 0) } };
     }
@@ -87,4 +97,4 @@ router.post('/tutorial/claim', (req, res) => {
   } catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} console.error('tutorial/claim 실패:', e); res.status(500).json({ error: '서버 오류가 났어요.' }); }
 });
 
-module.exports = { router, tutorialState, pickLegend, LEGENDS };
+module.exports = { router, tutorialState, pickCard, pickLegend, rollRarity, LEGENDS, POOLS };
