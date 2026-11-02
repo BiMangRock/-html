@@ -1,0 +1,86 @@
+/* tut-drama.css (v143) — 튜토리얼 1~4부 공용 연출: 대결 오프닝 · 장 제목 카드 · 가로쉬 도발 말풍선 · 타격 흔들림 · 결정타 · 승리 */
+
+/* 화면 흔들림 */
+.dr-shake1{animation:drShake1 .32s ease-out}
+.dr-shake2{animation:drShake2 .5s ease-out}
+@keyframes drShake1{20%{transform:translate(-4px,2px)}45%{transform:translate(4px,-2px)}70%{transform:translate(-2px,1px)}100%{transform:none}}
+@keyframes drShake2{10%{transform:translate(-9px,4px) rotate(-.4deg)}25%{transform:translate(8px,-5px) rotate(.4deg)}40%{transform:translate(-7px,3px)}60%{transform:translate(5px,-2px)}80%{transform:translate(-2px,1px)}100%{transform:none}}
+
+/* 번쩍임 */
+.dr-flash{position:fixed;inset:0;z-index:58;pointer-events:none;animation:drFlash .45s ease-out forwards}
+@keyframes drFlash{0%{opacity:.75}100%{opacity:0}}
+
+/* 대결 오프닝 */
+.dr-intro{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;
+  background:radial-gradient(90% 70% at 50% 50%,rgba(40,22,10,.92),rgba(5,3,2,.97));animation:drFadeIn .3s ease-out}
+.dr-intro.out{animation:drFadeOut .45s ease-in forwards}
+@keyframes drFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes drFadeOut{to{opacity:0}}
+.dr-intro .side{position:absolute;top:0;bottom:0;width:58%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.dr-intro .side.l{left:0;clip-path:polygon(0 0,100% 0,82% 100%,0 100%);background:linear-gradient(120deg,#1d3a66 0%,#0d1a33 70%);animation:drInL .55s cubic-bezier(.2,.9,.3,1.2) both}
+.dr-intro .side.r{right:0;clip-path:polygon(18% 0,100% 0,100% 100%,0 100%);background:linear-gradient(240deg,#6a1a12 0%,#2a0907 70%);animation:drInR .55s cubic-bezier(.2,.9,.3,1.2) .12s both}
+@keyframes drInL{from{transform:translateX(-100%)}to{transform:none}}
+@keyframes drInR{from{transform:translateX(100%)}to{transform:none}}
+.dr-intro .side.l{padding-right:12%}.dr-intro .side.r{padding-left:12%}
+.dr-intro .side img{width:min(26vw,170px);height:min(26vw,170px);border-radius:50%;object-fit:cover;border:4px solid var(--gold);box-shadow:0 0 40px rgba(0,0,0,.7)}
+.dr-intro .side.r img{border-color:#e0584a}
+.dr-intro .side b{font:900 clamp(18px,3.4vw,30px) var(--serif);color:#fff;text-shadow:0 3px 12px #000;letter-spacing:.04em}
+.dr-intro .side small{font-size:clamp(11px,1.6vw,14px);color:#e9dcc2;opacity:.85}
+.dr-intro .vs{position:relative;z-index:2;font:900 clamp(56px,11vw,120px)/1 var(--serif);color:var(--gold);text-shadow:0 0 30px rgba(255,200,90,.7),0 6px 0 #6b4a10;animation:drVs .5s cubic-bezier(.3,1.6,.5,1) .55s both}
+@keyframes drVs{from{transform:scale(3.2) rotate(-12deg);opacity:0}to{transform:none;opacity:1}}
+.dr-intro .ttl{position:absolute;left:0;right:0;bottom:9%;text-align:center;z-index:2;animation:drUp .5s ease-out 1s both}
+.dr-intro .ttl b{display:block;font:800 clamp(16px,2.6vw,24px) var(--serif);color:var(--gold);text-shadow:0 2px 8px #000}
+.dr-intro .ttl span{font-size:clamp(11px,1.5vw,13px);color:var(--dim)}
+@keyframes drUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* 장 제목 카드 */
+.dr-chap{position:fixed;left:0;right:0;top:38%;z-index:57;pointer-events:none;text-align:center;padding:16px 0;
+  background:linear-gradient(90deg,transparent,rgba(0,0,0,.82) 18%,rgba(0,0,0,.82) 82%,transparent);animation:drChap 2s ease-out forwards}
+.dr-chap small{display:block;font:700 12px var(--font);letter-spacing:.42em;color:var(--gold2)}
+.dr-chap b{display:block;font:900 clamp(24px,4.4vw,40px) var(--serif);color:var(--gold);text-shadow:0 2px 14px #000;margin-top:2px}
+.dr-chap::before,.dr-chap::after{content:'';position:absolute;left:20%;right:20%;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:drLine 2s ease-out forwards}
+.dr-chap::before{top:4px}.dr-chap::after{bottom:4px}
+@keyframes drChap{0%{opacity:0;transform:scaleY(.2)}12%{opacity:1;transform:none}82%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+@keyframes drLine{0%{transform:scaleX(0)}25%{transform:scaleX(1)}100%{transform:scaleX(1)}}
+
+/* 가로쉬의 말풍선 (전장 위) */
+.dr-taunt{position:fixed;z-index:56;pointer-events:none;max-width:min(300px,46vw);padding:8px 13px;border-radius:14px;font:700 14px/1.45 var(--font);color:#fff;
+  background:linear-gradient(180deg,#5a1d16,#3a120e);border:2px solid #e0584a;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:drTaunt 3.2s ease-out forwards}
+.dr-taunt::before{content:'';position:absolute;left:-10px;top:16px;border:8px solid transparent;border-right-color:#e0584a;border-left:0}
+.dr-taunt.yell{font-size:16px;letter-spacing:.01em;background:linear-gradient(180deg,#7a1e14,#4a0f0a)}
+.dr-taunt.below::before{left:18px;top:-10px;border:8px solid transparent;border-bottom-color:#e0584a;border-top:0}
+.dr-taunt b{color:#ffd08a}
+@keyframes drTaunt{0%{opacity:0;transform:scale(.6) translateY(6px)}8%{opacity:1;transform:scale(1.06)}14%{transform:none}86%{opacity:1}100%{opacity:0;transform:translateY(-6px)}}
+.hero.dr-angry{animation:drAngry .5s ease-out}
+@keyframes drAngry{20%{transform:translateX(-5px) scale(1.04)}40%{transform:translateX(5px) scale(1.04)}60%{transform:translateX(-3px)}100%{transform:none}}
+
+/* 턴 배너 */
+.dr-turn{position:fixed;left:50%;top:46%;z-index:60;pointer-events:none;transform:translate(-50%,-50%);display:flex;align-items:center;gap:12px;padding:10px 40px 10px 16px;
+  background:linear-gradient(90deg,transparent,rgba(0,0,0,.85) 14%,rgba(0,0,0,.85) 86%,transparent);animation:drTurn 1.25s ease-out forwards;white-space:nowrap}
+.dr-turn img{width:46px;height:46px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)}
+.dr-turn b{font:900 30px var(--serif);color:var(--gold);text-shadow:0 2px 10px #000}
+.dr-turn.foe img{border-color:#e0584a}.dr-turn.foe b{color:#ff8a7a}
+@keyframes drTurn{0%{opacity:0;transform:translate(-30%,-50%)}18%{opacity:1;transform:translate(-50%,-50%)}78%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-70%,-50%)}}
+
+/* 결정타 · 승리 */
+.dr-big{position:fixed;left:50%;top:44%;z-index:61;pointer-events:none;transform:translate(-50%,-50%);font:900 clamp(40px,8vw,84px) var(--serif);color:var(--gold);white-space:nowrap;
+  text-shadow:0 0 26px rgba(255,190,80,.8),0 5px 0 #6b4a10,0 10px 30px #000;animation:drBig 1.6s cubic-bezier(.2,1.4,.4,1) forwards}
+.dr-big small{display:block;text-align:center;font:700 clamp(13px,2vw,18px) var(--font);color:#fff;text-shadow:0 2px 8px #000;letter-spacing:.1em;margin-top:6px}
+.dr-big.red{color:#ff7d6b;text-shadow:0 0 26px rgba(255,90,70,.75),0 5px 0 #5a120c,0 10px 30px #000}
+@keyframes drBig{0%{opacity:0;transform:translate(-50%,-50%) scale(2.6)}22%{opacity:1;transform:translate(-50%,-50%) scale(.94)}32%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.06)}}
+
+/* 하수인을 끌고 있을 때 놓일 자리 (1·2부는 tut.css 를 안 쓰므로 여기도 둔다) */
+.gap{width:30px;height:var(--mh);border:2px dashed rgba(232,195,106,.45);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;color:var(--gold);transition:background .12s,border-color .12s}
+.gap i{font-style:normal;font-weight:800}.gap:hover{background:rgba(232,195,106,.15)}
+@media (max-width:900px){.gap{width:20px}}
+.gap.live{border-color:var(--green);background:rgba(111,211,138,.2);box-shadow:0 0 14px rgba(111,211,138,.5)}
+
+@media (orientation:landscape) and (max-height:540px){
+  .dr-taunt{font-size:12px;padding:5px 9px;max-width:40vw}.dr-taunt.yell{font-size:13px}
+  .dr-turn b{font-size:22px}.dr-turn img{width:34px;height:34px}
+  .dr-chap{top:34%;padding:10px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  .dr-shake1,.dr-shake2,.hero.dr-angry{animation:none}
+}
+@media (max-width:560px){ .dr-taunt{font-size:12.5px;padding:6px 10px;max-width:58vw}.dr-taunt.yell{font-size:13.5px} .dr-turn b{font-size:22px} }

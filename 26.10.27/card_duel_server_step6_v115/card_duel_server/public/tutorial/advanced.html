@@ -218,6 +218,8 @@ body.dragging,body.dragging *{cursor:grabbing!important}
 .inspect.show.force{display:block!important;left:50%;right:auto;top:40%;transform:translate(-50%,-50%);width:min(78vw,300px);font-size:14px;z-index:80;box-shadow:0 10px 30px rgba(0,0,0,.6)}
 .tut-reward{margin:10px auto 0;padding:10px 12px;max-width:420px;border:1px solid var(--gold2);border-radius:10px;background:rgba(232,195,106,.08);text-align:center;line-height:1.5}.tut-reward:empty{display:none}
 </style>
+<link rel="stylesheet" href="tut-drama.css">
+<script src="tut-drama.js"></script>
 </head>
 <body>
 <div class="app">
@@ -355,7 +357,7 @@ const CARD_POOL = [
   {type:'spell', name:"등산용 간식", cost:2, school:['자연'], effect:{type:'snack', value:2}},                                         // v32: 다음 턴에만 마나 +2
   {type:'spell', name:"키틴질 껍질", cost:2, school:['자연'], effect:{type:'carapace', value:4}},                                     // v32: 방어도 +4, 내 다음 턴 시작에 +4 더 (속성은 말씀에 없어 자연으로 정함)
   {type:'spell', name:"퇴비 만들기", cost:2, school:['자연'], effect:{type:'compost', value:1}},                                       // v32: 내 하수인 전체에 죽음의 메아리: 카드 1장 뽑기
-  {type:'spell', name:"새로운 경지", cost:3, school:['자연'], effect:{type:'ascend', value:3}},                                       // v35: 최대 마나 +3 (10 초과 가능) 후 빈 마나 수정 1개 (10 상한). 속성은 말씀에 없어 자연으로 정함
+  {type:'spell', name:"새로운 경지", cost:3, school:['자연'], effect:{type:'ascend', value:3}},                                       // v144: 최대 마나 +3 (10 초과 가능, 즉시) 후 빈 마나 수정 1개 (10 상한). 속성은 자연
   {type:'spell', name:"숲의 영혼",   cost:3, school:['자연'], effect:{type:'forestSoul', value:1}},                                   // v35: 내 하수인 전체에 죽음의 메아리: 2/2 나무정령 소환
   {type:'spell', name:"야생의 포효", cost:3, school:['자연'], effect:{type:'roar', value:2}},                                         // v35: 이번 턴 내 하수인 전체 공격력 +2 (영웅은 공격하지 않으므로 하수인만). 속성은 자연으로 정함
   {type:'spell', name:"휘둘러치기", cost:3, school:['자연'], effect:{type:'cleave', value:4, other:1}},                               // v38: 적 하나에 피해 4, 다른 모든 적에게 피해 1 (속성은 자연으로 정함)
@@ -1410,9 +1412,9 @@ const SPELL_FX = {
             spellWorth:(c,view)=> view.me.board.length>=2 && view.me.hand.length<=7 ? 3.5 : 0,
             ruleUse:(view,acts)=> acts.length && view.me.board.length>=3 && view.me.hand.length<=7 ? acts[0] : null },
   // ---- v35 ----
-  ascend: { text:v=>`내 최대 마나가 총 ${v} 증가합니다. 지금 당장은 빈 마나 수정 1개만 얻고, 나머지 ${v-1}는 다음 턴 시작에 더해집니다`, rank:-0.6,
-            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], v=c.effect.value; P.maxMana+=1; P.ascendNext=(P.ascendNext||0)+(v-1);     // v94: 총 +v, 즉시 빈 수정 1개 / 나머지는 다음 턴 시작. 증가는 10 제한 없음
-              ev.push({type:'ascend', seat, amount:1, later:v-1, now:P.maxMana, src}); },
+  ascend: { text:v=>`최대 마나가 ${v} 증가합니다. 빈 마나 수정을 1개 얻습니다`, rank:-0.6,
+            cast:(s,seat,c,target,ev,src)=>{ const P=s.seats[seat], v=c.effect.value; P.maxMana+=v; const b=P.maxMana; addMax(P, 1);     // v144: 최대 마나 +v (10 제한 없음, 즉시) → 빈 마나 수정 1개 (10까지). 둘 다 빈 칸이라 이번 턴 마나는 그대로
+              ev.push({type:'ascend', seat, amount:v, crystal:P.maxMana-b, now:P.maxMana, src}); },
             spellWorth:(c,view)=> view.me.maxMana<=7 ? 4 : 0,
             ruleUse:(view,acts)=> acts.length && view.me.maxMana<=7 ? acts[0] : null },
   forestSoul:{ text:()=>`내 하수인 전체에 "죽음의 메아리: 2/2 나무정령 소환"을 부여한다`, rank:2.8,
@@ -1863,7 +1865,7 @@ const SPELL_TEXT = {
   execute:  v=>`공격력 ${v} 이상인 적 하수인 처치. 보호막 무시`,
   freeze:   ()=>`적 하수인 하나를 얼린다. 다음 턴 공격 불가`,
   bloom:    v=>`이번 턴 마나 ${v} 획득`,
-  ascend:   v=>`최대 마나 총 ${v} 증가. 지금 빈 마나 수정 1개, 나머지 ${v-1}는 다음 턴 시작`,
+  ascend:   v=>`최대 마나 ${v} 증가, 빈 마나 수정 1개`,
   shrink:   v=>`내 덱 하수인의 비용과 공격력이 ${v}만큼 감소`,
   roar:     v=>`이번 턴 내 하수인의 공격력 +${v}`,
   crystal:  v=>`빈 마나 수정 ${v}개 획득`,
@@ -2013,7 +2015,7 @@ function mulliganHand(s, seat, ids){                            // v77 멀리건
 function startTurn(s, seat, ev){
   const P=s.seats[seat];
   s.turn=seat; s.turnNo++;
-  if(P.ascendNext){ P.maxMana+=P.ascendNext; P.ascendNext=0; }   // v94 새로운 경지: 예약된 최대 마나 증가
+  if(P.ascendNext){ P.maxMana+=P.ascendNext; P.ascendNext=0; }   // v94 새로운 경지(옛 방식): 예약된 최대 마나 증가 — v144부터 새로 쌓이지 않음, 옛 저장 판 호환용
   addMax(P, 1);   // 마나는 플레이어별로 따로 관리 (v35: 최대 마나가 10을 넘은 상태면 깎지 않고 그대로)
   const md=P.mods||{};
   P.turns=(P.turns||0)+1;                              // 이 좌석이 진행한 턴 수
@@ -3715,31 +3717,49 @@ const STEPS=[
 const KW2=KW;
 const MOOD={0:'J1',1:'G1'};
 const NAME={J:'제이나',G:'가로쉬'};
+/* 대사: 한 말풍선은 한 문장, 폰 가로 화면에서도 2줄을 넘지 않게 (server/test-tutorial-lines.js 가 검사). 키는 STEPS 의 번호 */
 const DIALOG={
-0:[['G1','스톰윈드의 애송이가 감히 호드의 대족장 앞에 서다니. 체력 10? 웃기는군.'],['J1','신경 쓰지 마세요. 저는 제이나, 오늘 당신의 군사 고문이에요.'],['J1',`이번엔 ${KW}죽음의 메아리${E}·${KW}발견${E}·${KW}동결${E}·${KW}주문 공격력${E}·${KW}탈진${E}을 배워요. 첫 턴 마나는 3, 가로쉬의 체력은 10이에요.`],['J2','안내하는 곳은 노란 테두리로 반짝여요. 따라오세요!']],
-1:[['J1',`먼저 ${KW}죽음의 메아리${E}. 하수인이 <b>쓰러질 때</b> 발동하는 능력이에요. 전투로 죽든 주문으로 죽든 똑같이요.`],['J2','낼 때 한 번 터지는 전투의 함성과 달리 <b>죽을 때</b> 터진다는 게 달라요. 손패의 <b>부정한 알</b>과 <b>유물 수집가</b> 위에 마우스를 올려 읽어 보세요.']],
-2:[['J1','비용 1짜리 <b>부정한 알</b>(0/2)부터 내요. 싸울 순 없지만 쓰러지면 <b>3/3 언데드 닭</b>이 나와요.'],['J2','게다가 알이 살아 있는 동안 <b>내 턴이 끝날 때마다</b> 닭이 점점 커져요. 오래 살릴수록 이득이에요!']],
-3:[['J1','남은 마나 2로 <b>유물 수집가</b>(3/2)! 공격력은 높지만 약해서 쉽게 쓰러져요. 대신 쓰러질 때 <b>손패에서 비용이 가장 높은 주문 한 장을 복사</b>해요.']],
-4:[['J1','마나를 다 썼어요. 턴을 넘기세요.']],
-6:[['J1','가로쉬가 <b>숲 늑대</b>(3/3)와 <b>견습 검사</b>(2/2)를 냈네요. 제 손엔 비용 4짜리 <b>화염구</b>가 있어요.'],['J2','수집가(3/2)로 견습 검사(2/2)를 치면 서로 쓰러져요. 수집가가 죽는 순간을 잘 보세요!']],
-7:[['G1','하수인을 잃고도 웃어? 미친 건가.'],['J1','죽음의 메아리 덕분이에요. <b>화염구</b>가 한 장 복사됐죠? 손패를 확인해 보세요.'],['J2','죽음의 메아리는 <b>상대 하수인에게도</b> 똑같이 있어요. 그쪽을 쓰러뜨리면 상대의 능력이 발동한다는 점도 기억하세요.'],['J1','화염구는 더 좋은 때에 쓸 거예요. 이번엔 그대로 턴을 넘기고 <b>부정한 알</b>이 어떻게 되는지 봐요.']],
-8:[['J1','남은 마나는 이월되지 않지만, 아껴 둘 카드가 있으니 괜찮아요.']],
-10:[['G1','…뭐야, 저 닭은?'],['J1','알이 두 턴을 버텨서 닭이 <b>5/5</b>로 나왔어요! 이 닭은 내 턴이 끝날 때마다 +1/+1씩 커져요.'],['J2','맞아서 죽는 게 오히려 이득인 하수인도 있다는 거죠.']],
-11:[['J1','가로쉬가 방패병(1/4)도 냈네요. 5/5 닭으로 쳐서 쓰러뜨려요!']],
-12:[['J1',`이번엔 ${KW}발견${E}이에요. <b>카드 3장 중 하나를 골라</b> 손패로 가져오는 능력인데, 보통 <b>비용이 줄어든 채로</b> 들어와요.`],['J2','손패의 <b>주문 발견</b>(비용 1)은 "주문 1장 발견, 비용 1 감소"예요. 써 볼까요?']],
-13:[['J1','<b>서리</b>가 들어왔고 비용이 2에서 <b>1</b>로 줄었어요. 고르지 않은 두 장은 사라져요. 후보는 쓸 때마다 달라서 상황에 맞게 고르는 게 핵심이에요.'],['J2','주의! 손패가 <b>10장으로 가득 차 있으면</b> 발견한 카드가 사라져요. 발견 전에 자리를 확인하세요.']],
-14:[['J3',`<b>서리</b>는 적 하수인 하나를 ${KW}동결${E}시켜요. 얼어붙은 하수인은 <b>공격할 수 없고</b>, 얼음은 그 주인의 턴이 끝나면 풀려요.`],['J1','가장 위협적인 <b>숲 늑대</b>(3/3)를 얼려요!']],
-15:[['J1','숲 늑대에 <span class="kw2">얼음</span> 표시와 푸른 빛이 생겼어요. 이제 상대 턴에 공격하려 해도 막혀요.'],['J2','마나가 3 남았지만 그대로 넘겨도 괜찮아요.']],
-16:[['J1','상대 턴에 숲 늑대가 어떻게 되는지 보세요.']],
-18:[['J1','늑대는 얼음 때문에 공격하지 못했고, 들쥐만 영웅을 쳐서 체력 29가 됐어요. 얼음은 상대 턴이 끝나며 풀렸고요.'],['J1',`마나 6을 전부 써서 <b>시프</b>(4/6)를 내요. 시프에는 ${KW}주문 공격력${E}이 있어요.`]],
-19:[['J1',`${KW}주문 공격력 +N${E}은 이 하수인이 있는 동안 <b>내 피해 주문이 N만큼 더 아프게</b> 만들어요. 영웅·하수인 모두에게 적용되고 회복엔 적용되지 않아요.`],['J2','시프는 기본 <b>+1</b>에 <b>이번 게임에 쓴 주문의 속성 종류</b>만큼 더 강해져요. 주문 발견(비전)과 서리(냉기), 2종이라 <b>+3</b>! 내 영웅 아래와 시프 위의 표시를 확인하세요.']],
-20:[['J1','마나를 다 썼어요. 시프의 힘은 다음 턴에 써요.']],
-22:[['J1',`앗, 턴이 시작되면서 영웅이 피해를 입었어요(29 → 28). 내 ${KW}덱이 비었기${E} 때문이에요. 왼쪽 아래 <b>덱 0장</b>을 보세요.`],['J2',`${KW}탈진${E}: 덱이 비었는데 카드를 뽑아야 하면 <b>영웅이 피해</b>를 입어요. <b>1, 2, 3…</b> 계속 커지고 멈출 수 없어요.`]],
-23:[['J1','<b>책벌레</b>의 전투의 함성은 "카드 1장 뽑기"예요. 덱이 비었으니 대신 탈진 피해를 받아요. 이번엔 <b>2</b>! 확인해 봐요.']],
-24:[['G2','크크, 스스로 무덤을 파는군.'],['J1','탈진 피해가 2였어요(28 → 26). 다음엔 3, 4… 이번엔 일부러 덱을 비웠지만, 실전에선 <b>긴 게임</b>이나 <b>카드를 너무 많이 뽑는 효과</b>가 원인이니 덱 장수를 눈여겨보세요.'],['J2','이제 마무리예요. 마나 6, 가로쉬의 체력은 10!']],
-25:[['J1','<b>화염구</b>의 원래 피해는 6이라 체력 10을 못 깎아요. 하지만 지금 시프의 주문 공격력은 <b>+3</b>이고, <b>화염</b> 주문을 처음 쓰는 순간 속성이 3종이 되어 <b>+4</b>가 돼요.'],['J3','6 + 4 = <b>10 피해!</b> 정확히 가로쉬의 체력만큼이에요. 쏴요!']]
+0:[['G3','다시 왔다, 꼬마 마법사!'],['G2','이번엔 체력 10으로 버텨 보시지.'],['J3','지휘관님, 이번엔 고급 전술이에요.'],
+   ['J1',`${KW}죽음의 메아리${E}, ${KW}발견${E}, ${KW}동결${E}…`],['J1',`${KW}주문 공격력${E}, 그리고 ${KW}탈진${E}.`],
+   ['J2','첫 턴 마나는 <b>3</b>, 가로쉬 체력은 <b>10</b>.'],['J1','모르는 카드는 <b>꾹 눌러</b> 확인해요!']],
+1:[['J1',`먼저 ${KW}죽음의 메아리${E}예요.`],['J3','하수인이 <b>쓰러질 때</b> 터지는 능력이에요.'],['J1','전투로 죽든 주문으로 죽든 똑같이요.'],
+   ['J2','<b>부정한 알</b>과 <b>유물 수집가</b>를 꾹 눌러 봐요.']],
+2:[['J1','<b>부정한 알</b>(0/2)부터 내요.'],['J1','싸울 순 없지만, 쓰러지면…'],['J3','<b>3/3 언데드 닭</b>이 튀어나와요!'],
+   ['J2','살아 있는 동안 닭이 점점 커져요.'],['J1','내 턴이 끝날 때마다요.']],
+3:[['J1','남은 마나 2로 <b>유물 수집가</b>(3/2)!'],['J1','세지만 약해서 쉽게 쓰러져요.'],['J3','대신 쓰러질 때 <b>주문 한 장을 복사</b>해요.'],
+   ['J2','손패에서 제일 비싼 주문으로요.']],
+4:[['J1','마나를 다 썼어요. 턴을 넘겨요.']],
+6:[['J3','<b>숲 늑대</b>와 <b>견습 검사</b>가 나왔어요.'],['J1','제 손엔 비용 4 <b>화염구</b>가 있죠.'],
+   ['J1','수집가(3/2)로 검사(2/2)를 치면?'],['J2','둘 다 쓰러져요. 그 순간을 보세요!']],
+7:[['G1','하수인을 잃고도 웃어? 미쳤군.'],['J2','<b>화염구</b>가 한 장 복사됐어요!'],['J1','손패를 확인해 보세요.'],
+   ['J3','상대 하수인에게도 메아리가 있어요.'],['J1','쓰러뜨리면 상대 쪽 능력이 터져요.'],['J1','화염구는 아껴 둘게요.'],['J2','알이 어떻게 되는지 지켜봐요.']],
+8:[['J1','남은 마나는 다음 턴에 안 남아요.'],['J2','그래도 아낄 카드가 있으니 괜찮아요.']],
+10:[['G1','…뭐야, 저 닭은?'],['J2','알이 두 턴을 버텨서 <b>5/5</b> 닭!'],['J1','내 턴이 끝날 때마다 +1/+1씩.'],['J3','맞아 죽는 게 이득인 하수인이죠.']],
+11:[['J1','가로쉬가 방패병(1/4)도 냈네요.'],['J3','5/5 닭으로 쓰러뜨려요!']],
+12:[['J1',`이번엔 ${KW}발견${E}이에요.`],['J1','<b>카드 3장 중 하나</b>를 골라 가져와요.'],['J2','보통 <b>비용이 줄어서</b> 들어와요.'],
+   ['J1','<b>주문 발견</b>: 주문 1장, 비용 -1.'],['J3','써 볼까요?']],
+13:[['J2','<b>서리</b>가 비용 <b>1</b>로 들어왔어요!'],['J1','고르지 않은 두 장은 사라져요.'],['J1','후보는 쓸 때마다 달라져요.'],
+   ['J3','주의! 손패가 <b>10장</b>이면…'],['J3','발견한 카드가 사라져요.']],
+14:[['J3',`<b>서리</b>는 적을 ${KW}동결${E}시켜요.`],['J1','얼어붙은 하수인은 <b>공격 못 해요</b>.'],['J1','얼음은 주인의 턴이 끝나면 풀려요.'],
+   ['J2','<b>숲 늑대</b>(3/3)를 얼려요!']],
+15:[['G1','내 늑대가… 얼어붙었다고?'],['J1','<span class="kw2">얼음</span> 표시와 푸른 빛 보이죠?'],['J3','다음 턴에 공격하려 해도 막혀요.'],['J2','마나 3은 남겨도 괜찮아요.']],
+16:[['J1','늑대가 어떻게 되는지 보세요.']],
+18:[['J2','늑대는 얼어서 꼼짝 못 했어요.'],['J1','들쥐에게만 맞아서 체력 29.'],['J1','얼음은 상대 턴이 끝나며 풀렸어요.'],
+   ['J3','이제 마나 6을 다 써서 <b>시프</b>를!'],['J1',`시프는 ${KW}주문 공격력${E}을 가졌어요.`]],
+19:[['J1',`${KW}주문 공격력 +N${E}이 있으면…`],['J3','피해 주문이 <b>N만큼 더 아파요</b>.'],['J1','영웅에도 하수인에도 적용돼요.'],['J1','회복엔 적용되지 않아요.'],
+   ['J2','시프는 기본 <b>+1</b>이에요.'],['J1','쓴 주문의 속성 종류만큼 더 세져요.'],['J1','비전·냉기 2종이라 지금 <b>+3</b>!'],['J3','시프 위의 표시를 확인하세요.']],
+20:[['J1','마나를 다 썼어요.'],['J3','시프의 힘은 다음 턴에 보여 줄게요.']],
+22:[['J3','앗, 턴 시작에 피해를 입었어요!'],['J1',`내 ${KW}덱이 비었기${E} 때문이에요.`],['J1','오른쪽 아래 <b>덱 0장</b>을 보세요.'],
+   ['J3',`${KW}탈진${E}: 빈 덱에서 뽑으면 피해.`],['J1','<b>1, 2, 3…</b> 계속 커져요.'],['G2','크크, 바닥이 드러났군!']],
+23:[['J1','<b>책벌레</b>는 카드 1장을 뽑게 해요.'],['J3','덱이 비었으니 탈진 피해예요.'],['J2','이번엔 <b>2</b>! 확인해 봐요.']],
+24:[['G2','크크, 스스로 무덤을 파는군.'],['J1','탈진 피해 2. 다음엔 3, 4…'],['J3','실전에선 덱 장수를 늘 보세요.'],
+   ['J1','긴 게임이나 많이 뽑는 효과가 원인이죠.'],['J2','이제 마무리예요!'],['J3','마나 6, 가로쉬 체력 10!']],
+25:[['J1','<b>화염구</b>는 피해 6. 10엔 모자라요.'],['J2','하지만 시프가 있죠.'],['J1','화염 주문을 처음 쓰면 속성 3종.'],
+   ['J3','주문 공격력이 <b>+4</b>가 돼요!'],['J2','6 + 4 = <b>10 피해!</b>'],['J3','정확히 가로쉬 체력만큼. 쏴요!']]
 };
-const ENEMY_TALK=[[['G3','숲 늑대! 견습 검사! 얼라이언스를 짓밟아라!']],[['G3','알 따위, 짓밟아 주마! 방패병, 앞을 막아라!']],[['G1','으윽, 늑대야 왜 안 움직이는 거냐! 비겁한 얼음 마법사 같으니!'],['J3','얼음은 상대 턴이 끝나면 풀려요. 딱 한 턴이죠.']],[['G2','네 덱이 바닥나는 건 시간문제다. 기다려 주지.']]];
+const ENEMY_TALK=[[['G3','숲 늑대! 견습 검사!'],['G3','얼라이언스를 짓밟아라!']],[['G3','알 따위, 짓밟아 주마!'],['G2','방패병, 앞을 막아라!']],
+  [['G1','으윽, 늑대야 왜 안 움직여!'],['G3','비겁한 얼음 마법사 같으니!'],['J3','얼음은 딱 한 턴이에요.']],[['G2','네 덱이 바닥나는 건 시간문제다.']]];
+const WIN_SAY=[['G4','말도 안 돼… 불덩이 하나에…!'],['G4','다음엔 결코 봐주지 않겠다!'],['J2','스톰윈드의 승리예요!'],['J2','고급 전술 완벽해요, 지휘관님.']];
 /* 대화 큐: 말풍선을 하나씩 띄운다 (다음 행동을 하면 남은 대사는 즉시 표시) */
 let Q=[], QT=null;
 function addMsg(l){
@@ -3748,14 +3768,16 @@ function addMsg(l){
   if(c==='D'){ box.appendChild(el('div','msg d','<span>'+txt+'</span>')); }
   else { const w=c[0], d=el('div','msg '+(w==='G'?'g':'j'));
     d.innerHTML=`<img src="${fxSrc(c)}" alt=""><div class="bub"><span class="who">${NAME[w]}</span>${txt}</div>`; box.appendChild(d);
-    MOOD[w==='G'?1:0]=c; document.querySelectorAll(`.hero[data-seat="${w==='G'?1:0}"] .av`).forEach(i=>i.src=fxSrc(c)); }
+    MOOD[w==='G'?1:0]=c; document.querySelectorAll(`.hero[data-seat="${w==='G'?1:0}"] .av`).forEach(i=>i.src=fxSrc(c));
+    if(w==='G' && !flushing) DRAMA.taunt(c,txt); }
   const b=$('#cbody'); b.scrollTop=b.scrollHeight;
 }
 function pump(){ clearTimeout(QT); if(!Q.length) return; const l=Q[0], box=document.querySelector('#cbody .chat');
   if(l[0]!=='D' && box && !box.querySelector('.typing')){ box.appendChild(el('div','msg typing'+(l[0][0]==='G'?' g':''),'<img src="'+fxSrc(l[0])+'" alt=""><div class="bub">•••</div>')); $('#cbody').scrollTop=1e6; }
-  QT=setTimeout(()=>{ addMsg(Q.shift()); pump(); }, l[0]==='D'?60:350+Math.min(800,l[1].length*7)); }
-function say(lines){ Q.push(...lines); pump(); }
-function flushSay(){ clearTimeout(QT); while(Q.length) addMsg(Q.shift()); }
+  QT=setTimeout(()=>{ addMsg(Q.shift()); pump(); }, l[0]==='D'?60:330+Math.min(700,l[1].replace(/<[^>]+>/g,'').length*16)); }
+function say(lines){ Q.push(...DRAMA.split(lines)); pump(); }
+let flushing=false;
+function flushSay(){ clearTimeout(QT); flushing=true; while(Q.length) addMsg(Q.shift()); flushing=false; }
 /* ---------- 상태 ---------- */
 let S, stepIdx=0, sel=null, busy=false, lastHand=new Set();
 const stepNow=()=>STEPS[stepIdx];
@@ -3873,6 +3895,8 @@ function showStep(){
   const visible=STEPS.filter(s=>s.type!=='enemy'&&s.type!=='win');
   $('#cbadge').textContent=`${visible.indexOf(st)+1} / ${visible.length}`;
   const ic=ICON_OF[st.title]; $('#ctitle').innerHTML=(ic?`<img src="${fxSrc(ic)}" alt="" style="width:40px;height:40px;object-fit:contain;vertical-align:middle;margin-right:8px">`:'')+st.title; { const idx=STEPS.indexOf(st); say([['D',st.title],...(DIALOG[idx]||[['J1',st.body]])]); }
+  DRAMA.chapter(st.ch,CHAPS.length,CHAPS[st.ch]);
+  if(st.type==='play'&&STEPS.indexOf(st)===STEPS.length-2) DRAMA.big('결정타!','불꽃이여, 성문을 지켜라',{shake:true});
   const task=$('#ctask'); if(st.task){task.innerHTML='<b>해 보기</b> · '+st.task; task.style.display='';} else task.style.display='none';
   $('#cerr').className='err'; $('#cnudge').className='nudge';
   const nb=$('#cnext'); nb.style.display=st.type==='info'?'':'none'; nb.disabled=busy;
@@ -4025,7 +4049,7 @@ async function playEvents(evs,rects,clones,playedCard,actor){
       const k=keyOf(e.target), p=center(rects[k]||rectOf(k));
       const spellName=e.src&&e.src.spell?e.src.name:null;
       if(e.absorbed){ fxImg('fx_a_shield.png',p,130); floatTxt('보호막!','sh',p); }
-      else if(e.amount>0){ if(spellName&&FX_SPELL[spellName])fxImg(FX_SPELL[spellName],p,170); else fxImg('fx_a_slash.png',p,110); floatTxt('-'+e.amount,'dmg',p); }
+      else if(e.amount>0){ if(spellName&&FX_SPELL[spellName])fxImg(FX_SPELL[spellName],p,170); else fxImg('fx_a_slash.png',p,110); floatTxt('-'+e.amount,'dmg',p); if(e.target.kind==='hero') DRAMA.impact(e.amount>=3?2:1); else if(spellName) DRAMA.impact(1); }
       await sleep(e.absorbed||e.amount>0?420:0);
     }
     else if(e.type==='heal'){
@@ -4049,13 +4073,13 @@ async function playEvents(evs,rects,clones,playedCard,actor){
     else if(e.type==='generated'){
       if(e.seat===0){ const p=center(rectOf('h:0')); floatTxt(e.name+' 복사!','txt',{x:p.x+60,y:p.y-30}); await sleep(450); }
     }
-    else if(e.type==='turn_start'){ if(e.seat===0){ banner('내 턴'); await sleep(500);} }
+    else if(e.type==='turn_start'){ if(e.seat===0){ DRAMA.turn(false,fxSrc(MOOD[0]),'제이나의 턴'); await sleep(600);} }
   }
 }
 
 /* ---------- 상대 턴(고정 대본) ---------- */
 async function runEnemy(n){
-  busy=true; render(); banner('상대 턴'); await sleep(1000);
+  busy=true; render(); DRAMA.turn(true,fxSrc(MOOD[1]),'가로쉬의 턴'); await sleep(1100);
   for(const act of ENEMY_TURNS[n]){
     if(act.play){ const c=S.seats[1].hand.find(x=>x.name===act.play); await perform({type:'PLAY_CARD',cardId:c.id,target:null},1); }
     else if(act.blocked){
@@ -4117,12 +4141,12 @@ function paintReward(){
 }
 function showWin(){
   reportDone();
-  flushSay(); MOOD[1]='G4'; document.querySelectorAll('.hero[data-seat="1"] .av').forEach(i=>i.src=fxSrc('G4')); say([['G4','말도 안 돼… 내가… 스톰윈드 따위에게…!'],['J2','스톰윈드의 승리예요! 수고했어요, 지휘관님.']]);
+  flushSay(); MOOD[1]='G4'; document.querySelectorAll('.hero[data-seat="1"] .av').forEach(i=>i.src=fxSrc('G4')); say(WIN_SAY); DRAMA.big('승리!','고급 전술 완료',{shake:true});
   renderChap(); $('#ctitle').textContent='승리!';  $('#ctask').style.display='none'; $('#cbadge').textContent='완료'; $('#cnext').style.display='none';
   setTimeout(()=>{ modal(`<div class="vict"><img src="${fxSrc('fx_victory.png')}" alt=""><h3>고급 튜토리얼 완료!</h3>
   <ul><li><b>죽음의 메아리</b>: 쓰러질 때 발동. 맞아 죽는 게 이득인 하수인도 있습니다.</li><li><b>발견</b>: 3장 중 1장을 골라 손패로, 보통 비용이 줄어듭니다. 손패가 가득 차면 사라집니다.</li><li><b>동결</b>: 얼어붙은 하수인은 그 주인의 턴이 끝날 때까지 공격하지 못합니다.</li><li><b>주문 공격력</b>: 내 피해 주문이 N만큼 강해집니다. 그래서 화염구 6 + 4 = 10!</li><li><b>탈진</b>: 덱이 비면 카드를 뽑을 때마다 1, 2, 3… 피해가 커집니다.</li></ul>
   <div id="tutReward" class="tut-reward"></div>
-  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn" style="flex:none" onclick="closeModal();init()">다시 하기</button><a class="cbtn" style="flex:none;text-decoration:none" href="part1.html">3부 · 실전 기본 ▶</a></div></div>`); paintReward(); },900);
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn" style="flex:none" onclick="closeModal();init()">다시 하기</button><a class="cbtn" style="flex:none;text-decoration:none" href="part1.html">3부 · 실전 기본 ▶</a></div></div>`); paintReward(); }, 1700);
 }
 
 
@@ -4222,8 +4246,10 @@ function lookCheck(c){
 function init(){
   STEPS.forEach(x=>{ delete x._seen; });
   closeModal(); flushSay(); Q=[]; MOOD[0]='J1'; MOOD[1]='G1'; $('#cbody').innerHTML='<div class="chat"></div>'; S=buildState(); stepIdx=0; sel=null; busy=false; lastHand=new Set(S.seats[0].hand.map(c=>c.id));
-  document.querySelectorAll('.fxl>*').forEach(e=>e.remove());
-  showStep();
+  document.querySelectorAll('.fxl>*,.dr-taunt,.dr-chap,.dr-big,.dr-turn').forEach(e=>e.remove());
+  DRAMA.resetChapters(); render();
+  DRAMA.intro({left:{img:fxSrc('J1'),name:'제이나',sub:'스톰윈드의 대마법사'},right:{img:fxSrc('G3'),name:'가로쉬',sub:'호드의 대족장'},
+    title:'고급 튜토리얼 · 대족장의 반격',sub:'화면을 누르면 바로 시작'}).then(showStep);
 }
 window.closeModal=closeModal; window.init=init;
 window.T={get S(){return S},get busy(){return busy},get stepIdx(){return stepIdx},STEPS,canAttack};

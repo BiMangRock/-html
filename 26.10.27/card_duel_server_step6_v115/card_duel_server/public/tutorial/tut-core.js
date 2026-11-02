@@ -1,4 +1,4 @@
-// tut-core.js (v140) — 3·4부 튜토리얼 공용 진행기 (화면 · 입력 · 대화 · 연출)
+// tut-core.js (v143) — 3·4부 튜토리얼 공용 진행기 (화면 · 입력 · 대화 · 연출)
 //  - 기본·고급 튜토리얼(index.html · advanced.html)의 진행 방식(제이나와 가로쉬의 대화, 노란 테두리 안내, 끌어서 내기)을 그대로 따른다
 //  - 규칙은 실제 게임 엔진(/js/engine.js)이 처리한다. 대본은 window.TUT (part1.js · part2.js), 대본 도우미는 window.TL (tut-logic.js)
 //  - 새로 다루는 것: 멀리건 창 · 영웅 능력 버튼 · 방어도 · 하수인 놓을 자리 · 선택/발견 창 · 막히는 상대 행동(모면·은신) · 과부하 잠금 표시
@@ -31,16 +31,18 @@
       const w = c[0], d = el('div', 'msg ' + (w === 'G' ? 'g' : 'j'));
       d.innerHTML = `<img src="${face(c)}" alt=""><div class="bub"><span class="who">${NAME[w]}</span>${txt}</div>`; box.appendChild(d);
       MOOD[w === 'G' ? 1 : 0] = c; document.querySelectorAll(`.hero[data-seat="${w === 'G' ? 1 : 0}"] .av`).forEach(i => { i.src = face(c); });
+      if (w === 'G' && !flushing) DRAMA.taunt(c, txt);
     }
     const b = $('#cbody'); b.scrollTop = b.scrollHeight;
   }
   function pump() {
     clearTimeout(QT); if (!Q.length) return; const l = Q[0], box = $('#cbody .chat');
     if (l[0] !== 'D' && box && !box.querySelector('.typing')) { box.appendChild(el('div', 'msg typing' + (l[0][0] === 'G' ? ' g' : ''), '<img src="' + face(l[0]) + '" alt=""><div class="bub">•••</div>')); $('#cbody').scrollTop = 1e6; }
-    QT = setTimeout(() => { addMsg(Q.shift()); pump(); }, l[0] === 'D' ? 60 : 350 + Math.min(800, l[1].replace(/<[^>]+>/g, '').length * 7));
+    QT = setTimeout(() => { addMsg(Q.shift()); pump(); }, l[0] === 'D' ? 60 : 330 + Math.min(700, l[1].replace(/<[^>]+>/g, '').length * 16));
   }
-  const say = lines => { Q.push(...(lines || [])); pump(); };
-  function flushSay() { clearTimeout(QT); while (Q.length) addMsg(Q.shift()); }
+  const say = lines => { Q.push(...DRAMA.split(lines || [])); pump(); };   // 한 말풍선 = 한 문장
+  let flushing = false;
+  function flushSay() { clearTimeout(QT); flushing = true; while (Q.length) addMsg(Q.shift()); flushing = false; }
 
   /* ---------- 카드 표시 ---------- */
   const KWS = [['taunt', '도발'], ['shield', '보호막'], ['elusive', '모면'], ['lifesteal', '생명력 흡수'], ['revive', '환생'], ['stealth', '은신'], ['poison', '독성'], ['windfury', '질풍']];
@@ -77,7 +79,14 @@
     d.onmouseenter = () => inspect(m); d.onmouseleave = () => inspect(null);
     return d;
   }
+  function inspectPower(seat, force) {
+    const id = S.seats[seat].heroPower, h = id ? heroPowerInfo(id) : null, b = $('#inspect'); if (!h) return;
+    b.innerHTML = `<b>${h.icon} ${h.name}</b><div class="s">${seat === 0 ? '내' : '상대'} 영웅 능력 · 비용 ${h.cost} · 턴마다 한 번</div>${h.text}`;
+    b.classList.add('show'); b.classList.toggle('force', !!force);
+    lookCheck('power');
+  }
   function inspect(c, force) {
+    if (c) lookCheck(c.name);
     const b = $('#inspect'); if (!c) { b.classList.remove('show', 'force'); return; }
     const isM = c.type !== 'spell';
     b.innerHTML = `<b>${c.name}</b><div class="s">${isM ? `하수인 · 공격력 ${c.atk} / 체력 ${c.hp}` : '주문'} · 비용 ${c.cost}</div>${cardText(c) || '<span style="color:var(--dim)">특수 능력 없음</span>'}${runeTag(c)}`;
@@ -101,6 +110,7 @@
     b.innerHTML = `<span class="ic">${h.icon}</span><span class="tx"><b>${h.name}</b><small>${P.powerUsed ? '이번 턴 사용함' : `비용 ${h.cost} · ${h.text}`}</small></span>`;
     b.disabled = !powerReady() && !(sel && sel.kind === 'power');
     b.onclick = ev => { ev.stopPropagation(); onPower(); };
+    b.onmouseenter = () => inspectPower(0); b.onmouseleave = () => inspect(null);
     return b;
   }
   function manaRow(seat) {
@@ -153,6 +163,12 @@
     } else if (st.type === 'power') {
       if (sel && sel.kind === 'power') add(tgtSel(st.target)); else add('#hpBtn');
     } else if (st.type === 'end') add('#endBtn');
+    else if (st.type === 'look') add(st.look === 'power' ? '#hpBtn' : `#hand .hc[data-name="${st.look}"],.mn[data-name="${st.look}"]`);
+  }
+  // 설명 보기 단계: 안내한 카드(또는 영웅 능력)의 설명 창을 띄우면 다음으로
+  function lookCheck(what) {
+    const st = stepNow(); if (!st || st.type !== 'look' || busy || st._seen || what !== st.look) return;
+    st._seen = true; setTimeout(() => { if (stepNow() === st) advance(); }, 1400);
   }
 
   /* ---------- 코치 패널 ---------- */
@@ -170,6 +186,8 @@
     $('#cbadge').textContent = `${visibleSteps().indexOf(st) + 1} / ${visibleSteps().length}`;
     $('#ctitle').textContent = st.title;
     say([['D', st.title], ...(st.say || [])]);
+    DRAMA.chapter(st.ch, T.chaps.length, T.chaps[st.ch]);
+    if (st.finale) DRAMA.big(st.finale, st.finaleSub || '', { shake: true });
     const task = $('#ctask'); if (st.task) { task.innerHTML = '<b>해 보기</b> · ' + st.task; task.style.display = ''; } else task.style.display = 'none';
     $('#cerr').className = 'err'; $('#cnudge').className = 'nudge';
     const nb = $('#cnext'); nb.style.display = st.type === 'info' ? '' : 'none'; nb.disabled = busy;
@@ -275,7 +293,7 @@
       if (a.type !== 'PLAY_CARD') return false;
       const c = P.hand.find(x => x.id === a.cardId);
       if (!c || c.name !== st.card || !TL.sameTarget(S, st.target || null, a.target || null)) return false;
-      if (st.pos != null && P.board.length && a.pos !== st.pos) return 'pos';
+      if (st.pos != null && P.board.length && a.pos !== st.pos) return 'pos';   // 자리를 정하지 않은 단계는 아무 자리나 된다
       return true;
     }
     if (st.type === 'attack') { if (a.type !== 'ATTACK') return false; const m = findMin(0, a.attackerId); return !!m && m.name === st.attacker && TL.sameTarget(S, st.target, a.target); }
@@ -359,7 +377,9 @@
       } else if (e.type === 'damage') {
         const k = keyOf(e.target), p = center(rects[k] || rectOf(k)), sp = e.src && e.src.spell ? e.src.name : null;
         if (e.absorbed) { fxImg('fx_a_shield.png', p, 130); floatTxt('보호막!', 'sh', p); }
-        else if (e.amount > 0) { if (sp && FX_SPELL[sp]) fxImg(FX_SPELL[sp], p, 170); else fxImg('fx_a_slash.png', p, 110); floatTxt('-' + e.amount, 'dmg', p); }
+        else if (e.amount > 0) { if (sp && FX_SPELL[sp]) fxImg(FX_SPELL[sp], p, 170); else fxImg('fx_a_slash.png', p, 110); floatTxt('-' + e.amount, 'dmg', p);
+          if (e.target.kind === 'hero') DRAMA.impact(e.amount >= 3 ? 2 : 1); else if (sp) DRAMA.impact(1); }
+        else if (e.armorHit && e.target.kind === 'hero') DRAMA.impact(1);
         if (e.armorHit) floatTxt('🛡-' + e.armorHit, 'sh', { x: p.x, y: p.y + 34 });
         await sleep(e.absorbed || e.amount > 0 ? 400 : 0);
       } else if (e.type === 'heal') {
@@ -380,14 +400,14 @@
       else if (e.type === 'mana' && e.seat === 0) { const p = at('h:0'); floatTxt('마나 +' + (e.amount || e.value || ''), 'txt', { x: p.x + 60, y: p.y - 30 }); await sleep(420); }
       else if ((e.type === 'generated' || e.type === 'twin' || e.type === 'echoCopy' || e.type === 'echo') && e.seat === 0) { const p = at('h:0'); floatTxt((e.name || '카드') + ' 복사본!', 'txt', { x: p.x + 60, y: p.y - 30 }); await sleep(450); }
       else if (e.type === 'heroPower') { const p = at(`h:${e.seat}`); bcb((e.name || '영웅 능력') + '!', '', { x: p.x, y: p.y - 50 }); await sleep(450); }
-      else if (e.type === 'turn_start' && e.seat === 0) { banner('내 턴'); await sleep(500); }
+      else if (e.type === 'turn_start' && e.seat === 0) { DRAMA.turn(false, face(MOOD[0]), '제이나의 턴'); await sleep(600); }
     }
   }
 
   /* ---------- 상대 턴 (고정 대본) ---------- */
   async function runEnemy(n) {
     const turn = T.enemyTurns[n];
-    busy = enemyRun = true; render(); banner('상대 턴'); await sleep(1000);
+    busy = enemyRun = true; render(); DRAMA.turn(true, face(MOOD[1]), '가로쉬의 턴'); await sleep(1100);
     for (const act of turn.acts) {
       const a = TL.enemyAction(S, act);
       if (TL.isBlocked(act)) {
@@ -429,7 +449,7 @@
       : '<small>완료 기록 저장 중…</small>';
   }
   function showWin() {
-    reportDone(); flushSay(); MOOD[1] = 'G4'; say(T.win.say);
+    reportDone(); flushSay(); MOOD[1] = 'G4'; say(T.win.say); DRAMA.big('승리!', T.win.big || '', { shake: true });
     renderChap(); $('#ctitle').textContent = '승리!'; $('#ctask').style.display = 'none'; $('#cbadge').textContent = '완료'; $('#cnext').style.display = 'none';
     const next = T.next ? (T.next.menuTour ? `<a class="cbtn" style="flex:none;text-decoration:none" href="/#tour">${T.next.name} ▶</a>` : `<a class="cbtn" style="flex:none;text-decoration:none" href="${T.next.url}">${T.next.name} ▶</a>`) : '';
     setTimeout(() => {
@@ -437,7 +457,7 @@
         <div id="tutReward" class="tut-reward"></div>
         <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap"><button class="cbtn alt" style="flex:none" onclick="closeModal()">전장 보기</button><button class="cbtn alt" style="flex:none" onclick="document.getElementById('gloss').click()">규칙 도감</button><button class="cbtn alt" style="flex:none" onclick="closeModal();TUTCORE.init()">다시 하기</button>${next}</div></div>`);
       paintReward();
-    }, 900);
+    }, 1700);
   }
   function modal(html) { $('#modal').innerHTML = html; $('#over').classList.add('show'); }
   function closeModal() { $('#over').classList.remove('show'); }
@@ -458,7 +478,10 @@
       eat = 0; clearTimeout(lpT); lpAt = null;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const t = e.target; if (!t.closest || t.closest('.disc') || t.closest('.over')) return;
-      if (e.pointerType !== 'mouse') { const c = cardAt(t); if (c) { lpAt = { x: e.clientX, y: e.clientY }; lpT = setTimeout(() => { lpOn = true; cancel(); inspect(c, true); }, 430); } }
+      if (e.pointerType !== 'mouse') {
+        const c = cardAt(t), hp = t.closest('#hpBtn');
+        if (c || hp) { lpAt = { x: e.clientX, y: e.clientY }; lpT = setTimeout(() => { lpOn = true; cancel(); if (hp) inspectPower(0, true); else inspect(c, true); }, 430); }
+      }
       if (busy || S.over || S.turn !== 0 || st) return;
       const hc = t.closest('#hand .hc'), mn = t.closest('.mn[data-seat="0"]'), pw = t.closest('#hpBtn');
       if (hc) { const c = handOf(Number(hc.dataset.id)); if (c) st = { kind: 'hand', c, x0: e.clientX, y0: e.clientY, pid: e.pointerId }; }
@@ -474,7 +497,10 @@
       const src = document.querySelector(`#hand .hc[data-id="${c.id}"]`); if (!src) { st.dead = true; return; }
       const r = src.getBoundingClientRect(), g = src.cloneNode(true);
       g.classList.add('drag-float'); g.classList.remove('hl', 'new', 'picked'); g.style.width = r.width + 'px'; g.style.height = r.height + 'px';
-      document.body.appendChild(g); st.float = g; st.fw = r.width; st.fh = r.height; src.classList.add('dragging');
+      document.body.appendChild(g); st.float = g; st.fw = r.width; st.fh = r.height;
+      const stp = stepNow();
+      if (c.type === 'minion' && S.seats[0].board.length && stp && stp.type === 'play' && stp.card === c.name && effCost(S.seats[0], c) <= S.seats[0].mana) { sel = { kind: 'place', card: c }; render(); st.place = true; }
+      const s2 = document.querySelector(`#hand .hc[data-id="${c.id}"]`); if (s2) s2.classList.add('dragging');
     }
     const overField = (x, y) => { const s = $('#stage').getBoundingClientRect(), h = $('#hand').getBoundingClientRect(); return x >= s.left && x <= s.right && y >= s.top && y <= s.bottom && !(y >= h.top - 4 && x >= h.left && x <= h.right); };
     const dropPos = x => { const L = [...document.querySelectorAll('#mBoard .mn')]; let p = 0; L.forEach(m => { const r = m.getBoundingClientRect(); if (x > r.left + r.width / 2) p++; }); return p; };
@@ -486,7 +512,8 @@
       e.preventDefault();
       if (st.kind !== 'hand' || st.aim) { arrow(e.clientX, e.clientY); return; }
       st.float.style.transform = `translate(${e.clientX - st.fw / 2}px,${e.clientY - st.fh * 0.6}px) rotate(-4deg) scale(1.05)`;
-      st.float.classList.toggle('drop-ok', overField(e.clientX, e.clientY));
+      const okF = overField(e.clientX, e.clientY); st.float.classList.toggle('drop-ok', okF);
+      if (st.place) { const p = okF ? dropPos(e.clientX) : -1; document.querySelectorAll('#mBoard .gap').forEach(g => g.classList.toggle('live', Number(g.dataset.pos) === p)); }
     }
     function clear() { if (st && st.float) st.float.remove(); document.querySelectorAll('.hc.dragging').forEach(x => x.classList.remove('dragging')); svg.style.display = 'none'; document.body.classList.remove('dragging'); st = null; }
     function up(e) {
@@ -504,9 +531,8 @@
         else if (t) return aimAt(t);
         sel = null; render(); return;
       }
-      if (!overField(e.clientX, e.clientY)) return;
-      const stp = stepNow();
-      if (s.c.type === 'minion' && stp && stp.type === 'play' && stp.pos != null && S.seats[0].board.length && s.c.name === stp.card) return dispatch({ type: 'PLAY_CARD', cardId: s.c.id, target: null, pos: dropPos(e.clientX) });
+      if (!overField(e.clientX, e.clientY)) { if (s.place) { sel = null; render(); } return; }
+      if (s.place && sel && sel.kind === 'place' && sel.card.id === s.c.id) return dispatch({ type: 'PLAY_CARD', cardId: s.c.id, target: null, pos: dropPos(e.clientX) });
       onHand(s.c);
     }
     function cancel() { if (!st) return; const s = st; clear(); if (s.on && !s.dead) { sel = null; render(); } }
@@ -526,7 +552,12 @@
     S = T.buildState(ENG, TL); stepIdx = 0; sel = null; busy = false; lastHand = new Set(S.seats[0].hand.map(c => c.id));
     document.querySelectorAll('#fxl>*').forEach(e => e.remove());
     $('#ttl').textContent = T.title;
-    showStep();
+    T.steps.forEach(x => { delete x._seen; });
+    document.querySelectorAll('.dr-taunt,.dr-chap,.dr-big,.dr-turn').forEach(e => e.remove());
+    DRAMA.resetChapters(); render();
+    const io = T.intro || {};
+    DRAMA.intro({ left: { img: face('J1'), name: '제이나', sub: '스톰윈드의 대마법사' }, right: { img: face(io.foe || 'G3'), name: '가로쉬', sub: '호드의 대족장' },
+      title: io.title || T.title, sub: io.sub || '화면을 누르면 바로 시작' }).then(showStep);
   }
   window.closeModal = closeModal;
   window.TUTCORE = { init, get S() { return S; }, get stepIdx() { return stepIdx; }, get busy() { return busy; }, showWin };
