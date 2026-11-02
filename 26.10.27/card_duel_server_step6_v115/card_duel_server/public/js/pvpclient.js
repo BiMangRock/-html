@@ -273,7 +273,7 @@ const PvpClient = (() => {
       return;
     }
     if (r.status === 409) { ui.busy = false; resync(); return; }            // 내 화면이 낡았음 → 최신 상태를 다시 받는다
-    logLine('⚠ ' + ((r.data && r.data.error) || '행동을 처리하지 못했어요.'));
+    { const msg = (r.data && r.data.error) || '행동을 처리하지 못했어요.'; if (typeof warn === 'function') warn(msg); else logLine('⚠ ' + msg); }   // v145 경고창
     ui.busy = false;
   }
 

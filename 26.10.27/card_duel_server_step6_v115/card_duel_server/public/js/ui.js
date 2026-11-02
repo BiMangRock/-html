@@ -534,7 +534,7 @@ async function playerAction(action){
   ui.busy=true; ui.selected=null; ui.pending=null; ui.place=null; stopArrow();
   if(game && game.mode==='pvp'){ await PvpClient.act(action); render(); return; }   // 유저 대전: 판은 서버가 진행한다 → 행동만 보내고, 결과·연출은 서버 메시지로 받는다
   const r=await perform(MY, action);
-  if(!r.ok){ logLine('⚠ '+r.error); ui.busy=false; render(); return; }
+  if(!r.ok){ ui.busy=false; warn(r.error); render(); return; }   // v145
   if(!Host.state.over && Host.state.turn===OPP) await runOpponentTurn();
   if(Host.state.over) finishGame();
   ui.busy=false; render();
@@ -605,11 +605,12 @@ async function runOpponentTurn(){
 
 // ---------- 입력 → 행동 ----------
 function playCard(c){
+  if(!ui.busy && !view.over && view.turn!==MY && !watching()){ warn('지금은 상대의 턴입니다.'); return; }   // v145
   if(ui.busy || view.turn!==MY || view.over) return;
-  if(view.pending){ logLine('먼저 선택을 마쳐야 합니다.'); return; }
+  if(view.pending){ warn('먼저 선택을 마쳐야 합니다.'); return; }
   const entries=view.legal.filter(a=>a.type==='PLAY_CARD' && a.cardId===c.id);
   if(!entries.length){
-    logLine(c.lifeCost ? (view.me.hp<=c.cost ? '체력이 부족합니다.' : '지금은 낼 수 없는 카드입니다.') : c.cost>view.me.mana ? '마나가 부족합니다.' : c.type==='spell' ? '이 주문을 쓸 대상이 없습니다.' : view.me.board.length>=CONFIG.MAX_BOARD ? '전장이 가득 찼습니다.' : '지금은 낼 수 없는 카드입니다.');
+    warn(c.lifeCost ? (view.me.hp<=c.cost ? '체력이 부족합니다.' : '지금은 낼 수 없는 카드입니다.') : c.cost>view.me.mana ? '마나가 부족합니다.' : c.type==='spell' ? '이 주문을 쓸 대상이 없습니다.' : view.me.board.length>=CONFIG.MAX_BOARD ? '전장이 가득 찼습니다.' : '지금은 낼 수 없는 카드입니다.');
     return;
   }
   ui.selected=null; ui.place=null; stopArrow();
@@ -643,6 +644,99 @@ function toast(text, kind){                          // 화면 위쪽에 잠깐 
   let box=$('toastBox'); if(!box){ box=document.createElement('div'); box.id='toastBox'; document.body.appendChild(box); }
   const t=document.createElement('div'); t.className='toast'+(kind?' '+kind:''); t.textContent=text; box.appendChild(t);
   setTimeout(()=>t.classList.add('out'), 3200); setTimeout(()=>t.remove(), 3800);
+}
+
+// ---------- v145 경고창 (튜토리얼처럼 화면 가운데 아래에 빨간 창) ----------
+//  할 수 없는 행동을 하면 이유를 전투 기록에도 남기고, 화면에도 크게 띄운다. 같은 문구를 연달아 누르면 창을 다시 흔들기만 한다.
+//  opt.flash: 'taunt' → 상대 도발 하수인을 잠깐 깜빡인다
+const TAUNT_MSG='상대 도발 하수인을 먼저 공격해야 합니다.';
+const watching=()=>!!(game && (game.spectate || game.replay));
+function warn(msg, opt){
+  if(!msg) return;
+  logLine('⚠ '+msg);
+  let w=$('warnToast'); if(!w){ w=document.createElement('div'); w.id='warnToast'; document.body.appendChild(w); }
+  w.textContent='⚠ '+msg; w.classList.remove('show'); void w.offsetWidth; w.classList.add('show');
+  if((opt && opt.flash)==='taunt' || msg===TAUNT_MSG) flashTaunts();
+}
+function flashTaunts(){
+  zoneEl(OPP).querySelectorAll('.card.taunt').forEach(el=>{ el.classList.remove('warn-flash'); void el.offsetWidth; el.classList.add('warn-flash'); setTimeout(()=>el.classList.remove('warn-flash'), 1200); });
+}
+// 공격할 수 없는 이유 (engine.js validate 의 ATTACK · HERO_ATTACK 순서를 그대로 따른다). t 가 없으면 공격하는 쪽의 이유만 본다
+function minionAtkReason(m){
+  const P=view.me;
+  if(m.summoned && !m.charge && !m.rush) return '소환된 턴에는 공격할 수 없습니다.';
+  if(m.atk<=0) return '공격력이 0이라 공격할 수 없습니다.';
+  if(m.attacked) return '이번 턴에 이미 공격했습니다.';
+  if(m.frozen) return '얼어 있어 이번 턴에는 공격할 수 없습니다.';
+  if(m.cantAttack) return '이 하수인은 공격할 수 없습니다.';
+  if(m.resting) return '쪽잠 중이라 이번 턴에는 공격할 수 없습니다.';
+  if(m.stunned) return '기절해 있어 공격할 수 없습니다.';
+  if(m.confused) return '혼란 상태라 조종할 수 없습니다.';
+  if(m.needArmor && (P.armor||0)<m.needArmor) return `방어도가 ${m.needArmor} 이상일 때에만 공격할 수 있습니다.`;
+  return null;
+}
+function heroAtkReason(){
+  const P=view.me;
+  if(!(P.heroAtk>0)) return '영웅의 공격력이 없습니다.';
+  if(P.heroFrozen) return '영웅이 이번 턴에는 행동할 수 없습니다.';
+  if(P.heroAttacked) return '영웅은 이번 턴에 이미 공격했습니다.';
+  return null;
+}
+function attackReason(sel, t){
+  if(view.turn!==MY) return '지금은 상대의 턴입니다.';
+  const P=view.me, O=view.opp; let m=null;
+  if(sel==='hero'){ const r=heroAtkReason(); if(r) return r; }
+  else { m=P.board.find(x=>x.id===sel); if(!m) return null; const r=minionAtkReason(m); if(r) return r; }
+  if(!t) return null;
+  if(t.seat!==OPP) return '아군은 공격할 수 없습니다.';
+  const taunts=P.board.some(x=>x.ignoreTaunt && x.hp>0) ? [] : O.board.filter(x=>x.taunt && !x.stealth);
+  if(t.kind==='hero'){
+    if(m && m.summoned && !m.charge) return '속공 하수인은 낸 턴에 영웅을 공격할 수 없습니다.';
+    if(taunts.length) return TAUNT_MSG;
+  } else {
+    const d=O.board.find(x=>x.id===t.id);
+    if(d && d.stealth) return '은신한 하수인은 공격할 수 없습니다.';
+    if(d && taunts.length && !d.taunt) return TAUNT_MSG;
+  }
+  return '공격할 수 없습니다.';
+}
+// 대상 고르기(주문·영웅 능력·전투의 함성) 중 고를 수 없는 대상을 눌렀을 때의 이유
+function targetReason(t){
+  if(!t || (t.kind!=='minion' && t.kind!=='hero')) return null;
+  if(t.kind==='minion'){
+    const m=(t.seat===MY ? view.me.board : view.opp.board).find(x=>x.id===t.id);
+    if(m){
+      if(t.seat===OPP && m.stealth) return '은신한 하수인은 대상으로 정할 수 없습니다.';
+      if(t.seat===OPP && m.airpods) return '노이즈 캔슬링 중이라 대상으로 정할 수 없습니다.';
+      if(m.elusive) return '모면: 주문과 영웅 능력의 대상이 될 수 없습니다.';
+    }
+  }
+  return '그 대상은 고를 수 없습니다.';
+}
+
+// ---------- v145 턴 종료 확인 · 내 턴 시작 알림 ----------
+const EndConfirm={ KEY:'cardDuel.endConfirm.v145',
+  get(){ try{ return localStorage.getItem(this.KEY)!=='off'; }catch(_){ return true; } },
+  set(on){ try{ localStorage.setItem(this.KEY, on?'on':'off'); }catch(_){} } };
+let endTurnTimer=null;
+function resetEndTurnBtn(){
+  clearTimeout(endTurnTimer); endTurnTimer=null;
+  const b=$('endTurnBtn'); if(b){ b.textContent='턴 종료'; b.classList.remove('armed'); }
+}
+function leftoverActions(){                             // 아직 할 수 있는 행동 (공격할 수 있는 캐릭터 수 · 낼 수 있는 카드 수 · 영웅 능력)
+  const L=view.legal||[];
+  const atk=new Set(L.filter(a=>a.type==='ATTACK').map(a=>a.attackerId)).size + (L.some(a=>a.type==='HERO_ATTACK')?1:0);
+  const cards=new Set(L.filter(a=>a.type==='PLAY_CARD').map(a=>a.cardId)).size;
+  const power=L.some(a=>a.type==='HERO_POWER');
+  const parts=[]; if(atk) parts.push(`공격 ${atk}`); if(cards) parts.push(`낼 수 있는 카드 ${cards}장`); if(power) parts.push('영웅 능력');
+  return parts;
+}
+function turnNotices(){                                  // 내 턴이 시작될 때 한 번: 손패 가득 · 덱 바닥 예고
+  if(!view || view.over || view.turn!==MY || watching()) return;
+  const P=view.me, max=typeof handMax==='function' ? handMax(P) : CONFIG.MAX_HAND;
+  if(P.hand.length>=max) toast(`✋ 손패가 가득 찼습니다 (${P.hand.length}/${max}) — 지금 카드를 더 뽑으면 그 카드는 소멸합니다.`);
+  if(P.deckCount===0) toast(`💀 덱이 비었습니다! 이제 카드를 뽑을 때마다 탈진 피해를 받습니다 (다음 ${(P.fatigue||0)+1}).`);
+  else if(P.deckCount<=3) toast(`📦 덱이 ${P.deckCount}장 남았습니다. 다 떨어지면 탈진 피해를 받습니다.`);
 }
 
 // ---------- v132 일일 퀘스트 화면 ----------
@@ -868,12 +962,13 @@ function renderPower(id, hp, usable, selected){
 }
 function usePower(e){
   if(e) e.stopPropagation();
+  if(!ui.busy && view && !view.over && view.turn!==MY && !watching()){ warn('지금은 상대의 턴입니다.'); return; }   // v145
   if(ui.busy || view.turn!==MY || view.over) return;
   if(ui.pending && ui.pending.cardId===-2){ cancelPending(); return; }   // 한 번 더 누르면 취소
-  if(view.pending){ logLine('먼저 선택을 마쳐야 합니다.'); return; }
+  if(view.pending){ warn('먼저 선택을 마쳐야 합니다.'); return; }
   const hp=view.me.heroPower; if(!hp) return;
   const entries=view.legal.filter(a=>a.type==='HERO_POWER');
-  if(!entries.length){ logLine(hp.used ? '영웅 능력은 턴마다 한 번만 쓸 수 있습니다.' : view.me.mana<hp.cost ? '마나가 부족합니다.' : view.me.heroFrozen ? '영웅이 이번 턴에는 행동할 수 없습니다.' : '지금은 영웅 능력을 쓸 수 없습니다.'); return; }
+  if(!entries.length){ warn(hp.used ? '영웅 능력은 한 턴에 한 번만 사용할 수 있습니다.' : view.me.mana<hp.cost ? '마나가 부족합니다.' : view.me.heroFrozen ? '영웅이 이번 턴에는 행동할 수 없습니다.' : '지금은 영웅 능력을 쓸 수 없습니다.'); return; }
   ui.selected=null; ui.place=null; stopArrow();
   if(entries.length===1 && !entries[0].target){ playerAction(entries[0]); return; }
   ui.pending={cardId:-2, entries};
@@ -883,7 +978,7 @@ function usePower(e){
 }
 function isPendingTarget(t){ return !!ui.pending && ui.pending.entries.some(a=>tkey(a.target)===tkey(t)); }
 function resolvePending(t){
-  if(!isPendingTarget(t)) return;
+  if(!isPendingTarget(t)){ if(ui.pending && !ui.busy) warn(targetReason(t)); return; }   // v145
   const a=ui.pending.entries.find(x=>tkey(x.target)===tkey(t));
   playerAction(Number.isInteger(ui.pending.pos) ? {...a, pos:ui.pending.pos} : a);   // v129 자리를 고른 하수인이면 그 자리로
 }
@@ -981,7 +1076,9 @@ async function flyDraw(seat, n){
 
 function selectMinion(m, canAttack){
   if(ui.busy) return;
-  if(!canAttack){ if(m.frozen && view.turn===MY) logLine('얼어 있어 이번 턴에는 공격할 수 없습니다.'); return; }
+  if(!canAttack){                                      // v145 왜 공격할 수 없는지 경고창으로
+    if(view.over || watching() || ui.place || view.pending) return;
+    warn(attackReason(m.id, null) || '지금 공격할 수 있는 대상이 없습니다.'); return; }
   if(ui.selected===m.id){ ui.selected=null; stopArrow(); render(); return; }
   ui.selected=m.id; render();
   const el=zoneEl(MY).querySelector(`.card[data-id="${m.id}"]`);
@@ -999,10 +1096,24 @@ function selectHero(){
 function attackTarget(t){
   if(ui.busy || ui.selected===null) return;
   const a=findAtk(ui.selected, t);
-  if(!a){ logLine(view.opp.board.some(m=>m.taunt) ? '상대 도발 하수인을 먼저 공격해야 합니다.' : '공격할 수 없습니다.'); return; }
+  if(!a){ warn(attackReason(ui.selected, t)); return; }   // v145
   playerAction(a);
 }
-$('endTurnBtn').onclick=()=>{ if(!ui.busy && view.turn===MY && !view.over && !ui.pending){ ui.place=null; playerAction({type:'END_TURN'}); } };
+$('endTurnBtn').onclick=()=>{
+  if(ui.busy || view.turn!==MY || view.over || ui.pending) return;
+  // v145 할 수 있는 행동이 남았으면 한 번 더 눌러야 끝난다 (전투 기록의 「턴 종료 확인」으로 끄고 켠다)
+  if(!endTurnTimer && EndConfirm.get()){
+    const left=leftoverActions();
+    if(left.length){
+      const b=$('endTurnBtn'); b.textContent='정말 종료?'; b.classList.add('armed');
+      toast(`아직 할 수 있는 행동이 있어요: ${left.join(' · ')} — 한 번 더 누르면 턴을 끝냅니다.`);
+      endTurnTimer=setTimeout(resetEndTurnBtn, 3000);
+      return;
+    }
+  }
+  resetEndTurnBtn(); ui.place=null; playerAction({type:'END_TURN'});
+};
+{ const cb=$('optEndConfirm'); if(cb){ cb.checked=EndConfirm.get(); cb.onchange=()=>{ EndConfirm.set(cb.checked); if(!cb.checked) resetEndTurnBtn(); toast(cb.checked?'턴 종료 확인을 켰습니다. 할 일이 남았으면 한 번 더 눌러야 턴이 끝나요.':'턴 종료 확인을 껐습니다.'); }; } }
 
 // 항복: 실수 방지를 위해 두 번 눌러야 한다 (첫 클릭 → 3초간 "정말 항복?" → 한 번 더 누르면 항복)
 let surrenderTimer=null;
@@ -1107,13 +1218,16 @@ const Drag=(function(){
       st={kind:'hand', id:c.id, card:c, x0:e.clientX, y0:e.clientY, pid:e.pointerId};
     } else if(bc && !ui.pending && !ui.place){
       const id=Number(bc.dataset.id);
-      if(!view.legal.some(a=>a.type==='ATTACK' && a.attackerId===id)) return;
+      if(!view.legal.some(a=>a.type==='ATTACK' && a.attackerId===id)){ st={kind:'noAttack', id, x0:e.clientX, y0:e.clientY, pid:e.pointerId}; return; }   // v145 끌면 이유를 알려 준다
       st={kind:'attack', id, x0:e.clientX, y0:e.clientY, pid:e.pointerId};
     } else if(he && !ui.pending && !ui.place && view.legal.some(a=>a.type==='HERO_ATTACK')){
       st={kind:'attack', id:'hero', x0:e.clientX, y0:e.clientY, pid:e.pointerId};
+    } else if(he && !ui.pending && !ui.place){
+      st={kind:'noAttack', id:'hero', x0:e.clientX, y0:e.clientY, pid:e.pointerId};   // v145 공격할 수 없는 영웅을 끌었다
     }
   }
   function begin(e){
+    if(st.kind==='noAttack'){ const id=st.id; st=null; eatUntil=Date.now()+500; warn(attackReason(id, null) || '지금 공격할 수 있는 대상이 없습니다.'); return; }   // v145
     st.started=true; ui.dragging=true; document.body.classList.add('dragging-cards');
     if(st.kind==='attack'){
       stopArrow(); ui.selected=st.id; ui.place=null; ui.pending=null; render();
@@ -1164,13 +1278,14 @@ const Drag=(function(){
       const t=targetAt(x,y), a=t && findAtk(s.id, t);
       finish(); ui.selected=null;
       if(a){ playerAction(a); return; }
-      if(t && t.seat===OPP) logLine(view.opp.board.some(m=>m.taunt) ? '상대 도발 하수인을 먼저 공격해야 합니다.' : '공격할 수 없습니다.');
+      if(t && t.seat===OPP) warn(attackReason(s.id, t));   // v145
       render(); return;
     }
     if(s.mode==='aim'){
       const t=targetAt(x,y); const ok=t && isPendingTarget(t);
       finish();
       if(ok){ resolvePending(t); return; }
+      if(t && (t.kind==='minion' || t.kind==='hero')) warn(targetReason(t));   // v145 고를 수 없는 대상 위에서 뗐다
       ui.pending=null; render(); return;
     }
     const board=overBoard(x,y);
@@ -1391,6 +1506,8 @@ function render(){
   });
 
   $('endTurnBtn').disabled = !active || !!pending;
+  if(!active && endTurnTimer) resetEndTurnBtn();                                                   // v145
+  if(active && !v.over && !watching() && ui.noticeTurn!==v.turnNo){ ui.noticeTurn=v.turnNo; setTimeout(turnNotices, 350); }   // v145 내 턴 시작 알림
   $('surrenderBtn').disabled = v.over || ui.busy;
   if(v.over || ui.busy) resetSurrenderBtn();
 

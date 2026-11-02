@@ -57,7 +57,7 @@
 <div class="deck-pile" id="myDeckPile" onclick="openDeck()"><img src="/images/deck_pile.webp" alt="내 덱" draggable="false"><span class="deck-cnt" id="myDeckPileCnt"></span></div>
 <div class="hand" id="hand"></div>
 </div>
-<aside id="logPanel"><h3>전투 기록</h3><div id="logList"></div></aside>
+<aside id="logPanel"><h3>전투 기록<label class="log-opt" title="할 수 있는 행동이 남았는데 턴 종료를 누르면 한 번 더 묻습니다"><input type="checkbox" id="optEndConfirm" checked> 턴 종료 확인</label></h3><div id="logList"></div></aside>
 <div id="overlay"><div id="overlayArt"></div><h2 id="overlayText"></h2><p id="overlayReward"></p><button class="end-turn" id="pvpAgainBtn" style="display:none">한 판 더</button><button class="end-turn sub" id="pvpReplayBtn" style="display:none">🎞 리플레이</button><button class="end-turn" onclick="goToMenu()">처음 화면으로</button></div>
 
 <div id="mulliganModal"><h3 id="mulliganTitle"></h3><p>바꾸고 싶은 카드를 클릭하면 ✕ 표시가 뜹니다. 다시 클릭하면 취소됩니다.</p><div id="mulliganGrid"></div><button class="end-turn" id="mulliganOk"></button></div>
