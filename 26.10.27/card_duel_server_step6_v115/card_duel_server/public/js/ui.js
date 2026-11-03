@@ -2619,6 +2619,7 @@ async function startBoss(idx, opts={}){
   if(!opts.devTest && bossLocked(boss, all)) return;                       // v117: 입학 중 + 이번 입학의 다음 단계만
   if(!opts.devTest && boss.chapter){ const po=ServerStore.offers.find(o=>{ const ob=all.find(x=>x.id===o.bossId); return ob && ob.chapter===boss.chapter; });
     if(po){ showOffer(po); return; } }                                                // 고르지 않은 보상 묶음이 있으면 먼저 고르게 (잠긴 덱에 더해야 하므로)
+  if(typeof AdvStory!=='undefined' && AdvStory.has(boss.id) && !opts.noStory){ try{ Preload.warmup(); }catch(_){} await AdvStory.play(boss.id); }   // v148 스토리 연출 (수능 전야 → 필적 확인란). 한 번 본 사람은 건너뛰기 가능
   await Preload.ensure();                                          // v138 보스 초상화·카드 그림을 전부 받은 뒤 시작
   const r=await resolveBossBot(boss);
   const d=DIFFICULTY.normal2;
@@ -2786,7 +2787,7 @@ function bossDeckSaved(list){ bossDraft.deck=list; closeDeckEditor(); bossFormSa
 function bossFormTest(){
   bossFormSave(true);
   if(BossBook.deckError(bossDraft)){ alert('덱이 규칙에 맞지 않습니다: '+BossBook.deckError(bossDraft)); return; }
-  startBoss(bossDraftIdx, {devTest:true});
+  startBoss(bossDraftIdx, {devTest:true, noStory:true});
 }
 function bossExport(){
   const list=BossBook.get(), ta=$('bossJson');
