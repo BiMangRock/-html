@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/intro.css">
+<link rel="stylesheet" href="/css/cutscene.css">
 </head>
 <body>
 <!-- v147 로그인 직후 인트로 (intro.js). 로그인하고 들어올 때만 보이고, 아니면 바로 지워진다 -->
@@ -68,7 +69,7 @@
     <div style="min-width:140px;"></div>
   </div>
 </div>
-<div class="controls"><div id="pvpTimer" class="pvp-timer" style="display:none"></div><div id="pvpRope" class="pvp-rope" style="display:none"><img class="rope-head" src="/images/pvp/rope.webp" alt=""><div class="rope-body" id="pvpRopeBody"></div></div><button class="end-turn sub" id="specLeaveBtn" style="display:none">관전 나가기</button><button class="end-turn sub" id="deckBtn" onclick="openDeck()">덱 보기</button><button class="end-turn sub" id="surrenderBtn">항복</button><button class="end-turn" id="endTurnBtn">턴 종료</button></div>
+<div class="controls"><div id="pvpTimer" class="pvp-timer" style="display:none"></div><div id="pvpRope" class="pvp-rope" style="display:none"><img class="rope-head" src="/images/pvp/rope.webp" alt=""><div class="rope-body" id="pvpRopeBody"></div></div><button class="end-turn sub" id="specLeaveBtn" style="display:none">관전 나가기</button><button class="end-turn sub" id="deckBtn" onclick="openDeck()">덱 보기</button><button class="end-turn sub dev-skip" id="devSkipBtn" style="display:none" title="개발자 전용: 이 보스전을 바로 승리로 끝냅니다">⏭ 보스 건너뛰기</button><button class="end-turn sub" id="surrenderBtn">항복</button><button class="end-turn" id="endTurnBtn">턴 종료</button></div>
 <div class="deck-pile" id="myDeckPile" onclick="openDeck()"><img src="/images/deck_pile.webp" alt="내 덱" draggable="false"><span class="deck-cnt" id="myDeckPileCnt"></span></div>
 <div class="hand" id="hand"></div>
 </div>
@@ -393,6 +394,7 @@
 <script src="/js/cardtext.js"></script>
 <script src="/js/preload.js"></script>
 <script src="/js/cardart.js"></script>
+<script src="/js/cutscene.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/menutour.js"></script>
 <script src="/js/pvpclient.js"></script>

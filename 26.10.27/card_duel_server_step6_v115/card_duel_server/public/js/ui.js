@@ -1134,6 +1134,20 @@ $('surrenderBtn').onclick=()=>{
   playerAction({type:'SURRENDER'});
 };
 
+// v148 개발자 전용: 보스 건너뛰기 → 이 판을 바로 승리로 끝낸다 (모험 보스전만. 상대 턴 도중에도 됨)
+//  개발자의 영남대 대전은 원래 시험 대전이라 기록·보상이 없고, 자유 보스전은 평소 승리와 똑같이 정산된다
+async function devSkipBoss(){
+  if(!isDev() || !game || game.mode!=='adventure' || !Host.state || Host.state.over) return;
+  if($('mulliganModal') && $('mulliganModal').classList.contains('show')) { warn('멀리건을 먼저 끝내 주세요.'); return; }
+  Host.state.over=true; Host.state.winner=MY; Host.state.pending=null;
+  ui.selected=null; ui.pending=null; ui.place=null; stopArrow(); resetSurrenderBtn();
+  logLine(`🛠 개발자: 보스 건너뛰기 → ${game.boss ? game.boss.name : '보스'} 승리 처리`);
+  view=Host.view(MY);
+  finishGame();
+  render();
+}
+{ const sk=$('devSkipBtn'); if(sk) sk.onclick=devSkipBoss; }
+
 // ---------- 조준 화살표 ----------
 function outsideCancel(e){
   if(e.target.closest && (e.target.closest('.card')||e.target.closest('#aiHero')||e.target.closest('#playerHero'))) return;
@@ -1509,6 +1523,7 @@ function render(){
   if(!active && endTurnTimer) resetEndTurnBtn();                                                   // v145
   if(active && !v.over && !watching() && ui.noticeTurn!==v.turnNo){ ui.noticeTurn=v.turnNo; setTimeout(turnNotices, 350); }   // v145 내 턴 시작 알림
   $('surrenderBtn').disabled = v.over || ui.busy;
+  { const sk=$('devSkipBtn'); if(sk){ const on=!!(ServerStore.isAdmin && game && game.mode==='adventure') && !game.replay && !game.spectate; sk.style.display=on?'':'none'; sk.disabled=!on || v.over; } }   // v148
   if(v.over || ui.busy) resetSurrenderBtn();
 
   renderPower('myPower', me.heroPower, active && !place && legal.some(a=>a.type==='HERO_POWER'), !!(pending && pending.cardId===-2));   // v131
@@ -2583,6 +2598,9 @@ function openAdventure(rank){
              `<div class="run-btns"><button type="button" onclick="showRunDeck('${advView}')">🗒 잠긴 덱 보기</button><button type="button" class="drop" onclick="dropRun('${advView}')">자퇴하기</button></div></div>`
            : `<div class="run-box"><button type="button" class="enroll" onclick="enrollRun('${advView}')">🎓 입학하기</button><br><small>${AdvDeckBook.has()?'모험 덱':'일반 덱'} 30장(일반 카드만)으로 입학해요. <b>입학하면 덱을 바꿀 수 없어요.</b> 모험 전용 카드는 단계를 깰 때마다 보상으로 덱에 더해지고, 입학이 끝나면 사라져요. 보스에게 지면 처음부터 다시.</small></div>`);
     if(isDev()) $('advChapterDesc').insertAdjacentHTML('beforeend', `<div class="run-box"><small>🛠 <b>개발자 모드</b>: 모든 단계를 바로 도전할 수 있어요. ${runOf(advView)?'잠긴 덱':'모험 덱'}(모든 카드 가능)으로 싸우고, 클리어 기록·보상·입학 진행은 남지 않아요.</small></div>`);   // v122
+    { const cb=list.find(b=>BOSS_CUTSCENE[b.id]);                                   // v148 컷신 다시 보기 (본 적이 있거나 개발자)
+      if(cb && typeof Cutscene!=='undefined' && (isDev() || Cutscene.seen(BOSS_CUTSCENE[cb.id])))
+        $('advChapterDesc').insertAdjacentHTML('beforeend', `<div class="run-box"><button type="button" class="cut-replay" onclick="playBossCutscene('${cb.id}')">🎬 ${escHtml(cb.name)} 입학 컷신 다시 보기</button></div>`); }
     list.forEach(b=>box.appendChild(bossButton(b, all.indexOf(b), all, {chapter:true})));
   }
   { const n=ServerStore.offers.length, ob=$('advOfferBtn'); ob.style.display=n?'':'none'; if(n) ob.innerHTML=`🎁 받지 않은 보상이 있어요 (${n})<span class="desc">${escHtml(ServerStore.offers[0].bossName)} 클리어 보상 — 눌러서 카드 묶음을 고르세요</span>`; }   // v117
@@ -2613,12 +2631,16 @@ function showRunDeck(ch){
   CARD_POOL.forEach(c=>{ if(!cnt[c.name]) return; const el=cardEl(c); const b=document.createElement('div'); b.className='copies'; b.textContent=`×${cnt[c.name]}`; el.appendChild(b); row.appendChild(el); });
   col.appendChild(row); box.appendChild(col); $('offerAfter').style.display='none'; $('offerLater').textContent='닫기'; $('offerModal').classList.add('show');
 }
+const BOSS_CUTSCENE = { ynu_1:'ynu1' };   // v148 보스 id → 도전 전에 트는 컷신 (cutscene.js)
+function playBossCutscene(bossId){ const cut=BOSS_CUTSCENE[bossId]; if(cut && typeof Cutscene!=='undefined') Cutscene.play(cut).then(()=>{ if($('screen-adventure').classList.contains('show')) openAdventure(); }); }
 async function startBoss(idx, opts={}){
   const all=BossBook.get(), boss=all[idx]; if(!boss || BossBook.deckError(boss)) return;
   if(isDev() && boss.chapter && !opts.devTest) opts={...opts, devTest:true, fromAdv:true};   // v122 개발자의 영남대 대전 = 시험 대전 (클리어 기록·보상·입학 진행 없음)
   if(!opts.devTest && bossLocked(boss, all)) return;                       // v117: 입학 중 + 이번 입학의 다음 단계만
   if(!opts.devTest && boss.chapter){ const po=ServerStore.offers.find(o=>{ const ob=all.find(x=>x.id===o.bossId); return ob && ob.chapter===boss.chapter; });
     if(po){ showOffer(po); return; } }                                                // 고르지 않은 보상 묶음이 있으면 먼저 고르게 (잠긴 덱에 더해야 하므로)
+  { const cut=BOSS_CUTSCENE[boss.id];                                               // v148 1학년 들어가기 전 컷신: 처음 도전할 때 한 번 (모험 화면에서 다시 보기)
+    if(cut && typeof Cutscene!=='undefined' && Cutscene.has(cut) && !Cutscene.seen(cut)) await Cutscene.play(cut); }
   await Preload.ensure();                                          // v138 보스 초상화·카드 그림을 전부 받은 뒤 시작
   const r=await resolveBossBot(boss);
   const d=DIFFICULTY.normal2;

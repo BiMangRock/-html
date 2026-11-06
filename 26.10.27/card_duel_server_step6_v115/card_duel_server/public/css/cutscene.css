@@ -1,0 +1,141 @@
+/* cutscene.css — v148 컷신 (cutscene.js) */
+#cutscene{position:fixed; inset:0; z-index:9800; background:#000; overflow:hidden; opacity:0; transition:opacity .5s ease;
+  -webkit-user-select:none; user-select:none; cursor:pointer; touch-action:manipulation; font-family:var(--font-u, system-ui, sans-serif);}
+#cutscene.on{opacity:1;}
+#cutscene.out{opacity:0; pointer-events:none;}
+#cutscene .cs-load{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#d9c48a; font-weight:700; letter-spacing:.1em; z-index:20; background:#000;}
+
+/* 배경 (두 장을 번갈아 겹쳐 부드럽게 바꾼다) */
+#cutscene .cs-stage{position:absolute; inset:0;}
+#cutscene .cs-bg{position:absolute; inset:-3%; background:#000 center/cover no-repeat; opacity:0; transition:opacity .8s ease; animation:csKen 22s ease-in-out infinite alternate;}
+#cutscene .cs-bg.show{opacity:1;}
+#cutscene .cs-tint{position:absolute; inset:0; pointer-events:none; transition:background .8s ease;
+  background:linear-gradient(to bottom, rgba(0,0,0,.45) 0, rgba(0,0,0,0) 18%, rgba(0,0,0,0) 52%, rgba(0,0,0,.75) 100%);}
+@keyframes csKen{from{transform:scale(1) translate(0,0);} to{transform:scale(1.06) translate(-1%,-1%);}}
+
+/* 위 막대: 제목 · 자동 · 건너뛰기 */
+#cutscene .cs-top{position:absolute; top:max(.6rem, env(safe-area-inset-top)); left:.8rem; right:.8rem; display:flex; align-items:center; gap:.5rem; z-index:12;}
+#cutscene .cs-title{flex:1; color:rgba(255,240,200,.75); font-size:.8rem; letter-spacing:.06em; text-shadow:0 1px 4px #000;}
+#cutscene .cs-top button{background:rgba(0,0,0,.5); color:#f3e2b0; border:1px solid rgba(201,162,39,.6); border-radius:999px; padding:.35rem .9rem; font-size:.8rem; cursor:pointer;}
+#cutscene .cs-top button.on{background:rgba(201,162,39,.85); color:#1a1408;}
+#cutscene .cs-top button:hover{border-color:#f3d36b;}
+
+/* 장면 제목 카드 */
+#cutscene .cs-card{position:absolute; left:50%; top:42%; transform:translate(-50%,-50%); text-align:center; z-index:8; opacity:0; pointer-events:none;
+  color:#fff; text-shadow:0 2px 12px rgba(0,0,0,.9); white-space:nowrap;}
+#cutscene .cs-card small{display:block; color:#f3d36b; letter-spacing:.35em; font-size:clamp(.7rem, 2vmin, .95rem); font-weight:700;}
+#cutscene .cs-card b{display:block; font-size:clamp(1.4rem, 5.5vmin, 2.6rem); margin:.25em 0; padding:.1em .8em; border-top:1px solid rgba(243,211,107,.6); border-bottom:1px solid rgba(243,211,107,.6);
+  background:linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.55), rgba(0,0,0,0));}
+#cutscene .cs-card span{font-size:clamp(.8rem, 2.4vmin, 1.05rem); color:#ddd;}
+#cutscene .cs-card.show{animation:csCard 1.9s ease forwards;}
+@keyframes csCard{0%{opacity:0; transform:translate(-50%,-40%);} 18%{opacity:1; transform:translate(-50%,-50%);} 82%{opacity:1;} 100%{opacity:0; transform:translate(-50%,-56%);}}
+
+/* 대사 상자 */
+#cutscene .cs-box{position:absolute; left:50%; bottom:max(.8rem, env(safe-area-inset-bottom)); width:min(96vw, 1000px); transform:translate(-50%, 20px);
+  display:flex; gap:.9rem; align-items:flex-end; z-index:10; opacity:0; transition:opacity .25s ease, transform .25s ease; pointer-events:none;}
+#cutscene .cs-box.show{opacity:1; transform:translate(-50%,0);}
+#cutscene .cs-face{flex:none; width:min(30vh, 22vw, 170px); aspect-ratio:1; border-radius:14px; overflow:hidden; background:#fff;
+  border:3px solid #c9a227; box-shadow:0 6px 22px rgba(0,0,0,.6);}
+#cutscene .cs-face img{width:100%; height:100%; object-fit:cover; display:block;}
+#cutscene .cs-face.pop{animation:csPop .3s ease-out;}
+@keyframes csPop{from{transform:scale(.85) translateY(10px); opacity:.3;} to{transform:none; opacity:1;}}
+#cutscene .cs-text{position:relative; flex:1; min-height:min(24vh, 140px); background:rgba(12,10,22,.86); border:1px solid rgba(201,162,39,.65); border-radius:14px;
+  padding:.75rem 1.1rem 1.2rem; color:#f4efe2; box-shadow:0 6px 22px rgba(0,0,0,.55); backdrop-filter:blur(3px);}
+#cutscene .cs-name{display:inline-block; font-weight:800; color:#1a1408; background:#f3d36b; border-radius:6px; padding:.05rem .6rem; margin-bottom:.3rem; font-size:clamp(.8rem, 2.4vmin, 1rem);}
+#cutscene .cs-act{color:#b9b2a0; font-size:clamp(.72rem, 2.1vmin, .9rem); margin-bottom:.2rem; font-style:italic;}
+#cutscene .cs-line{font-size:clamp(.92rem, 3vmin, 1.3rem); line-height:1.55; word-break:keep-all; white-space:pre-wrap;}
+#cutscene .cs-next{position:absolute; right:.9rem; bottom:.35rem; color:#f3d36b; font-style:normal; font-size:.8rem; opacity:0;}
+#cutscene .cs-box.ready .cs-next{opacity:1; animation:csNext .8s ease-in-out infinite;}
+@keyframes csNext{50%{transform:translateY(3px);}}
+/* 독백 · 지문 · 멀리서 들리는 목소리 · 큰 글씨 */
+#cutscene .cs-box.mono .cs-name{background:#6c7bd1; color:#fff;}
+#cutscene .cs-box.mono .cs-line{font-style:italic; color:#dfe4ff;}
+#cutscene .cs-box.desc .cs-text{background:rgba(0,0,0,.62); border-color:rgba(255,255,255,.18); text-align:center; min-height:0; padding:.7rem 1.1rem 1.1rem;}
+#cutscene .cs-box.desc .cs-line{color:#e9e2cf; font-size:clamp(.85rem, 2.7vmin, 1.15rem);}
+#cutscene .cs-box.far .cs-name{background:#555; color:#eee;}
+#cutscene .cs-box.far .cs-line{font-style:italic; letter-spacing:.03em; text-shadow:0 0 6px rgba(255,255,255,.5); animation:csEcho 2s ease-in-out infinite;}
+@keyframes csEcho{50%{opacity:.65;}}
+#cutscene .cs-box.big .cs-line{font-size:clamp(1.15rem, 4.6vmin, 2rem); font-weight:900; color:#fff; text-shadow:0 0 10px rgba(255,80,80,.7);}
+
+/* 단톡방 화면 (씬 6) */
+#cutscene .cs-phone{position:absolute; right:max(3vw, .8rem); top:12%; width:min(36vw, 340px); max-height:56%; display:flex; flex-direction:column; z-index:6;
+  background:#b2c7da; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.6); border:3px solid #222;}
+#cutscene .cs-phone[hidden], #cutscene .cs-call[hidden]{display:none;}
+#cutscene .cs-ph-head{display:flex; justify-content:space-between; align-items:center; padding:.45rem .7rem; background:#a3b9cd; color:#222; font-size:.8rem;}
+#cutscene .cs-ph-head span{background:#e8473c; color:#fff; border-radius:999px; padding:0 .45rem; font-weight:800; font-size:.72rem;}
+#cutscene .cs-ph-body{flex:1; overflow-y:auto; padding:.5rem .6rem; display:flex; flex-direction:column; gap:.45rem;}
+#cutscene .cs-msg{align-self:flex-start; max-width:92%; animation:csMsg .3s ease-out;}
+#cutscene .cs-msg b{display:block; font-size:.7rem; color:#333; margin-bottom:.1rem;}
+#cutscene .cs-msg span{display:inline-block; background:#fff; color:#111; border-radius:4px 12px 12px 12px; padding:.35rem .55rem; font-size:clamp(.75rem, 2.2vmin, .9rem); line-height:1.4; word-break:break-all;}
+#cutscene .cs-msg.video{display:flex; align-items:center; gap:.5rem; background:#222; color:#fff; border-radius:10px; padding:.55rem .7rem; font-size:clamp(.72rem, 2.1vmin, .86rem);}
+#cutscene .cs-msg.video span{background:none; color:#fff; padding:0;}
+#cutscene .cs-msg.video .play{width:1.8rem; height:1.8rem; border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; flex:none;}
+@keyframes csMsg{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+#cutscene .cs-call{position:absolute; left:50%; top:max(2.8rem, calc(env(safe-area-inset-top) + 2.4rem)); transform:translateX(-50%); z-index:7; display:flex; align-items:center; gap:.7rem;
+  background:rgba(30,30,34,.94); color:#fff; border-radius:14px; padding:.55rem 1.1rem; box-shadow:0 8px 24px rgba(0,0,0,.6); border:1px solid #e8473c; white-space:nowrap;}
+#cutscene .cs-call .ic{font-size:1.4rem;}
+#cutscene .cs-call b{display:block; color:#ff8a80; font-size:clamp(.85rem, 2.6vmin, 1.05rem);}
+#cutscene .cs-call small{color:#ccc; font-size:clamp(.7rem, 2vmin, .85rem);}
+#cutscene .cs-call.drop{animation:csDrop .45s cubic-bezier(.2,1.4,.4,1);}
+@keyframes csDrop{from{transform:translate(-50%,-160%);} to{transform:translate(-50%,0);}}
+
+/* 효과 */
+#cutscene .cs-flash{position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:9;}
+#cutscene.fx-flash .cs-flash{animation:csFlash .45s ease-out;}
+@keyframes csFlash{0%{opacity:.9;} 100%{opacity:0;}}
+#cutscene.fx-glare .cs-flash{background:radial-gradient(circle at 70% 25%, #fff 0, #fff8d8 35%, rgba(255,240,200,.6) 70%); animation:csGlare 2.6s ease-out;}
+@keyframes csGlare{0%{opacity:1;} 35%{opacity:.95;} 100%{opacity:0;}}
+#cutscene.fx-shake .cs-stage, #cutscene.fx-shake .cs-box.show{animation:csShake .45s linear;}
+@keyframes csShake{0%,100%{translate:0 0;} 15%{translate:-10px 4px;} 30%{translate:9px -5px;} 45%{translate:-7px -3px;} 60%{translate:6px 4px;} 75%{translate:-3px 2px;}}
+#cutscene.fx-buzz .cs-stage{animation:csBuzz .35s linear 2;}
+@keyframes csBuzz{0%,100%{translate:0 0;} 25%{translate:-3px 0;} 75%{translate:3px 0;}}
+#cutscene.fx-slowmo .cs-bg.show{animation:csSlow 3s ease-out forwards;}
+@keyframes csSlow{from{transform:scale(1.12); filter:blur(2px) saturate(1.3);} to{transform:scale(1.02); filter:none;}}
+#cutscene.fx-silence .cs-bg{filter:grayscale(.85) brightness(.75); transition:filter 1s ease;}
+#cutscene.fx-drunk .cs-bg.show{animation:csDrunk 5s ease-in-out infinite;}
+#cutscene.fx-drunk .cs-tint{background:radial-gradient(ellipse at center, rgba(255,60,60,0) 40%, rgba(150,0,40,.38) 100%), linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,0) 20%, rgba(0,0,0,0) 52%, rgba(0,0,0,.75));}
+@keyframes csDrunk{0%,100%{transform:scale(1.05) rotate(0); filter:blur(0);} 25%{transform:scale(1.07) rotate(-1.2deg) translateX(-1%); filter:blur(1.4px);} 50%{transform:scale(1.05) rotate(.6deg); filter:blur(.4px);} 75%{transform:scale(1.08) rotate(1.3deg) translateX(1%); filter:blur(1.8px);}}
+#cutscene.fx-spin .cs-bg.show{animation:csSpin 6s ease-in forwards;}
+@keyframes csSpin{from{transform:scale(1.05) rotate(0); filter:blur(0);} to{transform:scale(1.3) rotate(30deg); filter:blur(4px);}}
+#cutscene .cs-eye{position:absolute; left:-10%; right:-10%; height:52%; background:#000; z-index:5; transition:transform 2.6s cubic-bezier(.5,0,.6,1); pointer-events:none;}
+#cutscene .cs-eye.top{top:0; transform:translateY(-102%); border-radius:0 0 50% 50% / 0 0 30% 30%;}
+#cutscene .cs-eye.bot{bottom:0; transform:translateY(102%); border-radius:50% 50% 0 0 / 30% 30% 0 0;}
+#cutscene.fx-eyes .cs-eye.top{transform:translateY(-22%);}
+#cutscene.fx-eyes .cs-eye.bot{transform:translateY(22%);}
+#cutscene.fx-eyes .cs-box.show .cs-line{filter:blur(.6px); opacity:.85;}
+#cutscene .cs-black{position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:7; transition:opacity 1.2s ease;}
+#cutscene.fx-black .cs-black, #cutscene.fx-fade .cs-black{opacity:1;}
+#cutscene.fx-black .cs-eye.top, #cutscene.fx-black .cs-eye.bot{transform:translateY(0);}
+#cutscene.fx-black .cs-box.desc .cs-text{background:transparent; border-color:transparent;}
+#cutscene.fx-black .cs-box.desc .cs-line{letter-spacing:.4em; color:#999;}
+#cutscene.fx-fade .cs-black{transition:opacity 2.4s ease;}
+
+/* 끝 카드 */
+#cutscene .cs-endcard{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:11; opacity:0; pointer-events:none; color:#fff; transition:opacity .9s ease;}
+#cutscene .cs-endcard.show{opacity:1;}
+#cutscene .cs-endcard small{color:#f3d36b; letter-spacing:.4em; font-weight:700; font-size:clamp(.75rem, 2.2vmin, 1rem);}
+#cutscene .cs-endcard b{font-size:clamp(2.2rem, 10vmin, 4.6rem); margin:.15em 0; text-shadow:0 0 24px rgba(243,211,107,.55);}
+#cutscene .cs-endcard span{color:#ccc; font-size:clamp(.8rem, 2.4vmin, 1.05rem);}
+
+/* 폰 가로 화면 (높이가 낮다) */
+@media (max-height:500px){
+  #cutscene .cs-face{width:min(34vh, 18vw, 130px); border-radius:10px;}
+  #cutscene .cs-text{min-height:0; padding:.5rem .9rem .9rem;}
+  #cutscene .cs-line{line-height:1.4;}
+  #cutscene .cs-phone{top:14%; max-height:52%; width:min(38vw, 300px);}
+}
+/* 세로 화면 */
+@media (max-aspect-ratio:1/1){
+  #cutscene .cs-bg{background-size:auto 100%;}
+  #cutscene .cs-face{width:min(26vw, 120px);}
+  #cutscene .cs-phone{left:6vw; right:6vw; width:auto; top:14%; max-height:44%;}
+}
+@media (prefers-reduced-motion:reduce){
+  #cutscene .cs-bg, #cutscene.fx-drunk .cs-bg.show, #cutscene.fx-spin .cs-bg.show{animation:none;}
+}
+
+/* v148 개발자 전용 [⏭ 보스 건너뛰기] 버튼 (판 화면 아래 조작 막대) */
+button.end-turn.sub.dev-skip{color:#7fe3ff; border-color:#3a8fa8;}
+button.end-turn.sub.dev-skip:hover:not(:disabled){background:rgba(58,143,168,.25);}
+/* 모험 화면의 컷신 다시 보기 버튼 */
+.run-box .cut-replay{margin-top:.35rem; background:transparent; color:var(--gold, #c9a227); border:1px solid var(--gold-d, #8a6f1c); border-radius:6px; padding:.25rem .7rem; font-size:.8rem; cursor:pointer;}
