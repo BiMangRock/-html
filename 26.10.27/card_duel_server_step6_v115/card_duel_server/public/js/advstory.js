@@ -5,6 +5,8 @@
 //   · 한 번 끝까지 본 사람(계정별, localStorage)은 오른쪽 위 [건너뛰기 ⏭] 가 보인다. 처음 보는 사람은 [다음]만
 //   쓰는 곳: ui.js startBoss → AdvStory.has(boss.id) 이면 await AdvStory.play(boss.id) 뒤에 판을 시작한다
 //   대사를 고치려면 아래 STORIES 만 고치면 된다. 그림은 images/ynu/story/
+//   v150 선택지: {choice:'질문', opts:[{label, sub, set:{cond:+1}, flag:{k:v}, then:[줄...]}], def} — 고르면 숨은 수치(StoryState, cutscene.js)에 쌓이고 then 줄이 이어진다
+//        조건 줄: 아무 줄에나 if: s => 조건 (s = StoryState.get()). 건너뛰기를 누르면 선택지는 def(없으면 첫 번째)로 정해진다
 const AdvStory = (() => {
   'use strict';
   const IMG = 'images/ynu/story/';
@@ -25,6 +27,11 @@ const AdvStory = (() => {
         { who: '엄마', face: 'mom_happy', t: '아들 왔니~?' },
         { bg: 's1_choco' },
         { who: '엄마', t: '이거 봐, 이모가 초콜릿 보내왔단다. 이게 그 유명하다던 두바이 초콜릿 아니겠니?' },
+        { choice: '(두바이 초콜릿… 어떻게 할까?)', opts: [
+          { label: '지금 바로 먹는다', sub: '💪 +1', set: { cond: 1 }, then: [{ mono: '한 입 베어 물자 피스타치오 향이 확 퍼졌다. …긴장이 조금 풀린다.', face: 'me_calm' }] },
+          { label: '시험 끝나고 먹을게', flag: { savedChoco: true }, then: [{ mono: '시험 끝나고 먹는 초콜릿이 세상에서 제일 맛있을 거다.', face: 'me_calm' }] },
+          { label: '엄마랑 나눠 먹자', sub: '💪 +1', set: { cond: 1 }, then: [{ who: '엄마', face: 'mom_happy', t: '어머, 우리 아들 다 컸네~' }] },
+        ] },
         { bg: 's1_living' },
         { mono: '원래는 무덤덤하게 넘기려고 했는데. 아무렇지 않은 척하려고 했는데…', face: 'me_calm' },
         { mono: '거실에 놓인 선물상자들을 보니까, 그제야 실감이 났다.', face: 'me_calm' },
@@ -35,10 +42,21 @@ const AdvStory = (() => {
         { mono: '깜깜한 내 방. 침대에 누워 천장만 바라보고 있다.' },
         { mono: '째깍, 째깍… 시계 소리가 유난히 크게 들린다.' },
         { mono: '역시… 잠이 오지 않는다.' },
+        { choice: '(잠이 오지 않는다. 어떻게 할까?)', opts: [
+          { label: '양을 센다', sub: '💪 +1', set: { cond: 1 }, flag: { sleep: 'sheep' }, then: [{ mono: '양 한 마리… 양 두 마리… 양 백열두 마리…' }, { mono: '…어느새 잠이 들었다.' }] },
+          { label: '유튜브 딱 한 편만…', sub: '💪 −2', set: { cond: -2 }, flag: { sleep: 'yt' }, then: [{ mono: '한 편이… 열두 편이 됐다. 새벽 3시.' }, { who: '엄마', face: 'mom_worried', t: '아들… 아직도 안 자니? 내일 시험인데…' }] },
+          { label: '오답노트를 한 번 더 본다', sub: '💪 −1  ✏️ +1', set: { cond: -1, score: 1 }, flag: { sleep: 'note' }, then: [{ mono: '형광펜으로 그어 둔 문장이 눈에 들어온다. …이건 내일 나올 것 같다.' }] },
+        ] },
         { black: true },
         { bg: 's3_cheer', title: '수능 당일 · 아침' },
-        { mono: '결국 거의 한숨도 못 잤다. 눈이 뻑뻑하다.', face: 'me_tired' },
+        { mono: '결국 거의 한숨도 못 잤다. 눈이 뻑뻑하다.', face: 'me_tired', if: s => s.sleep !== 'sheep' },
+        { mono: '신기하게 푹 잤다. 머리가 맑다.', face: 'me_calm', if: s => s.sleep === 'sheep' },
         { who: '후배들', t: '선배님 힘내세요! 찍는 것도 다 정답일 거예요! 파이팅!' },
+        { choice: '(후배들이 손을 내민다!)', opts: [
+          { label: '하이파이브!', sub: '💪 +1', set: { cond: 1 }, then: [{ bg: 's3_highfive' }, { who: '후배들', t: '와아아! 선배님 대박 나세요!!' }, { mono: '손바닥이 얼얼하다. …힘이 난다.', face: 'me_calm' }] },
+          { label: '고개만 꾸벅 숙인다', then: [{ mono: '고맙다. 진심으로.', face: 'me_nervous' }] },
+          { label: '이어폰 끼고 지나간다', sub: '💪 −1', set: { cond: -1 }, then: [{ mono: '…지금은 아무 말도 들리지 않았으면 좋겠다.', face: 'me_nervous' }] },
+        ] },
         { bg: 's3_gate' },
         { mono: '……', face: 'me_nervous' },
         { mono: '정신 차리자. 원래 하던 대로.', face: 'me_calm' },
@@ -49,7 +67,10 @@ const AdvStory = (() => {
       ],
     },
   };
-  const FACES = ['mom_happy', 'mom_calm', 'me_calm', 'me_tired', 'me_nervous'];
+  const FACES = ['mom_happy', 'mom_calm', 'mom_worried', 'me_calm', 'me_tired', 'me_nervous'];
+  const SS = () => window.StoryState || null;                 // v150 숨은 수치 (cutscene.js)
+  const sget = () => (SS() ? SS().get() : {});
+  const sapply = (o, quiet) => { if (SS() && o) SS().apply(o.set, o.flag, quiet); };
 
   const has = id => !!STORIES[id];
   const seenKey = id => `cardDuel.story.${id}.${(window.CURRENT_USER && (window.CURRENT_USER.username || window.CURRENT_USER.id)) || 'guest'}`;
@@ -67,7 +88,8 @@ const AdvStory = (() => {
   }
   function preload(story) {
     const set = new Set([IMG + 'pencil.webp', IMG + 's4_sheet.jpg', ...FACES.map(f => IMG + f + '.webp')]);
-    story.lines.forEach(l => { if (l.bg && l.bg !== 'dark') set.add(IMG + l.bg + '.jpg'); });
+    const walk = ls => ls.forEach(l => { if (l.bg && l.bg !== 'dark') set.add(IMG + l.bg + '.jpg'); (l.opts || []).forEach(o => walk(o.then || [])); });   // v150 선택지 안의 배경까지
+    walk(story.lines);
     const fonts = document.fonts && document.fonts.load ? document.fonts.load('40px "AdvPen"', '잘 있거라').catch(() => {}) : Promise.resolve();
     return Promise.all([...[...set].map(s => load(s)), fonts]);
   }
@@ -113,7 +135,7 @@ const AdvStory = (() => {
 
   async function play(id) {
     const story = STORIES[id]; if (!story) return;
-    const canSkip = seen(id);
+    const canSkip = seen(id) || !!(window.ServerStore && ServerStore.isAdmin);   // v150 개발자는 처음부터 건너뛰기 가능
     const w = build(story, canSkip), q = s => w.querySelector(s);
     requestAnimationFrame(() => w.classList.add('on'));
     let skipped = false, onSkip = null;
@@ -143,7 +165,9 @@ const AdvStory = (() => {
     let advance = null;
     const tap = e => { if (e && e.target && e.target.closest && e.target.closest('.as-skip')) return; if (advance) advance(); };
     w.addEventListener('pointerup', tap);
+    let choiceKey = null;
     const key = e => {
+      if (choiceKey && /^[1-9]$/.test(e.key)) { e.preventDefault(); choiceKey(+e.key); return; }
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tap(); }
       else if (e.key === 'Escape' && canSkip) { skipped = true; if (onSkip) onSkip(); }
     };
@@ -162,8 +186,27 @@ const AdvStory = (() => {
 
     const pause = ms => new Promise(res => { const t = setTimeout(res, ms); onSkip = () => { clearTimeout(t); res(); }; });
 
-    for (const L of story.lines) {
-      if (skipped) break;
+    // v150 선택지: 고르면 수치에 쌓고, 그 선택의 줄(then)을 바로 다음에 끼워 넣는다
+    const choose = L => new Promise(res => {
+      box.classList.remove('show'); setFace('');
+      const c = document.createElement('div'); c.className = 'as-choice';
+      c.innerHTML = `<div class="as-q">${esc(L.choice)}</div>` + L.opts.map((o, i) => `<button type="button" data-i="${i}" style="animation-delay:${i * 0.07}s"><span class="n">${i + 1}</span><span class="l">${esc(o.label)}</span>${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</button>`).join('');
+      w.appendChild(c);
+      let done = false;
+      const pick = i => { if (done || !L.opts[i]) return; done = true; choiceKey = null; c.querySelectorAll('button').forEach(b => b.disabled = true); c.querySelector(`[data-i="${i}"]`).classList.add('picked'); setTimeout(() => { c.remove(); res(L.opts[i]); }, skipped ? 0 : 380); };
+      c.querySelectorAll('button').forEach(b => b.addEventListener('pointerup', e => { e.stopPropagation(); pick(+b.dataset.i); }));
+      choiceKey = n => pick(n - 1);
+      onSkip = () => pick(L.def || 0);
+    });
+    const queue = story.lines.slice();
+    while (queue.length) {
+      const L = queue.shift();
+      if (L.if && !L.if(sget())) continue;
+      if (skipped) {                                                   // 건너뛰어도 선택지는 기본값으로 정해 둔다 (다음 컷신이 이어 받도록)
+        if (L.choice) { const o = L.opts[L.def || 0]; sapply(o, true); queue.unshift(...(o.then || [])); }
+        continue;
+      }
+      if (L.choice) { const o = await choose(L); sapply(o, skipped); queue.unshift(...(o.then || [])); continue; }
       if (L.black) {
         box.classList.remove('show'); setFace('');
         black.classList.add('show'); await pause(900); if (skipped) break;
