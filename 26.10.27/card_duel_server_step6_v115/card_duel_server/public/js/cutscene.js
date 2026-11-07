@@ -86,7 +86,7 @@
   const SCRIPTS = {
     // ---------------- 수능 1교시 (advstory 수능 스토리 바로 뒤) ----------------
     suneung: {
-      dir: 'ynu1/', title: '수능 · 1교시',
+      dir: 'ynu1/', title: '수능 당일',
       steps: [
         { t: 'scene', kicker: '수능 당일', title: '1교시 · 국어 영역', time: '오전 8:40', bg: 'bg_exam_room' },
         { t: 'desc', text: '감독관이 문제지를 나눠 준다. 펄럭— 종이 넘기는 소리만 가득하다.' },
@@ -96,9 +96,23 @@
           q: '다음 글에 드러난 화자의 정서로 가장 적절한 것은?',
           passage: '창밖엔 첫눈, 책상엔 수능 특강.\n펜은 지문 위를 걷는데, 마음은 이미\n수능 끝난 다음 날 늦잠 속에 누워 있다.',
           opts: ['학업에 대한 뜨거운 열정', '자연에 대한 경외감', '현실에서 벗어나고 싶은 마음', '첫눈을 기다리는 설렘', '출판사에 대한 감사'], ans: 2 },
+        { t: 'desc', bg: 'bg_exam_break', text: '쉬는 시간. 복도 여기저기서 답을 맞춰 보는 소리가 들린다.' },
+        { t: 'choice', q: '(친구들이 국어 답을 맞춰 보고 있다…)', def: 1, opts: [
+          { label: '같이 맞춰 본다', sub: '💪 −1', set: { cond: -1 }, then: [{ t: 'mono', face: 'me_sn_panic', text: '…18번, 나만 다른 걸 골랐다. 망했다.' }] },
+          { label: '귀를 막고 다음 과목만 생각한다', then: [{ t: 'mono', face: 'me_sn_calm', text: '지나간 건 지나간 거다. 다음.' }] },
+          { label: '창밖을 보며 심호흡', sub: '💪 +1', set: { cond: 1 }, then: [{ t: 'mono', face: 'me_sn_relief', text: '후— 하늘이 회색이다. …괜찮아, 아직 반도 안 왔다.' }] },
+        ] },
+        { t: 'scene', kicker: '수능 당일', title: '2교시 · 수학 영역', time: '오전 10:30', bg: 'bg_exam_math' },
+        { t: 'desc', text: '머리에서 김이 난다. 앞자리 수험생이 머리를 쥐어뜯고 있다.' },
         { t: 'game', g: 'quiz', subj: '수학', no: 21,
           q: '(전날 잔 시간) × (유튜브를 본 편수) = 12 이다.\n유튜브를 4편 봤다면, 전날 잔 시간은?',
           opts: ['2시간', '4시간', '6시간', '3시간', '12시간'], ans: 3 },
+        { t: 'scene', kicker: '수능 당일', title: '점심시간', time: '낮 12:10', bg: 'bg_lunch' },
+        { t: 'desc', text: '엄마가 싸 준 도시락. 따뜻한 국에서 김이 오른다. 뚜껑 안쪽에 쪽지가 붙어 있다.' },
+        { t: 'mono', face: 'me_sn_calm', text: '「아들, 원래 하던 대로. 사랑해.」 …목이 메어서 밥이 잘 안 넘어간다.' },
+        { if: s => s.savedChoco, t: 'mono', face: 'me_sn_relief', text: '가방 안에 아껴 둔 두바이 초콜릿 한 조각. …지금이다.', set: { cond: 1 } },
+        { t: 'scene', kicker: '수능 당일', title: '3교시 · 영어 영역', time: '오후 1:10', bg: 'bg_exam_english' },
+        { t: 'desc', text: '듣기 평가가 시작된다. 스피커에서 지지직— 소리가 난다. 교실 전체가 숨을 죽인다.' },
         { t: 'game', g: 'quiz', subj: '영어', no: 29,
           q: 'Choose the word that best fits the blank.',
           passage: 'After the exam, I will finally ______ my phone for twelve hours straight.',
@@ -113,25 +127,29 @@
           ] },
         ] },
         { t: 'calc', fn: s => ({ sn: s.score + (s.cond >= 2 ? 1 : 0) >= 4 ? 'S' : s.score + (s.cond >= 2 ? 1 : 0) >= 2 ? 'A' : 'B' }) },
-        { t: 'big', kicker: '딩- 동- 댕- 동-', text: '1교시 종료', sub: '결과는… 한 달 뒤에 나온다' },
+        { t: 'desc', bg: 'bg_exam_end', text: '해 질 녘. 교문 밖으로 수험생들이 쏟아져 나온다. 꽃다발, 따뜻한 차, 끌어안는 사람들.' },
+        { t: 'mono', face: 'me_sn_relief', text: '끝났다. …정말, 끝났다.' },
+        { t: 'big', kicker: '딩- 동- 댕- 동-', text: '수능 종료', sub: '결과는… 한 달 뒤에 나온다' },
       ],
     },
 
     // ---------------- 1학년 ----------------
     ynu1: {
       dir: 'ynu1/', title: '영남대 입학 · 1학년',
-      preload: ['bg_phone', 'bg_room', 'bg_room_fresh', 'me_drunk', 'me_cool', 'me_hangover'],   // 조건에 따라 고르는 그림 (s => …) 은 여기서 미리 받는다
+      preload: ['bg_phone', 'bg_phone_plain', 'me_drunk', 'me_cool', 'me_hangover'],   // 조건에 따라 고르는 그림 (s => …) 은 여기서 미리 받는다
       steps: [
         // ---- 프롤로그 : 합격 발표 (수능 결과에 따라) ----
-        { t: 'scene', kicker: 'PROLOGUE', title: '합격자 발표', time: '12월', bg: STORY + 's1_living.jpg' },
+        { t: 'scene', kicker: 'PROLOGUE', title: '합격자 발표', time: '12월', bg: 'bg_result_night' },
         { t: 'desc', text: '수능이 끝나고 한 달. 오늘은 합격자 발표 날이다. 떨리는 손으로 새로고침을 누른다.' },
         { if: s => snGrade(s) === 'S', t: 'say', who: ME, face: 'me_sn_happy', text: '자… 장학생?! 엄마!! 나 장학금 받는대!!', fx: ['flash'] },
         { if: s => snGrade(s) === 'S', t: 'say', who: '엄마', face: STORY + 'mom_happy', text: '어머 어머! 우리 아들 장하다!! 이모한테 전화해야겠네!' },
         { if: s => snGrade(s) === 'A', t: 'mono', face: 'me_sn_relief', text: '합격. …됐다. 진짜 됐다.' },
         { if: s => snGrade(s) === 'A', t: 'say', who: '엄마', face: STORY + 'mom_happy', text: '고생했어, 아들. 오늘은 맛있는 거 먹자!' },
-        { if: s => snGrade(s) === 'B', t: 'say', who: ME, face: 'me_sn_panic', text: '예비 번호…? 추가합격… 마지막 차례로…?', fx: ['shake'] },
+        { if: s => snGrade(s) === 'B', t: 'say', who: ME, face: 'me_sn_panic', text: '불합격… 예비 번호…?', fx: ['shake'] },
+        { if: s => snGrade(s) === 'B', t: 'desc', bg: 'bg_result_call', text: '……그리고 며칠 뒤, 자정 직전. 모르는 번호로 전화가 온다.', fx: ['shake'] },
+        { if: s => snGrade(s) === 'B', t: 'say', who: ME, face: 'me_sn_happy', text: '추, 추가합격이요?! 네!! 등록하겠습니다!! 무조건 합니다!!', fx: ['flash'] },
         { if: s => snGrade(s) === 'B', t: 'say', who: '엄마', face: STORY + 'mom_worried', text: '그, 그래도 붙었잖니… 붙은 게 어디야, 아들.' },
-        { t: 'mono', text: '그렇게 나는, 영남대 새내기가 되었다.' },
+        { t: 'mono', bg: 'bg_campus_spring', text: '그렇게 나는, 영남대 새내기가 되었다.' },
 
         // ---- 씬 1 : 왁자지껄한 포차 ----
         { t: 'scene', no: 1, title: '왁자지껄한 포차', time: '오후 8:30', bg: 'bg_pocha_out' },
@@ -189,7 +207,7 @@
         { if: s => drunk(s) && !s.caught, t: 'mono', face: 'me_drunk', text: '쨍그랑 소리와 함께… 내 마지막 이성의 끈도 산산조각 났다.', set: { rep: -1 }, flag: { crash: true } },
         { if: s => !drunk(s), t: 'desc', text: '다행히 오늘은 아무 사고도 없었다. 테이블 위 소주병들은 무사하다.' },
         // 춤
-        { t: 'desc', bg: 'bg_toast', text: s => drunk(s) ? '어디선가 신나는 음악이 터진다. 흥이 끝까지 올랐다. 동기들이 박수를 치며 나를 부른다!' : '어디선가 신나는 음악이 터진다. 동기들이 박수를 치며 나를 부른다!', fx: ['shake'] },
+        { t: 'desc', bg: 'bg_dance_circle', text: s => drunk(s) ? '어디선가 신나는 음악이 터진다. 흥이 끝까지 올랐다. 동기들이 박수를 치며 나를 부른다!' : '어디선가 신나는 음악이 터진다. 동기들이 박수를 치며 나를 부른다!', fx: ['shake'] },
         { t: 'choice', style: 'dance', q: '(어떤 춤을 출까…)', def: 0, opts: [
           ...Object.entries(DANCES).map(([key, d]) => ({ label: d.name, img: d.frames[d.frames.length - 1], set: { rep: d.rep }, flag: { dance: key }, then: [{ t: 'dance', key }] })),
           { label: '안 춘다 (박수 담당)', flag: { dance: 'none' }, then: [
@@ -228,7 +246,7 @@
             { t: 'say', who: HW, face: 'hw_sigh', text: '…그래. 내일 보자, 전설아.' },
           ] },
         ] },
-        { if: s => !drunk(s), t: 'desc', text: '선선한 밤바람. 골목길을 걸으며 동기들과 오늘 얘기에 낄낄댄다.' },
+        { if: s => !drunk(s), t: 'desc', bg: 'bg_walk_sober', text: '선선한 밤바람. 벚꽃 아래를 걸으며 동기들과 오늘 얘기에 낄낄댄다.' },
         { if: s => !drunk(s), t: 'say', who: HW, face: 'hw_laugh', text: s => danced(s) ? `야 오늘 너 ${DANCES[s.dance].word} 진짜 레전드였다 ㅋㅋㅋㅋ` : '야 너 오늘 제일 멀쩡했다 ㅋㅋ 비결이 뭐냐?' },
         { if: s => !drunk(s), t: 'say', who: ME, face: 'me_proud', text: '자기 관리지 뭐. 내일 1교시도 끄떡없다!' },
         { t: 'desc', bg: 'bg_taxi', text: '현우가 잡아 준 택시. 창밖으로 불빛이 길게, 길게 번진다.' },
@@ -239,7 +257,7 @@
         { if: s => s.alc >= 4, t: 'desc', text: '무거운 눈꺼풀이 스르륵… 친구 목소리가 물속처럼 먹먹해진다.', fx: ['eyes'] },
         { if: s => s.alc >= 4, t: 'desc', text: '삐———', fx: ['black'], auto: 1600 },
         { if: s => s.alc >= 4, t: 'mono', text: '그렇게 내 첫 성인식의 밤은… 어둠 속으로 로그아웃되었다.' },
-        { if: s => s.alc < 4, t: 'desc', text: '집 도착. 씻고, 물 한 잔 마시고, 바로 잠들었다.', fx: ['fade'] },
+        { if: s => s.alc < 4, t: 'desc', bg: 'bg_home_sober', text: '집 도착. 씻고, 물 한 잔 마시고, 폰 충전기 꽂고. 바로 잠들었다.' },
 
         // ---- 씬 5 : 아침 ----
         { if: s => s.alc >= 4, t: 'scene', no: 5, title: '재앙의 아침', time: '오전 8:30', bg: 'bg_room_sun', fx: ['glare'] },
@@ -252,7 +270,7 @@
         { if: s => s.alc < 4, t: 'say', who: ME, face: 'me_proud', text: '개운하다! 역시 나는 페이스 조절의 신.' },
 
         // ---- 씬 6 : 단톡방 ----
-        { t: 'scene', no: 6, title: s => (danced(s) || s.crash || s.called) ? '공포의 단톡방' : '평화로운 단톡방', time: '오전 8:42', bg: s => danced(s) ? 'bg_phone' : s.alc >= 4 ? 'bg_room' : 'bg_room_fresh' },
+        { t: 'scene', no: 6, title: s => (danced(s) || s.crash || s.called) ? '공포의 단톡방' : '평화로운 단톡방', time: '오전 8:42', bg: s => danced(s) ? 'bg_phone' : 'bg_phone_plain' },
         { t: 'desc', text: s => danced(s) ? '떨리는 손으로 액정 깨진 스마트폰을 집어 든다. 카톡 알림 99+.' : '스마트폰을 집어 든다. 카톡 알림이 몇 개 와 있다.', fx: ['phone'] },
         { if: danced, t: 'video', text: s => `어제자 강민수 ${DANCES[s.dance].word}.mp4`, img: s => DANCES[s.dance].frames[DANCES[s.dance].frames.length - 1] },
         { if: danced, t: 'desc', text: s => `재생 ▶ … 영상 속 내가 선배 과잠을 머리에 뒤집어쓴 채 술집 바닥에서 「${DANCES[s.dance].name}」을 추고 있다.` },
@@ -274,27 +292,32 @@
         // 첫사랑: 전화를 걸었으면 통화 기록 + 카톡 / 안 걸었으면 프로필 사진 알림
         { if: s => s.called, t: 'call', who: '고등학교 첫사랑', text: '새벽 02:14 · 발신 3회' },
         { if: s => s.called, t: 'say', who: ME, face: 'me_shock', act: '베개에 얼굴을 묻으며', text: '으아아아아악!! 차라리 날 죽여!! 죽여줘 제발!!!', fx: ['shake', 'big'] },
+        { t: 'fx', fx: ['phoneOff'] },
+        { if: s => s.called, t: 'noti', bg: 'bg_phone_noti', from: '고등학교 첫사랑', photo: 'crush_profile', text: '어제 새벽에 전화 세 번 한 거 뭐야?' },
+        { if: s => s.called, t: 'dm', with: '고등학교 첫사랑', photo: 'crush_profile' },
         { if: s => s.called, t: 'kakao', from: '고등학교 첫사랑', text: '어제 새벽에 전화 세 번 한 거 뭐야?' },
         { if: s => s.called, t: 'choice', style: 'kakao', q: '첫사랑에게 답장', def: 1, opts: [
           { label: '사귈래?', then: [
-            { if: s => s.rep >= 4, t: 'say', who: CR, face: 'crush_flutter', text: '…술 깨고. 맨정신에 다시 말해 봐.', fx: ['pink'], set: { love: 2 } },
-            { if: s => s.rep < 4, t: 'say', who: CR, face: 'crush_angry', text: '…술 깨고 다시 연락해.', fx: ['red'], set: { love: -1 } },
+            { if: s => s.rep >= 4, t: 'say', who: CR, face: 'crush_flutter', bg: 'bg_crush_room', text: '…술 깨고. 맨정신에 다시 말해 봐.', fx: ['phoneOff', 'pink'], set: { love: 2 } },
+            { if: s => s.rep < 4, t: 'say', who: CR, face: 'crush_angry', bg: 'bg_crush_room', text: '…술 깨고 다시 연락해.', fx: ['phoneOff', 'red'], set: { love: -1 } },
           ] },
           { label: '미안해, 잘못했어', set: { love: 2 }, then: [
-            { t: 'say', who: CR, face: 'crush_flutter', text: 'ㅋㅋ 괜찮아. 오랜만에 목소리 들어서 좋았어.', fx: ['pink'] },
+            { t: 'say', who: CR, face: 'crush_flutter', bg: 'bg_crush_room', text: 'ㅋㅋ 괜찮아. 오랜만에 목소리 들어서 좋았어.', fx: ['phoneOff', 'pink'] },
           ] },
           { label: '(읽씹한다)', set: { love: -2 }, flag: { ignored: true }, then: [
             { t: 'desc', text: '숫자 1이 사라졌다. 그리고… 아무 일도 일어나지 않았다.', fx: ['cold'] },
-            { t: 'say', who: CR, face: 'crush_cold', text: '……' },
+            { t: 'say', who: CR, face: 'crush_cold', bg: 'bg_crush_room', text: '……', fx: ['phoneOff', 'cold'] },
           ] },
           { label: '누구세요?', set: { love: -3 }, then: [
-            { t: 'say', who: CR, face: 'crush_angry', text: '…차단할게.', fx: ['red', 'shake'] },
+            { t: 'say', who: CR, face: 'crush_angry', bg: 'bg_crush_room', text: '…차단할게.', fx: ['phoneOff', 'red', 'shake'] },
           ] },
         ] },
-        { if: s => !s.called, t: 'kakao', from: '고등학교 첫사랑', notice: '고등학교 첫사랑님이 프로필 사진을 변경했습니다.', photo: 'crush_profile' },
+        { if: s => !s.called, t: 'noti', bg: 'bg_phone_noti', from: '카카오톡', photo: 'crush_profile', text: '고등학교 첫사랑님이 프로필 사진을 변경했습니다.' },
+        { if: s => !s.called, t: 'dm', with: '고등학교 첫사랑', photo: 'crush_profile', profile: true },
+        { if: s => !s.called, t: 'kakao', from: '고등학교 첫사랑', notice: '새 프로필 사진 · 방금', photo: 'crush_profile' },
         { if: s => !s.called, t: 'choice', style: 'kakao', q: '프로필 사진에…', def: 1, opts: [
           { label: '좋아요 ♥ 누른다', set: { love: 1 }, then: [
-            { t: 'say', who: CR, face: 'crush_flutter', text: '(어? …민수가 좋아요 눌렀네?)', fx: ['pink'] },
+            { t: 'say', who: CR, face: 'crush_flutter', bg: 'bg_crush_room', text: '(어? …민수가 좋아요 눌렀네?)', fx: ['phoneOff', 'pink'] },
           ] },
           { label: '그냥 넘긴다', then: [{ t: 'mono', face: s => s.alc >= 4 ? 'me_hangover' : 'me_cool', text: '…지금은 1교시가 더 급하다.' }] },
         ] },
@@ -398,6 +421,7 @@
     const box = $('.cs-box'), faceEl = $('.cs-face');
     const nameEl = $('.cs-name'), actEl = $('.cs-act'), lineEl = $('.cs-line');
     const card = $('.cs-card'), phone = $('.cs-phone'), phBody = $('.cs-ph-body'), call = $('.cs-call');
+    const phHead = $('.cs-ph-head'), phHeadGroup = phHead.innerHTML;
     const S = () => StoryState.get();
     const val = v => typeof v === 'function' ? v(S()) : v;
 
@@ -464,7 +488,7 @@
       if (['shake', 'flash', 'glare', 'slowmo', 'red'].includes(f)) restart(root, 'fx-' + f);
       else if (['silence', 'drunk', 'spin', 'eyes', 'black', 'fade'].includes(f)) root.classList.add('fx-' + f);
       else if (f === 'pink' || f === 'cold') { mood.className = 'cs-mood ' + f; void mood.offsetWidth; mood.classList.add('on'); }
-      else if (f === 'phone') { phone.hidden = false; phBody.innerHTML = ''; restart(root, 'fx-buzz'); }
+      else if (f === 'phone') { phone.hidden = false; phone.classList.remove('dm'); phHead.innerHTML = phHeadGroup; phBody.innerHTML = ''; restart(root, 'fx-buzz'); }
       else if (f === 'phoneOff') { phone.hidden = true; call.hidden = true; }
     });
     const clearScene = () => {
@@ -733,6 +757,30 @@
       }
       root.style.removeProperty('--tilt'); w.remove();
     }
+    // 1:1 채팅 알림: 폰 위쪽에서 배너가 내려온다 (띠링). 누르거나 다음 → 채팅방
+    function ding() {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+        const ac = new AC(), t0 = ac.currentTime + 0.02;
+        [1318.5, 1760].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(), t = t0 + i * 0.12;
+          o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35); o.start(t); o.stop(t + 0.4); });
+        setTimeout(() => ac.close().catch(() => {}), 1200);
+      } catch (_) {}
+    }
+    async function noti(st) {
+      hideBox(); setFace(''); phone.hidden = true; if (st.bg) setBg(st.bg);
+      const n = ui('cs-noti', `<img src="${urlOf(sc, st.photo)}" alt=""><div><b>${esc(st.from)}</b><span>${esc(st.text)}</span></div><small>지금</small>`);
+      n.addEventListener('pointerdown', e => { e.stopPropagation(); tap(); });
+      ding(); restart(root, 'fx-buzz');
+      await waitTap(st.auto || (auto ? 1600 : 0));
+      n.classList.add('out'); await sleep(250); n.remove();
+    }
+    function openDm(st) {
+      phone.hidden = false; phone.classList.add('dm'); phBody.innerHTML = '';
+      phHead.innerHTML = `<i class="back">‹</i><img src="${urlOf(sc, st.photo)}" alt=""><b>${esc(st.with)}</b>`;
+      restart(phone, 'open');
+    }
     async function kakao(st) {
       hideBox(); setFace(''); phone.hidden = false;
       if (st.notice) {
@@ -801,6 +849,8 @@
         case 'dance': await dance(st); return;
         case 'ring': if (!skipped) await ring(st); return;
         case 'kakao': if (!skipped) await kakao(st); return;
+        case 'noti': if (!skipped) await noti(st); return;
+        case 'dm': if (!skipped) openDm(st); return;
         case 'report': if (!skipped) await report(); return;
         case 'video': case 'chat': {
           if (skipped) return;

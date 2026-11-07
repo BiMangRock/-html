@@ -98,6 +98,23 @@
 #cutscene .cs-call.drop{animation:csDrop .45s cubic-bezier(.2,1.4,.4,1);}
 @keyframes csDrop{from{transform:translate(-50%,-160%);} to{transform:translate(-50%,0);}}
 
+/* 1:1 채팅방 (첫사랑) · 알림 배너 */
+#cutscene .cs-phone.dm{background:#bacee0;}
+#cutscene .cs-phone.dm .cs-ph-head{justify-content:flex-start; gap:.5rem; background:#a9bfd3; font-size:.85rem;}
+#cutscene .cs-phone.dm .cs-ph-head .back{font-style:normal; font-size:1.3rem; line-height:1; color:#333;}
+#cutscene .cs-phone.dm .cs-ph-head img{width:28px; height:28px; border-radius:38%; object-fit:cover;}
+#cutscene .cs-phone.open{animation:csDmOpen .35s ease-out;}
+@keyframes csDmOpen{from{opacity:0; transform:translateX(30px);}}
+#cutscene .cs-noti{left:50%; top:max(3.2rem, calc(env(safe-area-inset-top) + 2.8rem)); translate:-50% 0; display:flex; align-items:center; gap:.7rem; width:min(460px, 90vw);
+  padding:.65rem .9rem; border-radius:18px; background:rgba(250,250,252,.96); color:#111; box-shadow:0 10px 30px rgba(0,0,0,.5); cursor:pointer; animation:csNoti .5s cubic-bezier(.2,1.3,.4,1);}
+#cutscene .cs-noti img{width:44px; height:44px; border-radius:38%; object-fit:cover; flex:none;}
+#cutscene .cs-noti div{flex:1; min-width:0;}
+#cutscene .cs-noti b{display:block; font-size:.9rem;}
+#cutscene .cs-noti span{display:block; font-size:.85rem; color:#444; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#cutscene .cs-noti small{color:#888; font-size:.72rem; align-self:flex-start;}
+#cutscene .cs-noti.out{animation:csNoti .25s reverse forwards;}
+@keyframes csNoti{from{transform:translateY(-160%); opacity:0;}}
+
 /* ---- 효과 ---- */
 #cutscene .cs-flash{position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:20;}
 #cutscene.fx-flash .cs-flash{animation:csFlash .45s ease-out;}
