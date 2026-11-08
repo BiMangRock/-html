@@ -2598,9 +2598,8 @@ function openAdventure(rank){
              `<div class="run-btns"><button type="button" onclick="showRunDeck('${advView}')">🗒 잠긴 덱 보기</button><button type="button" class="drop" onclick="dropRun('${advView}')">자퇴하기</button></div></div>`
            : `<div class="run-box"><button type="button" class="enroll" onclick="enrollRun('${advView}')">🎓 입학하기</button><br><small>${AdvDeckBook.has()?'모험 덱':'일반 덱'} 30장(일반 카드만)으로 입학해요. <b>입학하면 덱을 바꿀 수 없어요.</b> 모험 전용 카드는 단계를 깰 때마다 보상으로 덱에 더해지고, 입학이 끝나면 사라져요. 보스에게 지면 처음부터 다시.</small></div>`);
     if(isDev()) $('advChapterDesc').insertAdjacentHTML('beforeend', `<div class="run-box"><small>🛠 <b>개발자 모드</b>: 모든 단계를 바로 도전할 수 있어요. ${runOf(advView)?'잠긴 덱':'모험 덱'}(모든 카드 가능)으로 싸우고, 클리어 기록·보상·입학 진행은 남지 않아요.</small></div>`);   // v122
-    { const cb=list.find(b=>CUT_REPLAY[b.id]);                                      // v150 1학년 컷신 다시 보기 (본 적이 있거나 개발자)
-      if(cb && typeof Cutscene!=='undefined' && (isDev() || Cutscene.seen(BOSS_CUTSCENE[cb.id])))
-        $('advChapterDesc').insertAdjacentHTML('beforeend', `<div class="run-box"><button type="button" class="cut-replay" onclick="playBossCutscene('${cb.id}')">🎬 ${escHtml(CUT_REPLAY[cb.id])} 컷신 다시 보기</button></div>`); }
+    { const cbs=list.filter(b=>CUT_REPLAY[b.id] && typeof Cutscene!=='undefined' && (isDev() || Cutscene.seen(BOSS_CUTSCENE[b.id])));   // v150 컷신 다시 보기 (본 적이 있거나 개발자) · v152 학년마다 버튼
+      if(cbs.length) $('advChapterDesc').insertAdjacentHTML('beforeend', `<div class="run-box">${cbs.map(cb=>`<button type="button" class="cut-replay" onclick="playBossCutscene('${cb.id}')">🎬 ${escHtml(CUT_REPLAY[cb.id])} 컷신 다시 보기</button>`).join(' ')}</div>`); }
     list.forEach(b=>box.appendChild(bossButton(b, all.indexOf(b), all, {chapter:true})));
   }
   { const n=ServerStore.offers.length, ob=$('advOfferBtn'); ob.style.display=n?'':'none'; if(n) ob.innerHTML=`🎁 받지 않은 보상이 있어요 (${n})<span class="desc">${escHtml(ServerStore.offers[0].bossName)} 클리어 보상 — 눌러서 카드 묶음을 고르세요</span>`; }   // v117
@@ -2632,9 +2631,9 @@ function showRunDeck(ch){
   col.appendChild(row); box.appendChild(col); $('offerAfter').style.display='none'; $('offerLater').textContent='닫기'; $('offerModal').classList.add('show');
 }
 // v150 보스 id → 도전할 때마다 트는 컷신 (cutscene.js). 수능은 팀원의 수능 스토리(advstory.js) 뒤에 1교시 시험 컷신이 이어진다
-const BOSS_CUTSCENE = { ynu_suneung:'suneung', ynu_1:'ynu1' };
-const STORY_CHAPTER = { ynu_suneung:'suneung', ynu_1:'ynu1' };   // 이 보스에 들어가면 그 장의 선택 기록을 새로 시작 (StoryState)
-const CUT_REPLAY = { ynu_1:'1학년 입학' };
+const BOSS_CUTSCENE = { ynu_suneung:'suneung', ynu_1:'ynu1', ynu_2:'ynu2' };   // v152 2학년
+const STORY_CHAPTER = { ynu_suneung:'suneung', ynu_1:'ynu1', ynu_2:'ynu2' };   // 이 보스에 들어가면 그 장의 선택 기록을 새로 시작 (StoryState)
+const CUT_REPLAY = { ynu_1:'1학년 입학', ynu_2:'2학년 입영 통지서' };
 function playBossCutscene(bossId){ const cut=BOSS_CUTSCENE[bossId]; if(!cut || typeof Cutscene==='undefined') return;
   if(typeof StoryState!=='undefined' && STORY_CHAPTER[bossId]) StoryState.begin(STORY_CHAPTER[bossId]);
   Cutscene.play(cut).then(()=>{ if($('screen-adventure').classList.contains('show')) openAdventure(); }); }

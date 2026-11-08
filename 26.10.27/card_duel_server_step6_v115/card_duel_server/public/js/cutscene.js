@@ -6,6 +6,7 @@
 //   컷신은 보스에 들어갈 때마다 나온다 (ui.js startBoss)
 //     · 'suneung' : 수능 스토리(advstory.js, 팀원 작업) 뒤 → 1교시 시험 문제 3개 + OMR 밀림 위기 → 보스전
 //     · 'ynu1'    : 1학년 → 합격 발표 · 포차 · 007빵 · 소주병 잡기 · 춤 · 골목 · 아침 · 단톡방 · 첫사랑 카톡 · 출석 · 1학기 성적표
+//     · 'ynu2'    : 2학년 → 도어락 · 입영 통지서 · (여자친구) 이별 / (솔로) 소개팅 · 송별회 1~4차 · 군휴학 · 호밀밭의 파수꾼 · 편지 · 입대 · 2학년 생활기록부
 //   선택과 미니게임 결과는 StoryState 에 쌓여서 다음 장면(과 다음 학년)의 대사·그림을 바꾼다
 //
 //   대본 한 줄(step) — 공통: if(s => 조건) · bg · face · fx(['shake','flash','glare','slowmo','silence','spin','eyes','black','drunk','phone','phoneOff','fade','red','pink','cold'])
@@ -13,6 +14,7 @@
 //     {t:'say', who, face, act, text} {t:'mono'} {t:'desc'}   대사 · 독백 · 지문 (text 는 문자열 또는 s => 문자열)
 //     {t:'choice', q, opts:[{label, sub, img, set:{alc:+1}, flag:{k:v}, then:[...]}], def, style:'list'|'dance'|'kakao'}
 //     {t:'game', g:'007'|'catch'|'attend'|'quiz'|'mash', ...}   미니게임 (결과는 수치·flag 로 남는다)
+//     {t:'item', img, text} 소품 크게 · {t:'to', v:{alc:0}} 수치를 그 값으로 · {t:'report', title, rows:s=>[[k,v]], stamp} (v152)
 //     {t:'vs'} {t:'big'} {t:'dance'} {t:'video'} {t:'chat'} {t:'call'} {t:'ring'} {t:'kakao'} {t:'set'} {t:'calc'} {t:'report'}
 (() => {
   'use strict';
@@ -27,8 +29,8 @@
   // ===================== 숨은 수치 (StoryState) =====================
   //  장(chapter)마다 따로 쌓는다. 어떤 장을 다시 시작하면 그 장과 뒤의 장 기록만 지운다 (수능을 다시 보면 1학년 기록도 새로)
   const StoryState = (() => {
-    const ORDER = ['suneung', 'ynu1'];
-    const STATS = { alc: '🍺 취기', rep: '⭐ 평판', love: '💌 첫사랑', grade: '📝 학점', cond: '💪 컨디션', score: '✏️ 수능' };
+    const ORDER = ['suneung', 'ynu1', 'ynu2'];
+    const STATS = { alc: '🍺 취기', rep: '⭐ 평판', love: '💌 첫사랑', grade: '📝 학점', cond: '💪 컨디션', score: '✏️ 수능', mind: '🌱 철듦' };
     const k = () => 'cardDuel.storyState.' + userKey();
     const load = () => { try { const d = JSON.parse(localStorage.getItem(k()) || 'null'); if (d && d.ch) return d; } catch (_) {} return { ch: {}, cur: 'ynu1' }; };
     const save = d => { try { localStorage.setItem(k(), JSON.stringify(d)); } catch (_) {} };
@@ -38,7 +40,7 @@
       d.cur = ch; d.ch[ch] = { d: {}, f: {} }; save(d);
     }
     function get() {
-      const d = load(), s = { alc: 0, rep: 0, love: 0, grade: 0, cond: 0, score: 0 };
+      const d = load(), s = { alc: 0, rep: 0, love: 0, grade: 0, cond: 0, score: 0, mind: 0 };
       ORDER.concat(Object.keys(d.ch).filter(c => !ORDER.includes(c))).forEach(c => {
         const x = d.ch[c]; if (!x) return;
         Object.entries(x.d || {}).forEach(([key, v]) => { s[key] = (s[key] || 0) + v; });
@@ -71,7 +73,7 @@
   window.StoryState = StoryState;
 
   // ===================== 대본 =====================
-  const ME = '나', HW = '현우', SB = '선배', CR = '첫사랑', PF = '교수님';
+  const ME = '나', HW = '현우', SB = '선배', CR = '첫사랑', PF = '교수님', GF = '여자친구';
   const STORY = '/images/ynu/story/';
   const DANCES = {
     windmill: { name: '통제 불능의 윈드밀', frames: ['dance_flail', 'dance_windmill', 'dance_windmill2'], rep: 3, word: '윈드밀' },
@@ -337,6 +339,293 @@
         { t: 'report' },
       ],
     },
+
+    // ---------------- 2학년 · 입영 통지서 (v152) ----------------
+    //  여자친구 루트: 1학년 💌 첫사랑 ≥ 2 / 솔로 루트: 그 밖
+    //  flag: door(도어락) · notice(brag|hide|call) · buddy(현우도 통지서) · told · end(hold|let|wait|part) · meal · song · called2 · buddy2 · kept · book(line|send|close) · letter
+    ynu2: {
+      dir: 'ynu2/', title: '2학년 · 입영 통지서',
+      preload: ['me2_rain_cry', 'gf_teary_smile', 'gf_cold', 'gf_resolve', 'hw2_buzz_grin', 'gf_wave_far', 'me2_hide_smile', 'me2_drunk_happy'],
+      steps: [
+        // ---- PROLOGUE : 새벽 3시의 현관 ----
+        { t: 'to', v: { alc: 4 }, quiet: true },
+        { t: 'scene', kicker: 'PROLOGUE', title: '새벽 3시의 현관', time: '11월 · 새벽 3:04', bg: 'bg_villa_hall' },
+        { t: 'desc', text: '2학년 2학기 종강 파티. 현우랑 어깨동무를 하고 비틀비틀 빌라 계단을 올라왔다.', fx: ['drunk'] },
+        { t: 'say', who: HW, face: 'hw2_drunk_laugh', act: '현관 앞에서 손을 휘휘 저으며', text: '민수야~ 들어가서 물 마시고 자라~ 내일… 아니 오늘 보자아~' },
+        { t: 'say', who: ME, face: 'me2_drunk_happy', text: '오케이~ 사랑한다 현우야~ 비밀번호가… 엄마 생일이었지? 공삼일오!' },
+        { t: 'game', g: 'doorlock', code: '0315', face: 'me2_doorlock_fail', hint: '엄마 생일… 3월 15일… 맞나?' },
+        { if: s => s.door === 'alarm', t: 'desc', text: '삐삐삐삐삐—!! 옆집 불이 켜졌다. …결국 안에서 엄마가 문을 열어 줬다.', fx: ['shake'] },
+        { if: s => s.door === 'alarm', t: 'say', who: '엄마', face: 'mom2_gentle', text: '…들어와. 냉장고에 꿀물 있다.' },
+
+        { t: 'desc', bg: 'bg_room_desk_night', text: '방에 불을 켰다. 책상 위에, 반듯하게 놓인 하얀 봉투 하나.', fx: ['silence'] },
+        { t: 'item', img: 'item_notice', text: '「입영 통지서」' },
+        { t: 'desc', bg: 'bg_notice_close', text: '옆에는 노란 포스트잇이 하나 붙어 있다.' },
+        { t: 'item', img: 'item_postit', text: '「아들, 냉장고에 꿀물 있다.」' },
+        { t: 'say', who: ME, face: 'me2_notice_shock', text: '……어?' , fx: ['flash'] },
+        { t: 'to', v: { alc: 0 } },
+        { t: 'mono', face: 'me2_blank', text: '취기가 한 번에 빠져나갔다. 술이 깬 게 아니라, 술이 도망쳤다.' },
+        { t: 'choice', q: '(통지서를 손에 들고…)', def: 1, opts: [
+          { label: '사진 찍어서 단톡방에 올린다', sub: '⭐ +1', set: { rep: 1 }, flag: { notice: 'brag' }, then: [
+            { t: 'say', who: ME, face: 'me2_bravado', act: '브이를 하며 셀카를 찍는다', text: '여러분~ 저 나라의 부름을 받았습니다~ ㅋㅋ' },
+            { t: 'fx', fx: ['phone'] },
+            { t: 'chat', who: '', text: '강민수님이 사진을 보냈습니다.', sys: true },
+            { t: 'chat', who: '김준혁', text: 'ㅋㅋㅋㅋㅋㅋ 새벽 3시에 이게 뭐냨ㅋㅋ' },
+            { t: 'chat', who: '이동기', text: '축하한다 ㅋㅋㅋ 송별회 각' },
+            { t: 'fx', fx: ['phoneOff'] },
+          ] },
+          { label: '서랍에 넣고 못 본 척', sub: '💪 −1', set: { cond: -1 }, flag: { notice: 'hide' }, then: [
+            { t: 'mono', face: 'me2_blank', text: '서랍을 닫았다. 닫는다고 없어지는 게 아니라는 건, 나도 안다.' },
+          ] },
+          { label: '현우에게 전화한다', flag: { notice: 'call', buddy: true }, then: [
+            { t: 'say', who: ME, face: 'me2_notice_shock', text: '현우야… 나 왔다. 그거.' },
+            { t: 'say', who: HW, face: 'hw2_phone_me_too', act: '수화기 너머로 한참 조용하다가', text: '…야. 나도 왔다. 방금 봤다. ㅋㅋㅋ 미친.' },
+            { t: 'mono', face: 'me2_blank', text: '둘이서 전화기 붙잡고 한참을 웃었다. 왜 웃었는지는 모르겠다.' },
+          ] },
+        ] },
+
+        // ---- SCENE 1 (여자친구 루트) : 말해야 한다 ----
+        { if: s => s.love >= 2, t: 'scene', no: 1, title: '말해야 한다', time: '다음 날 · 오후 4:20', bg: 'bg_campus_pond' },
+        { if: s => s.love >= 2, t: 'desc', text: '1학년 겨울, 그 새벽 전화가 계기가 되어 우리는 사귀게 됐다. 연못 앞 벤치, 은행잎이 물 위에 떠 있다.' },
+        { if: s => s.love >= 2, t: 'say', who: GF, face: 'gf_bright', act: '폰을 흔들며 신이 나서', text: '민수야! 나 교환학생 붙었어! 내년 3월부터 일 년! 대박이지?!' },
+        { if: s => s.love >= 2, t: 'mono', face: 'me2_hide_smile', text: '주머니 속 봉투 모서리가 손바닥을 찌른다. 3월. 나도 3월이다.' },
+        { if: s => s.love >= 2, t: 'choice', q: '(말해야 한다. 어떻게?)', def: 0, opts: [
+          { label: '지금, 바로 말한다', sub: '💌 +1', set: { love: 1 }, flag: { told: 'now' }, then: [
+            { t: 'say', who: ME, face: 'me2_nervous', text: '축하해. 진짜로. …근데 나도 할 말 있어. 나 입영 통지서 나왔어. 3월.' },
+            { t: 'say', who: GF, face: 'gf_confused', text: '…아. 그렇구나. …우리 둘 다 3월이네.' },
+            { t: 'say', who: GF, face: 'gf_resolve', text: '그래도 말해 줘서 고마워. 기다릴게. 편지도 쓸게.' },
+          ] },
+          { label: '농담처럼 던진다', sub: '💌 −1', set: { love: -1 }, flag: { told: 'joke' }, then: [
+            { t: 'say', who: ME, face: 'me2_bravado', text: '오 대박~ 나도 3월에 해외 연수 가. 국가가 보내 주는 2년짜리. ㅋ' },
+            { t: 'say', who: GF, face: 'gf_confused', text: '…뭐? 잠깐, 그거 군대 말하는 거야?' },
+            { t: 'say', who: GF, face: 'gf_angry', act: '팔짱을 끼며', text: '지금 그걸 장난처럼 말해? 나 방금 내 얘기 하고 있었잖아.' },
+          ] },
+          { label: '…결국 말하지 못한다', sub: '💌 −2', set: { love: -2 }, flag: { told: 'no' }, then: [
+            { t: 'say', who: ME, face: 'me2_hide_smile', text: '진짜 축하해. 오늘 맛있는 거 먹자.' },
+            { t: 'desc', text: '사흘 뒤.' },
+            { t: 'dm', with: GF, photo: 'gf_bright' },
+            { if: s => s.notice === 'brag', t: 'kakao', from: GF, text: '단톡방 캡처 돌던데. 입영 통지서? 나는 그걸 남한테 들어야 돼?' },
+            { if: s => s.notice !== 'brag', t: 'kakao', from: GF, text: '현우가 그러던데. 너 3월에 입대한다며? 나만 몰랐어?' },
+            { t: 'fx', fx: ['phoneOff'] },
+            { t: 'say', who: GF, face: 'gf_hurt', bg: 'bg_campus_cafe', text: '…화난 게 아니야. 서운한 거야. 그게 더 커.' },
+          ] },
+        ] },
+        // 몇 주: 카톡이 짧아진다
+        { if: s => s.love >= 2, t: 'desc', bg: 'bg_room_desk_night', text: '그리고 매일 밤 송별회가 이어졌다. 동기, 선배, 동아리, 고등학교 친구…' },
+        { if: s => s.love >= 2, t: 'dm', with: GF, photo: 'gf_bright' },
+        { if: s => s.love >= 2, t: 'kakao', from: GF, text: '오늘도 마셔?' },
+        { if: s => s.love >= 2, t: 'choice', style: 'kakao', q: '답장', def: 0, opts: [
+          { label: '응 미안 ㅠ 오늘만 송별회라', sub: '🍺 +1  💌 −1', set: { alc: 1, love: -1 }, then: [
+            { t: 'kakao', from: GF, text: '어제도 오늘만이었잖아' },
+            { t: 'kakao', from: GF, text: '응' },
+            { t: 'fx', fx: ['phoneOff'] },
+            { t: 'mono', face: 'me2_guilty', text: '「응」 한 글자. 예전엔 이모티콘이 세 개씩 붙어 있었는데.' },
+          ] },
+          { label: '아니! 오늘은 너 만날래', sub: '💌 +1', set: { love: 1 }, then: [
+            { t: 'kakao', from: GF, text: '…진짜? 그럼 정류장에서 봐. 할 얘기 있어.' },
+          ] },
+        ] },
+        { if: s => s.love >= 2, t: 'fx', fx: ['phoneOff'] },
+        // 이별
+        { if: s => s.love >= 2, t: 'scene', no: 2, title: '비 오는 정류장', time: '12월 · 밤 10:40', bg: 'bg_busstop_rain', fx: ['cold'] },
+        { if: s => s.love >= 2, t: 'desc', text: '도서관 앞 버스 정류장. 비가 세차게 온다. 우산은 하나.' },
+        { if: s => s.love >= 2, t: 'say', who: GF, face: 'gf_tired', text: '2년이 무서운 게 아니야. …요즘 네가, 벌써 없는 사람 같아서.' },
+        { if: s => s.love >= 2, t: 'say', who: GF, face: 'gf_teary_smile', text: '나 3월에 가고, 너도 3월에 가고. 우리 지금 서로 손 흔드는 연습만 하고 있는 것 같아.' },
+        { if: s => s.love >= 2, t: 'say', who: ME, face: 'me2_heartbreak', text: '……' },
+        { if: s => s.love >= 2, t: 'choice', q: '(그녀가 우산을 쥔 손을 내린다…)', def: 1, opts: [
+          { label: '잡는다', sub: '💌 +1', set: { love: 1 }, flag: { end: 'hold' }, then: [
+            { t: 'say', who: ME, face: 'me2_heartbreak', act: '그녀의 손목을 붙잡으며', text: '가지 마. 내가 잘할게. 송별회 다 취소할게. 그러니까…' },
+            { t: 'say', who: GF, face: 'gf_teary_smile', text: '…그 말 한 달 전에 듣고 싶었어. 고마웠어, 민수야. 진짜로.' },
+          ] },
+          { label: '보내준다', flag: { end: 'let' }, then: [
+            { t: 'desc', text: '말없이 우산을 그녀 손에 쥐여 줬다. 그리고 빗속으로 걸어 나왔다.' },
+            { t: 'say', who: GF, face: 'gf_cold', text: '……', fx: ['cold'] },
+          ] },
+          { label: '"기다려 달라고 안 할게"', sub: '???', then: [
+            { t: 'say', who: ME, face: 'me2_heartbreak', text: '기다려 달라고 안 할게. 너는 너 하고 싶은 거 해. 그게 맞아.' },
+            { if: s => s.love >= 4 && s.rep >= 3, t: 'say', who: GF, face: 'gf_resolve', act: '눈물을 닦으며, 단호하게', text: '…기다릴지 말지는 내가 정해. 네가 정하는 거 아니야.', fx: ['pink'], flag: { end: 'wait' } },
+            { if: s => s.love >= 4 && s.rep >= 3, t: 'mono', face: 'me2_reflect', text: '빗소리 사이로, 그녀가 웃었다. 우산이 다시 우리 둘 위로 올라왔다.' },
+            { if: s => !(s.love >= 4 && s.rep >= 3), t: 'say', who: GF, face: 'gf_teary_smile', text: '…응. 그래. 고마워. 몸 건강히 다녀와.', flag: { end: 'part' } },
+          ] },
+        ] },
+        { if: s => s.love >= 2 && s.end !== 'wait', t: 'desc', bg: 'bg_rain_walk', text: '집까지 걸었다. 비는 그칠 생각이 없었다.' },
+        { if: s => s.love >= 2 && s.end !== 'wait', t: 'mono', face: 'me2_rain_cry', text: '빗물인지 뭔지 모를 게 계속 흘렀다. 다행이었다. 비가 와서.', fx: ['cold'] },
+
+        // ---- SCENE 1 (솔로 루트) : 소개팅 ----
+        { if: s => s.love < 2, t: 'scene', no: 1, title: '타이밍', time: '다음 날 · 오후 2:00', bg: 'bg_blinddate_cafe' },
+        { if: s => s.love < 2 && s.ignored, t: 'noti', bg: 'bg_blinddate_cafe', from: '카카오톡', photo: 'gf_profile_bf', text: '고등학교 첫사랑님이 프로필 사진을 변경했습니다.' },
+        { if: s => s.love < 2 && s.ignored, t: 'mono', face: 'me2_blank', text: '사진 구석에 낯선 남자 어깨가 걸쳐 있다. …그래. 읽씹한 건 나였지.' },
+        { if: s => s.love < 2, t: 'desc', text: '현우가 3주를 졸라서 잡아 준 소개팅. 맞은편 사람이 환하게 웃는다.' },
+        { if: s => s.love < 2, t: 'say', who: '소개팅 상대', text: '민수 씨, 다음 주 주말에 영화 볼래요? 그 다음 주는 전시회도 있고~' },
+        { if: s => s.love < 2, t: 'say', who: ME, face: 'me2_blinddate_awkward', act: '식은땀을 닦으며', text: '아 네 좋죠… 근데 혹시… 21개월 뒤 주말은 어떠세요…?' },
+        { if: s => s.love < 2, t: 'say', who: '소개팅 상대', text: '……네?' },
+        { if: s => s.love < 2, t: 'mono', face: 'me2_blinddate_awkward', text: '그날 이후 그녀의 카톡 프로필엔 「나를 기다려 줄 사람 구함 X」라는 상태 메시지가 올라왔다. 아마 나 때문이다.' },
+
+        // ---- SCENE 3 : 입대 직전의 광기 ----
+        { t: 'scene', no: 3, title: '입대 직전의 광기', time: '1월 · 오후 7:00', bg: 'bg_bbq' },
+        { t: 'desc', text: '송별회 마지막 날. 1차는 늘 가던 삼겹살집. 불판 위에서 기름이 튄다.', fx: ['flash'] },
+        { t: 'say', who: SB, face: 'sb2_army_story', act: '집게를 내려놓고 검지를 치켜들며', text: '민수야, 형이 딱 한 가지만 말해 준다. 내가 자대 배치 받았을 때 말이야…' },
+        { t: 'say', who: SB, face: 'sb2_film_cut', act: '15분 뒤, 같은 손가락', text: '…그래서 내가 자대 배치 받았을 때 말이야…' },
+        { t: 'say', who: HW, face: 'hw2_drunk_laugh', text: '형 그거 세 번째예요 ㅋㅋㅋㅋ' },
+        { t: 'choice', q: '(선배가 잔을 채운다. 오늘은…)', def: 0, opts: [
+          { label: '어차피 군대 간다! 달린다!', sub: '🍺 +2  ⭐ +1', set: { alc: 2, rep: 1 }, then: [
+            { t: 'say', who: ME, face: 'me2_party_wild', act: '잔을 머리 위로 치켜들며', text: '어차피 다음 달에 군대 가는데 내일이 어딨어요!! 짠!!!', fx: ['shake'] },
+          ] },
+          { label: '천천히, 오래 남는다', sub: '🍺 +1  🌱 +1', set: { alc: 1, mind: 1 }, then: [
+            { t: 'say', who: ME, face: 'me2_dawn_calm', text: '오늘은 끝까지 다 기억하고 싶어서요. 천천히 갈게요.' },
+            { t: 'say', who: SB, face: 'sb2_teary', act: '갑자기 어깨를 툭 짚으며', text: '…그래. 그게 맞다. 형은 그날 기억이 하나도 없어서 아직도 아쉽다.' },
+          ] },
+        ] },
+        // 2차 포차
+        { t: 'desc', bg: 'bg_pocha_winter', text: '2차. 1학년 환영회를 했던 바로 그 포차. 눈발이 날리기 시작한다.' },
+        { t: 'say', who: '포차 이모님', face: 'owner_recognize', text: s => s.crash ? '아이고 니 그때 소주병 깬 아 아이가?! 오늘은 조심해래이!' : s.caught ? '니 그때 소주병 한 손으로 잡은 아 맞제?! 국가대표 골키퍼!' : '어이고 작년 새내기들 아이가! 벌써 군대 가나! 세월 빠르다!' },
+        { t: 'say', who: '후배', face: 'jr_puppy', act: '두 손을 모으고 반짝이는 눈으로', text: '선배니임~ 군대 가시기 전에 밥약 한 번만 해 주세요오~ 파스타!' },
+        { t: 'mono', face: 'me2_blank', text: '통장 잔고: 3,420원.' },
+        { t: 'choice', q: '(후배의 밥약 공격!)', def: 1, opts: [
+          { label: '…카드 긁는다. 선배니까', sub: '⭐ +2  💪 −1', set: { rep: 2, cond: -1 }, flag: { meal: 'paid' }, then: [
+            { t: 'say', who: '후배', face: 'jr_cheer', text: '꺄아! 역시 민수 선배! 휴가 나오면 제가 쏠게요!' },
+          ] },
+          { label: '"전역하고 꼭 사 줄게"', flag: { meal: 'later' }, then: [
+            { t: 'say', who: '후배', face: 'jr_cheer', text: '약속하셨어요! 21개월 뒤 캘린더에 적어 둡니다!' },
+          ] },
+        ] },
+        { t: 'vs', left: { face: 'me2_party_wild', name: '강민수', sub: '입대 D-14' }, right: { face: 'hw2_drunk_laugh', name: '송별회 멤버', sub: '+ 선배 · 후배' }, title: '1년 만의 007빵', sub: '틀리면 벌주!' },
+        { t: 'game', g: '007', rounds: 4, bg: 'bg_pocha_winter' },
+        // 3차 노래방
+        { t: 'desc', bg: 'bg_karaoke', text: '3차, 노래방. 탬버린 소리와 형광 불빛이 정신없이 돈다.' },
+        { t: 'choice', q: '(마이크가 내 차례로 왔다. 무슨 노래?)', def: 0, opts: [
+          { label: '신나는 댄스곡', sub: '🍺 +1  ⭐ +1', set: { alc: 1, rep: 1 }, flag: { song: 'dance' }, then: [
+            { t: 'say', who: ME, face: 'me2_party_wild', text: '다들 일어나!!! 오늘 이 방 무너진다!!!', fx: ['shake', 'flash'] },
+            { t: 'say', who: '후배', face: 'jr_cheer', text: '선배 미쳤다 ㅋㅋㅋㅋ 이거 찍어야 돼!!' },
+          ] },
+          { label: '이별 발라드', sub: '🌱 +1', set: { mind: 1 }, flag: { song: 'ballad' }, then: [
+            { t: 'say', who: ME, face: 'me2_karaoke_sad', act: '눈을 감고 마이크를 꽉 쥔 채', text: '(2절에서… 목이 메었다.)', fx: s => (s.love >= 2 && s.end !== 'wait') ? ['cold'] : [] },
+            { t: 'say', who: HW, face: 'hw2_sentimental', text: '…야, 분위기 왜 이래. 다음 곡 빨리 눌러.' },
+          ] },
+          { label: '군가', sub: '⭐ +2', set: { rep: 2 }, flag: { song: 'army' }, then: [
+            { t: 'say', who: SB, face: 'sb2_salute', act: '벌떡 일어나 경례하며', text: '오오오! 이 녀석 벌써 준비가 됐구나! 다 같이 기립!!' },
+          ] },
+        ] },
+        // 4차 새벽
+        { t: 'desc', bg: 'bg_cvs_dawn', text: '4차. 새벽 5시, 편의점 앞 플라스틱 의자. 하늘 끝이 조금씩 분홍색으로 물든다.' },
+        { t: 'desc', bg: 'bg_pole_dawn', text: '그리고 1년 전과 정반대의 광경. 이번엔 현우가 전봇대를 끌어안고 있다.' },
+        { t: 'say', who: HW, face: 'hw2_pole_drunk', act: '전봇대에 볼을 비비며 울먹이며', text: '전봇대야… 너는 군대 안 가서 좋겠다… 평생 여기 서 있으면 되잖아…' },
+        { t: 'desc', bg: '/images/cutscene/ynu1/bg_choco', text: '편의점에서 빨대 꽂은 초코우유를 사 와서, 현우 눈앞에 쑥 내밀었다.' },
+        { t: 'say', who: ME, face: 'me2_dawn_calm', text: s => s.choco ? '자. 1년 전에 네가 준 거, 이제 갚는 거다.' : '자. 이거 마시고 정신 차려라.' },
+        { t: 'say', who: HW, face: 'hw2_choco_thanks', act: '훌쩍이며', text: '민수야… 흑… 너밖에 없다…' },
+        { t: 'say', who: HW, face: 'hw2_buddy_grin', act: '초코우유를 다 마시고, 안경을 밀어 올리며', text: s => s.buddy ? '야. 우리 어차피 같은 3월이잖아. 동반입대로 바꾸자. 너 혼자 보내면 전봇대랑 대화할 거잖아.' : '야. 나 지금 병무청 앱 켰다. 동반입대 신청한다. 너 혼자 보내면 전봇대랑 대화할 거잖아.' },
+        { t: 'choice', q: '(현우가 폰 화면을 내민다)', def: 0, opts: [
+          { label: '…콜. 같이 가자', sub: '⭐ +1', set: { rep: 1 }, flag: { buddy2: true }, then: [
+            { t: 'say', who: ME, face: 'me2_dawn_calm', text: '콜. 대신 생활관에서 코 골면 죽는다.' },
+          ] },
+          { label: '아니야. 이건 나 혼자 가 볼게', sub: '🌱 +1', set: { mind: 1 }, then: [
+            { t: 'say', who: ME, face: 'me2_reflect', text: '고맙다. 근데 이번엔… 나 혼자 해 보고 싶어.' },
+            { t: 'say', who: HW, face: 'hw2_sentimental', text: '…그래. 그럼 휴가 날짜는 맞추자.' },
+          ] },
+        ] },
+        // 전 여친에게 전화 (여자친구 루트, 헤어졌으면)
+        { if: s => s.love >= 2 && s.end !== 'wait', t: 'desc', bg: 'bg_cvs_dawn', text: '다들 꾸벅꾸벅 졸 때, 폰을 꺼냈다. 연락처 맨 위에 아직 그 이름이 있다.' },
+        { if: s => s.love >= 2 && s.end !== 'wait', t: 'mono', face: 'me2_phone_hesitate', text: '1학년 때도 새벽에 이랬었지. 그때 그 전화가… 시작이었는데.' },
+        { if: s => s.love >= 2 && s.end !== 'wait', t: 'choice', q: '(통화 버튼 위에서 엄지가 멈춰 있다)', def: 1, opts: [
+          { label: '건다', flag: { called2: true }, then: [
+            { t: 'ring', bg: '/images/cutscene/ynu1/bg_call', name: GF, times: 2 },
+            { if: s => s.end === 'hold', t: 'desc', text: '…받았다. 아무 말도 없다. 숨소리만 들린다. 나도 아무 말 하지 못했다. 그렇게 1분 12초.' },
+            { if: s => s.end === 'hold', t: 'mono', face: 'me2_dawn_calm', text: '끊기 직전에 들렸다. 아주 작게. "…잘 다녀와."' },
+            { if: s => s.end !== 'hold', t: 'mono', face: 'me2_phone_hesitate', text: '받지 않는다. …그래. 이게 맞다.' },
+          ] },
+          { label: '폰을 덮는다', sub: '🌱 +2', set: { mind: 2 }, then: [
+            { t: 'mono', face: 'me2_dawn_calm', text: '1학년의 나라면 걸었을 거다. 세 번이고 네 번이고. …덮었다.' },
+          ] },
+        ] },
+        { t: 'desc', bg: 'bg_sunrise_street', text: '해가 떴다. 빈 플라스틱 의자 두 개에 햇빛이 길게 눕는다.' },
+        { t: 'mono', face: 'me2_dawn_calm', text: '스무 살 3월엔 이 시간이 세상의 끝인 줄 알았다. 스물한 살 1월엔, 그냥 아침이다.' },
+        { t: 'to', v: { alc: 0 }, quiet: true },
+
+        // ---- SCENE 4 : 군휴학 · 호밀밭의 파수꾼 ----
+        { t: 'scene', no: 4, title: '군휴학', time: '입대 열흘 전 · 오후 2:10', bg: 'bg_portal_leave', fx: ['silence'] },
+        { t: 'desc', text: '커서가 [군휴학 신청] 버튼 위에서 한참 멈춰 있다. …딸깍.' },
+        { t: 'mono', face: 'me2_blank', text: '버튼 하나 누르는 데, 2년이 걸리는구나.' },
+        { t: 'desc', bg: 'bg_room_packing', text: '자취방 정리. 상자 세 개면 2년치 짐이 다 들어간다. 벽 구석엔 곰팡이가 피어 있다.' },
+        { if: s => s.love >= 2, t: 'item', img: 'item_hairtie', text: '침대 밑에서 나온 그녀의 머리끈' },
+        { if: s => s.love >= 2, t: 'choice', q: '(머리끈을…)', def: 1, opts: [
+          { label: '버린다', sub: '🌱 +1', set: { mind: 1 }, then: [{ t: 'mono', face: 'me2_reflect', text: '쓰레기봉투 속으로. 생각보다 가벼운 소리가 났다.' }] },
+          { label: '상자에 넣는다', flag: { kept: true }, then: [{ t: 'mono', face: 'me2_reflect', text: '맨 아래 상자, 맨 구석에. 21개월 뒤의 내가 알아서 하겠지.' }] },
+        ] },
+        { t: 'desc', bg: 'bg_dad_bookshelf', text: '본가로 짐을 옮기다가, 거실 책장에서 누렇게 바랜 책 한 권이 눈에 들어왔다. 『호밀밭의 파수꾼』.' },
+        { t: 'mono', face: 'me2_reflect', text: '고등학교 필독서 목록에서 본 제목이다. 그때는 끝까지 안 읽었다.' },
+        { t: 'desc', bg: 'bg_reading_desk', text: '열여섯 살 홀든은 크리스마스 직전에 학교에서 쫓겨난다. 집에도 못 들어가고, 며칠 동안 뉴욕을 혼자 떠돈다.' },
+        { t: 'mono', face: 'me2_reading', text: '학교에서 잘린 애가 집에 못 가고 술집이랑 호텔을 떠돈다… 이거 그냥 지난주 나잖아.' },
+        { t: 'desc', text: '홀든은 만나는 어른마다 다 「가짜」라고 투덜댄다. 그러면서 정작 자기는 어디에도 마음을 못 붙인다.' },
+        { t: 'desc', text: '그리고 계속 궁금해한다. 겨울이 와서 센트럴파크 연못이 얼면, 거기 살던 오리들은 다 어디로 가는 걸까.' },
+        { t: 'mono', face: 'me2_reflect', text: '…나도 궁금하다. 21개월 동안 나는 어디로 가는 걸까. 돌아오면, 그 자리에 뭐가 남아 있을까.' },
+        { t: 'desc', bg: 'bg_book_margin', text: '244쪽 근처. 옛 선생님이 홀든에게 조언하는 장면에, 연필 밑줄이 진하게 그어져 있다. 여백엔 반쯤 지워진 날짜. 아빠가 입대하기 전 해다.' },
+        { t: 'mono', face: 'me2_reading', text: '아빠도 이 페이지에서 멈췄었구나. 지금 내 나이 때.' },
+        { t: 'choice', q: '(아빠의 밑줄 앞에서…)', def: 0, opts: [
+          { label: '밑줄 친 곳을 다시 읽는다', sub: '🌱 +2', set: { mind: 2 }, flag: { book: 'line' }, then: [
+            { t: 'mono', face: 'me2_reading', text: '세 번을 읽었다. 무슨 뜻인지 다는 모르겠다. 그래도 아빠가 왜 여기서 멈췄는지는, 조금 알 것 같다.' },
+          ] },
+          { label: '사진 찍어서 아빠한테 보낸다', sub: '🌱 +1', set: { mind: 1 }, flag: { book: 'send' }, then: [
+            { t: 'dm', with: '아빠', photo: 'dad_stoic' },
+            { t: 'chat', mine: true, text: '아빠 이거 아빠 책이에요?' },
+            { t: 'kakao', from: '아빠', text: '.' },
+            { t: 'desc', text: '1분 뒤.' },
+            { t: 'kakao', from: '아빠', text: '다 읽고 와라.' },
+            { t: 'fx', fx: ['phoneOff'] },
+          ] },
+          { label: '덮는다. 아직은 못 읽겠다', flag: { book: 'close' }, then: [
+            { t: 'mono', face: 'me2_blank', text: '책을 덮었다. 밑줄은 21개월 뒤에도 거기 있을 거다.' },
+          ] },
+        ] },
+        { t: 'desc', bg: 'bg_reading_desk', text: '여동생 피비가 커서 뭐가 되고 싶냐고 묻자, 홀든은 이렇게 답한다. 호밀밭 절벽 끝에 서서, 뛰노는 아이들이 떨어지지 않게 붙잡아 주는 사람.' },
+        { t: 'mono', face: 'me2_reflect', text: '누굴 붙잡아 줄 생각은 해 본 적이 없다. 나 하나 안 떨어지기도 바빴으니까.' },
+        { if: s => s.love >= 2 && s.end !== 'wait', t: 'mono', face: 'me2_reflect', text: '…그 사람한테 나는, 붙잡아 주는 쪽이었을까. 떨어지는 쪽이었을까.' },
+        { if: s => s.buddy2, t: 'mono', face: 'me2_reflect', text: '현우는 전봇대 앞에서 매번 나를 붙잡았다. 이번엔 내 차례다.' },
+        { t: 'desc', bg: 'bg_room_empty', text: '마지막에 홀든은 비 오는 날, 회전목마를 타는 피비를 벤치에서 바라본다. 흠뻑 젖으면서도, 이유 없이 행복해진다.' },
+        { if: s => s.love >= 2, t: 'mono', face: 'me2_reflect', text: '비 맞으면서 행복할 수도 있는 거구나. 그날 정류장에선 몰랐는데.' },
+        { t: 'mono', face: 'me2_reflect', text: '책을 덮었다. 정답을 알게 된 건 아니다. 그냥… 조금 덜 무서워졌다.', set: { mind: 1 } },
+        { t: 'game', g: 'letter', bg: 'bg_letter_future', title: '21개월 뒤의 나에게', pick: 3, lines: [
+          { text: '가짜 말고 진짜, 찾았냐?', set: { mind: 1 } },
+          { text: '겨울 오리들이 어디 가는지 알아냈냐?' },
+          { text: '누군가를 붙잡아 준 적 있냐?', set: { mind: 1 } },
+          { text: '아빠가 밑줄 그은 페이지, 다시 읽어 봐라.', if: s => s.book !== 'close' },
+          { text: '그 사람한테 연락하지 마라. …아니, 해도 된다.', if: s => s.love >= 2 && s.end !== 'wait' },
+          { text: '편지 답장 꼬박꼬박 해라. 진짜로.', if: s => s.end === 'wait' },
+          { text: '후배 파스타 사 줘라. 약속했다.', if: s => s.meal === 'later' },
+          { text: '술은 좀 줄였냐?', if: s => s.rep >= 4 || s.song === 'dance' },
+        ] },
+
+        // ---- EPILOGUE : 입대 날 ----
+        { t: 'scene', kicker: 'EPILOGUE', title: '입대 날', time: '3월 · 오전 6:30', bg: 'bg_mirror_shave' },
+        { t: 'item', img: 'item_clipper', text: '웅————' },
+        { t: 'desc', text: '바리깡이 손안에서 떨린다. 거울 속 내가 낯설다.' },
+        { t: 'game', g: 'mash', need: 14, ms: 4200, label: '바리깡으로 밀어라!', okText: '깔끔하게 밀었다!', failText: '…뒤통수에 땜빵이 생겼다', failSet: {}, failFlag: { patch: true } },
+        { t: 'say', who: ME, face: 'me2_buzz_mirror', act: '까끌한 머리를 쓸어 보며', text: s => s.patch ? '…이 땜빵은 훈련소에서 아무도 못 보게 해야 된다.' : '…생각보다 두상이 괜찮은데? 아닌가.' },
+        { t: 'say', who: '엄마', face: 'mom2_cry_door', act: '문틈으로 보다가 입을 틀어막으며', text: '……' },
+        { t: 'desc', bg: 'bg_front_door_morning', text: '현관. 신발이 가지런히 놓여 있고, 문 앞엔 짐 가방 하나.' },
+        { t: 'say', who: '엄마', face: 'mom2_hug', text: '밥 잘 먹고. 아프면 꼭 말하고. …우리 아들, 원래 하던 대로.' },
+        { t: 'say', who: '아빠', face: 'dad_stoic', text: '……' },
+        { t: 'say', who: '아빠', face: 'dad_envelope', act: '눈을 피하며 하얀 봉투를 내민다', text: '…가서 써라.' },
+        { if: s => s.book === 'line' || s.book === 'send', t: 'say', who: '아빠', face: 'dad_soft', text: '…그 책. 끝까지 읽었냐.' },
+        { if: s => s.book === 'line' || s.book === 'send', t: 'say', who: ME, face: 'me2_buzz_brave', text: '네. 밑줄도 봤어요.' },
+        { if: s => s.book === 'line' || s.book === 'send', t: 'desc', text: '아빠는 아무 말 없이, 고개를 한 번 끄덕였다.', set: { mind: 1 } },
+        { t: 'desc', bg: 'bg_bootcamp_gate', text: '훈련소 정문. 짧은 머리의 사람들과, 그들을 붙잡고 우는 사람들.' },
+        { if: s => s.buddy2, t: 'say', who: HW, face: 'hw2_buzz_grin', act: '까까머리를 문지르며', text: '야, 우리 같은 생활관이면 좋겠다. 아니다, 너 코 골지. 다른 데 가라.' },
+        { if: s => !s.buddy2, t: 'mono', face: 'me2_buzz_brave', text: '혼자 서 있다. 이상하게, 괜찮다.' },
+        { if: s => s.end === 'wait', t: 'say', who: GF, face: 'gf_wave_far', act: '멀리서, 투명한 우산을 든 채 손을 흔든다', text: '강민수!! 편지 답장 안 하면 죽는다!!', fx: ['pink'] },
+        { if: s => s.end === 'wait', t: 'item', img: 'item_umbrella', text: '그날 정류장의 우산이, 다시 돌아왔다.' },
+        { t: 'say', who: ME, face: 'me2_buzz_brave', act: '숨을 크게 들이쉬고, 고개를 든다', text: '다녀오겠습니다.' },
+        { t: 'big', kicker: '2학년 · 끝', text: '입 대', sub: '다음 장 — 복학생' },
+        { t: 'report', title: '📋 2학년 생활기록부', foot: '이 선택들은 복학생 이야기로 이어집니다…',
+          rows: s => [
+            ['현관', s.door === 'alarm' ? '경보 울림 (옆집 기상)' : s.door === 1 ? '한 번에 성공' : '겨우 열었다'],
+            ['이별', s.love < 2 ? '소개팅 21개월 보류' : ({ hold: '붙잡았지만, 고마웠어', let: '우산만 건넸다', wait: '💌 기다려 준대', part: '서로 보내 줬다' }[s.end] || '-')],
+            ['송별회', `4차 · ${({ dance: '댄스곡', ballad: '이별 발라드', army: '군가' }[s.song] || '노래방')}${s.meal === 'paid' ? ' · 밥약 결제' : ''}`],
+            ['책', ({ line: '아빠 밑줄까지 읽음', send: '아빠에게 사진 보냄', close: '덮어 둠' }[s.book] || '-')],
+            ['입대', s.buddy2 ? '현우랑 동반입대' : '혼자, 괜찮다'],
+            ['편지', (s.letter && s.letter[0]) || '-'],
+          ],
+          stamp: s => s.mind >= 7 ? 'S' : s.mind >= 5 ? 'A' : s.mind >= 3 ? 'B' : 'C' },
+      ],
+    },
   };
 
   // ===================== 저장 (봤는지) =====================
@@ -354,7 +643,8 @@
       im.src = src;
     });
   }
-  const urlOf = (sc, name) => !name ? '' : name.startsWith('/') ? (/\.(jpe?g|png|webp)$/.test(name) ? name : name + '.webp') : DIR + sc.dir + name + '.webp';
+  const SHARED = /^(hand_|item_glass$|item_bottle$|prof_roll$|bg_report$|bg_007_target$)/;   // v152 미니게임 공용 그림은 어느 장에서든 ynu1 폴더
+  const urlOf = (sc, name) => !name ? '' : name.startsWith('/') ? (/\.(jpe?g|png|webp)$/.test(name) ? name : name + '.webp') : DIR + (SHARED.test(name) ? 'ynu1/' : sc.dir) + name + '.webp';
   function imagesOf(sc) {
     const s = new Set();
     const walk = list => (list || []).forEach(st => {
@@ -365,7 +655,7 @@
     });
     walk(sc.steps);
     (sc.preload || []).forEach(n => s.add(urlOf(sc, n)));
-    const extra = { '007': ['bg_007_target', 'hand_point', 'hand_gun', 'hand_up', 'item_glass'], catch: ['item_bottle'], attend: ['prof_roll'], report: ['bg_report'] };
+    const extra = { '007': ['bg_007_target', 'hand_point', 'hand_gun', 'hand_up', 'item_glass'], catch: ['item_bottle'], attend: ['prof_roll'], report: ['bg_report'], doorlock: ['bg_doorlock'], letter: ['bg_letter_future'] };
     const games = new Set(); const scan = list => (list || []).forEach(st => { if (st.t === 'game') games.add(st.g); if (st.t === 'report') games.add('report'); (st.opts || []).forEach(o => scan(o.then)); });
     scan(sc.steps);
     games.forEach(g => (extra[g] || []).forEach(n => s.add(urlOf(sc, n))));
@@ -713,8 +1003,60 @@
         const t = setTimeout(() => finish(false), st.ms);
         return () => { clearTimeout(t); p.remove(); };
       }, true);
-      if (!skipped) await bigText(ok ? '휴… 다 고쳤다!' : '종이 울렸다…', ok ? 'good' : 'bad', 1000);
-      if (!ok) StoryState.apply({ score: -1 });
+      if (!skipped) await bigText(ok ? (st.okText || '휴… 다 고쳤다!') : (st.failText || '종이 울렸다…'), ok ? 'good' : 'bad', 1000);
+      if (!ok) StoryState.apply(st.failSet || { score: -1 }, st.failFlag);
+      else if (st.okFlag) StoryState.apply({}, st.okFlag, true);
+    };
+
+    // v152 도어락: 비밀번호를 잠깐 보여 주고 숨긴다 → 숫자판으로 4자리. 취할수록 숫자판이 흔들린다. 세 번 틀리면 경보
+    GAMES.doorlock = async st => {
+      hideBox(); setFace(st.face || ''); setBg('bg_doorlock');
+      const code = st.code || '0315', alc = S().alc;
+      let tries = 0, ok = false;
+      if (!skipped) { const h = ui('cs-gdoor show-code', `<div class="g-code">${code.split('').join(' ')}</div><small>${esc(st.hint || '비밀번호… 분명 이거였는데')}</small>`); h.style.pointerEvents = 'none'; await sleep(1500); h.remove(); }
+      while (!skipped && tries < 3 && !ok) {
+        const r = await until(finish => {
+          let typed = '';
+          const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
+          const p = ui('cs-gdoor', `<div class="g-scr"><span>${'○'.repeat(4)}</span><small>기회 ${3 - tries}번</small></div><div class="g-pad${alc >= 2 ? ' wob' : ''}" style="--wob:${Math.min(alc, 8) * 0.9}px">${keys.map(k => `<button type="button" data-k="${k}">${k}</button>`).join('')}</div>`);
+          const scr = p.querySelector('.g-scr span');
+          const press = k => { if (!/\d/.test(k)) return; typed += k; scr.textContent = '●'.repeat(typed.length) + '○'.repeat(4 - typed.length); if (typed.length >= 4) setTimeout(() => finish(typed), 200); };
+          p.querySelectorAll('button').forEach(b => b.onpointerdown = e => { e.preventDefault(); e.stopPropagation(); b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit'); press(b.dataset.k); });
+          keyHook = e => { if (/^\d$/.test(e.key)) { press(e.key); return true; } return false; };
+          return () => p.remove();
+        }, code);
+        if (skipped) break;
+        tries++;
+        if (r === code) { ok = true; restart(root, 'fx-flash'); await bigText('띠리릭— 철컥', 'good', 900); }
+        else { restart(root, 'fx-shake'); restart(root, 'fx-red'); await bigText(tries < 3 ? '삐— 비밀번호가 틀렸습니다' : '삐삐삐삐삐!! 경보!!', 'bad' + (tries < 3 ? '' : ' warn'), tries < 3 ? 900 : 1400); }
+      }
+      if (skipped) ok = true;
+      StoryState.apply(ok ? {} : { rep: -1 }, { door: ok ? tries : 'alarm' }, true);
+    };
+
+    // v152 편지: 문장 중 정확히 st.pick 개를 골라 봉투에 넣는다 → flag letter: [문장들]
+    GAMES.letter = async st => {
+      hideBox(); setFace(''); if (st.bg) setBg(st.bg);
+      const lines = st.lines.filter(o => !o.if || o.if(S())), need = st.pick || 3;
+      const got = await until(finish => {
+        const on = new Set();
+        const p = ui('cs-gletter', `<div class="g-paper"><h3>${esc(st.title || '21개월 뒤의 나에게')}</h3><small>${need}줄을 골라 적는다</small>
+          <div class="g-lines">${lines.map((o, i) => `<button type="button" data-i="${i}">${esc(o.text)}</button>`).join('')}</div>
+          <button type="button" class="g-seal" disabled>✉ 봉투에 넣기</button></div>`);
+        const seal = p.querySelector('.g-seal');
+        p.querySelectorAll('.g-lines button').forEach(b => b.onclick = () => {
+          const i = +b.dataset.i;
+          if (on.has(i)) on.delete(i); else if (on.size < need) on.add(i);
+          p.querySelectorAll('.g-lines button').forEach(x => x.classList.toggle('on', on.has(+x.dataset.i)));
+          seal.disabled = on.size !== need;
+        });
+        seal.onclick = () => finish([...on].sort((a, b) => a - b).map(i => lines[i]));
+        keyHook = e => e.key === ' ' || e.key === 'Enter';
+        return () => p.remove();
+      }, lines.slice(0, need));
+      const delta = {}; got.forEach(o => Object.entries(o.set || {}).forEach(([k, v]) => { delta[k] = (delta[k] || 0) + v; }));
+      StoryState.apply(delta, { letter: got.map(o => o.text) }, skipped);
+      if (!skipped) await bigText('봉인 완료', 'soft', 900);
     };
 
     // ===================== 연출 단계 =====================
@@ -795,9 +1137,23 @@
       const el = addChat({ who: st.from, text: st.text }); el.classList.add('crush');
       await waitTap(st.auto || (auto ? 1600 : 0));
     }
-    async function report() {
+    async function item(st) {
+      hideBox(); setFace('');
+      const w = ui('cs-item', `<img src="${urlOf(sc, st.img)}" alt="">${st.text ? `<b>${esc(val(st.text))}</b>` : ''}`); w.style.pointerEvents = 'none';
+      restart(root, 'fx-flash');
+      await waitTap(st.auto || (auto ? 1600 : 0)); w.classList.add('out'); await sleep(250); w.remove();
+    }
+    async function report(st) {
       hideBox(); setFace(''); setBg('bg_report'); root.classList.remove('fx-fade', 'fx-black');
       const s = S(), d = DANCES[s.dance];
+      if (st && st.rows) {   // v152 다른 학년: 대본이 줄과 도장을 정한다
+        const rows = st.rows(s), stamp = st.stamp ? st.stamp(s) : '';
+        const w = ui('cs-report', `<div class="rp-paper"><h3>${esc(st.title)}</h3>${rows.map(([k, v], i) => `<div class="rp-row" style="animation-delay:${0.3 + i * 0.35}s"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}
+          ${stamp ? `<div class="rp-stamp" style="animation-delay:${0.5 + rows.length * 0.35}s">${esc(stamp)}</div>` : ''}<p class="rp-foot">${esc(st.foot || '')}</p></div>`);
+        w.style.pointerEvents = 'none';
+        setTimeout(() => restart(root, 'fx-shake'), (0.5 + rows.length * 0.35) * 1000 + 250);
+        await pause(4200); await waitTap(); w.remove(); return;
+      }
       const nick = s.called ? '새벽 3회 발신남' : s.caught ? '소주병 캐치의 신' : d ? `${d.word} 강민수` : s.crash ? '와장창 강민수' : s.cider ? '사이다 위장술사' : '모범 새내기';
       const tier = v => v >= 5 ? 'S' : v >= 3 ? 'A' : v >= 1 ? 'B' : 'C';
       const love = s.love >= 3 ? '♥♥♥ 썸 시작?!' : s.love >= 1 ? '♥ 좋은 예감' : s.love === 0 ? '- 아직 모름' : s.love >= -2 ? '💔 멀어짐' : '🚫 차단됨';
@@ -851,7 +1207,9 @@
         case 'kakao': if (!skipped) await kakao(st); return;
         case 'noti': if (!skipped) await noti(st); return;
         case 'dm': if (!skipped) openDm(st); return;
-        case 'report': if (!skipped) await report(); return;
+        case 'report': if (!skipped) await report(st); return;
+        case 'item': if (!skipped) await item(st); return;
+        case 'to': { const cur = S(), dl = {}; Object.entries(st.v).forEach(([k, v]) => { if (cur[k] !== v) dl[k] = v - (cur[k] || 0); }); StoryState.apply(dl, null, skipped || st.quiet); return; }
         case 'video': case 'chat': {
           if (skipped) return;
           phone.hidden = false; hideBox(); setFace('');
